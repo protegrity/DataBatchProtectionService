@@ -1,0 +1,44 @@
+# Build directories
+build/
+
+# CMake and Ninja build artifacts
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Ninja-specific
+.ninja_deps
+.ninja_log
+rules.ninja
+build.ninja
+
+# Crow/FetchContent build deps
+_deps/
+
+# Compiled binaries
+*.o
+*.obj
+*.a
+*.so
+*.out
+*.exe
+*.dll
+
+# Logs and dumps
+*.log
+*.core
+
+# macOS
+.DS_Store
+
+# Editor/IDE config
+.vscode/
+.idea/
+*.swp
+*~
+
+# Docker artifacts
+*.tar
