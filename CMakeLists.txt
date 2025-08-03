@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# Crow is a lightweight framework for running web APIs
 FetchContent_Declare(
   crow
   GIT_REPOSITORY https://github.com/CrowCpp/crow.git
