@@ -13,7 +13,8 @@
 
 namespace dbps::external {
 
-// Intentionally similar to parquet::Type
+// Captures the data type of the data batch elements.
+// Intentionally similar to parquet::Type to ease mapping and for compatibility with a known enum.
 struct Type {
     enum type {
         BOOLEAN = 0,
