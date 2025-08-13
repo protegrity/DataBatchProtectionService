@@ -39,7 +39,7 @@ paths:
             examples:
               standard:
                 summary: Encrypt a base64-encoded byte array of emails
-                description: |
+                description: >
                   `data_batch.value` is a Base64 string representing raw bytes of two lines:
                   user1@example.com\nuser2@example.com
                   The debug block includes a UUID and a pretty-printed helper for development.
@@ -273,13 +273,15 @@ components:
           properties:
             database:
               type: string
-              description: Optional database name containing the schema
+              description: Database name containing the DB schemas and tables.
             schema:
               type: string
-              description: Schema name of the source column
+              description: >
+                Namespace inside the database which contains the tables.
+                In databases without explicit schema definition, this is usually "public".
             schema_version:
               type: string
-              description: Optional version identifier for the schema
+              description: Optional version identifier for the schema.
             table:
               type: string
               description: Table name of the source column
@@ -306,9 +308,9 @@ components:
       type: object
       description: Column name reference only
       required:
-        - column
+        - name
       properties:
-        column:
+        name:
           type: string
           description: Column name in the source table
 
@@ -321,8 +323,7 @@ components:
         key_id:
           type: string
           description: >
-            Identifier of the key to use. Required for all encryption algorithms
-            except 'UNENCRYPTED', where it may be omitted.
+            Identifier of the key to use. Required for all encryption algorithms.
 
     compression:
       type: string
@@ -354,7 +355,7 @@ components:
 
     value_format:
       type: object
-      description: Details on how the data was serialized for plain values
+      description: Details on how the data was serialized for plaintext values.
       required:
         - compression
         - format
@@ -369,7 +370,8 @@ components:
 
     value_format_encrypted:
       type: object
-      description: Details on how the data was serialized for encrypted values. Format is assumed to be binary.
+      description: > 
+        Details on how the data was serialized for encrypted values. Format is assumed to be binary and encoded as base64.
       required:
         - compression
       properties:
@@ -384,7 +386,9 @@ components:
       properties:
         user_id:
           type: string
-          description: Identity associated with the request
+          description: >
+            User identifier associated with the request. The request is sent "on behalf of" the user.
+            The user id refers to an internal ID on the encryption service for which ACLs are checked.
 
     access_response:
       type: object
@@ -394,7 +398,9 @@ components:
       properties:
         user_id:
           type: string
-          description: Identity associated with the response
+          description: >
+            User identifier associated with the response. The user id refers to an internal ID on the
+            encryption service for which ACLs are checked.
         role:
           type: string
           example: EmailReader
