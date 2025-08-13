@@ -4,7 +4,7 @@
 #include <iostream>
 
 // Helper function to create error response
-crow::response createErrorResponse(const std::string& error_msg, int status_code = 400) {
+crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
     crow::json::wvalue error_response;
     error_response["error"] = error_msg;
     return crow::response(status_code, error_response);
@@ -55,7 +55,7 @@ int main() {
         // Parse the JSON request body
         auto json_body = crow::json::load(req.body);
         if (!json_body) {
-            return createErrorResponse("Invalid JSON in request body");
+            return CreateErrorResponse("Invalid JSON in request body");
         }
         
         // Extract required fields from the request body payload
@@ -70,15 +70,15 @@ int main() {
         auto user_id = SafeGetFromJsonPath(json_body, {"access", "user_id"});
         
         // Check for missing required fields and return error response
-        if (!column_name)return createErrorResponse("Missing required field: column_reference.name");
-        if (!datatype) return createErrorResponse("Missing required field: data_batch.datatype");
-        if (!compression) return createErrorResponse("Missing required field: data_batch.value_format.compression");
-        if (!format) return createErrorResponse("Missing required field: data_batch.value_format.format");
-        if (!encoding) return createErrorResponse("Missing required field: data_batch.value_format.encoding");
-        if (!value) return createErrorResponse("Missing required field: data_batch.value");
-        if (!encrypted_compression) return createErrorResponse("Missing required field: data_batch_encrypted.value_format.compression");
-        if (!key_id) return createErrorResponse("Missing required field: encryption.key_id");
-        if (!user_id) return createErrorResponse("Missing required field: access.user_id");
+        if (!column_name)return CreateErrorResponse("Missing required field: column_reference.name");
+        if (!datatype) return CreateErrorResponse("Missing required field: data_batch.datatype");
+        if (!compression) return CreateErrorResponse("Missing required field: data_batch.value_format.compression");
+        if (!format) return CreateErrorResponse("Missing required field: data_batch.value_format.format");
+        if (!encoding) return CreateErrorResponse("Missing required field: data_batch.value_format.encoding");
+        if (!value) return CreateErrorResponse("Missing required field: data_batch.value");
+        if (!encrypted_compression) return CreateErrorResponse("Missing required field: data_batch_encrypted.value_format.compression");
+        if (!key_id) return CreateErrorResponse("Missing required field: encryption.key_id");
+        if (!user_id) return CreateErrorResponse("Missing required field: access.user_id");
 
         // For now, we'll simulate encryption by creating a "processed" version of the input
         // In a real implementation, this would involve actual encryption logic        
@@ -114,7 +114,7 @@ int main() {
         // Parse the JSON request body
         auto json_body = crow::json::load(req.body);
         if (!json_body) {
-            return createErrorResponse("Invalid JSON in request body");
+            return CreateErrorResponse("Invalid JSON in request body");
         }
         
         // Extract required fields from the request body payload
@@ -129,15 +129,15 @@ int main() {
         auto user_id = SafeGetFromJsonPath(json_body, {"access", "user_id"});
         
         // Check for missing required fields and return error response
-        if (!column_name) return createErrorResponse("Missing required field: column_reference.name");
-        if (!encrypted_compression) return createErrorResponse("Missing required field: data_batch_encrypted.value_format.compression");
-        if (!encrypted_value) return createErrorResponse("Missing required field: data_batch_encrypted.value");
-        if (!datatype) return createErrorResponse("Missing required field: data_batch.datatype");
-        if (!compression) return createErrorResponse("Missing required field: data_batch.value_format.compression");
-        if (!format) return createErrorResponse("Missing required field: data_batch.value_format.format");
-        if (!encoding) return createErrorResponse("Missing required field: data_batch.value_format.encoding");
-        if (!key_id) return createErrorResponse("Missing required field: encryption.key_id");
-        if (!user_id) return createErrorResponse("Missing required field: access.user_id");
+        if (!column_name) return CreateErrorResponse("Missing required field: column_reference.name");
+        if (!encrypted_compression) return CreateErrorResponse("Missing required field: data_batch_encrypted.value_format.compression");
+        if (!encrypted_value) return CreateErrorResponse("Missing required field: data_batch_encrypted.value");
+        if (!datatype) return CreateErrorResponse("Missing required field: data_batch.datatype");
+        if (!compression) return CreateErrorResponse("Missing required field: data_batch.value_format.compression");
+        if (!format) return CreateErrorResponse("Missing required field: data_batch.value_format.format");
+        if (!encoding) return CreateErrorResponse("Missing required field: data_batch.value_format.encoding");
+        if (!key_id) return CreateErrorResponse("Missing required field: encryption.key_id");
+        if (!user_id) return CreateErrorResponse("Missing required field: access.user_id");
 
         // For now, we'll simulate decryption by removing the "ENCRYPTED_" prefix
         // In a real implementation, this would involve actual decryption logic        
