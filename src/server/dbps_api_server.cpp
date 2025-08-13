@@ -3,8 +3,6 @@
 #include <string>
 #include <iostream>
 
-
-
 // Helper function to create error response
 crow::response createErrorResponse(const std::string& error_msg, int status_code = 400) {
     crow::json::wvalue error_response;
@@ -12,8 +10,17 @@ crow::response createErrorResponse(const std::string& error_msg, int status_code
     return crow::response(status_code, error_response);
 }
 
-// Helper function to safely get field value or return null
-std::optional<std::string> safe_get(const crow::json::rvalue& json, const std::vector<std::string>& path) {
+/**
+ * Safely extracts a string value from a nested JSON path.
+ *
+ * Traverses a JSON object following a specified path and returns
+ * the string value at the end of the path. If any part of the path doesn't exist
+ * or if an exception occurs during traversal, it returns std::nullopt.
+ *
+ * Converts any JSON type to string using std::string().
+ * For objects and arrays, this will return the JSON string representation.
+ */
+std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json, const std::vector<std::string>& path) {
     try {
         const crow::json::rvalue* current = &json;
         for (const auto& field : path) {
@@ -24,7 +31,7 @@ std::optional<std::string> safe_get(const crow::json::rvalue& json, const std::v
         }
         return std::string(*current);
     } catch (const std::exception& e) {
-        CROW_LOG_ERROR << "Exception in safe_get: " << e.what();
+        CROW_LOG_ERROR << "Exception in SafeGetFromJsonPath: " << e.what();
         return std::nullopt;
     }
 }
@@ -48,25 +55,22 @@ int main() {
         // Parse the JSON request body
         auto json_body = crow::json::load(req.body);
         if (!json_body) {
-            // Handle JSON parsing error
-            crow::json::wvalue error_response;
-            error_response["error"] = "Invalid JSON in request body";
-            return crow::response(400, error_response);
+            return createErrorResponse("Invalid JSON in request body");
         }
         
         // Extract required fields from the request body payload
-        auto column_name = safe_get(json_body, {"column_reference", "name"});
-        auto datatype = safe_get(json_body, {"data_batch", "datatype"});
-        auto compression = safe_get(json_body, {"data_batch", "value_format", "compression"});
-        auto format = safe_get(json_body, {"data_batch", "value_format", "format"});
-        auto encoding = safe_get(json_body, {"data_batch", "value_format", "encoding"});
-        auto value = safe_get(json_body, {"data_batch", "value"});
-        auto encrypted_compression = safe_get(json_body, {"data_batch_encrypted", "value_format", "compression"});
-        auto key_id = safe_get(json_body, {"encryption", "key_id"});
-        auto user_id = safe_get(json_body, {"access", "user_id"});
+        auto column_name = SafeGetFromJsonPath(json_body, {"column_reference", "name"});
+        auto datatype = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"});
+        auto compression = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"});
+        auto format = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "format"});
+        auto encoding = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "encoding"});
+        auto value = SafeGetFromJsonPath(json_body, {"data_batch", "value"});
+        auto encrypted_compression = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value_format", "compression"});
+        auto key_id = SafeGetFromJsonPath(json_body, {"encryption", "key_id"});
+        auto user_id = SafeGetFromJsonPath(json_body, {"access", "user_id"});
         
         // Check for missing required fields and return error response
-        if (!column_name) return createErrorResponse("Missing required field: column_reference.name");
+        if (!column_name)return createErrorResponse("Missing required field: column_reference.name");
         if (!datatype) return createErrorResponse("Missing required field: data_batch.datatype");
         if (!compression) return createErrorResponse("Missing required field: data_batch.value_format.compression");
         if (!format) return createErrorResponse("Missing required field: data_batch.value_format.format");
@@ -95,7 +99,7 @@ int main() {
         response["access"] = std::move(access);
 
         // Build debug structure only if reference_id was provided in request
-        auto request_reference_id = safe_get(json_body, {"debug", "reference_id"});
+        auto request_reference_id = SafeGetFromJsonPath(json_body, {"debug", "reference_id"});
         if (request_reference_id) {
             crow::json::wvalue debug;
             debug["reference_id"] = *request_reference_id;
@@ -110,22 +114,19 @@ int main() {
         // Parse the JSON request body
         auto json_body = crow::json::load(req.body);
         if (!json_body) {
-            // Handle JSON parsing error
-            crow::json::wvalue error_response;
-            error_response["error"] = "Invalid JSON in request body";
-            return crow::response(400, error_response);
+            return createErrorResponse("Invalid JSON in request body");
         }
         
         // Extract required fields from the request body payload
-        auto column_name = safe_get(json_body, {"column_reference", "name"});
-        auto encrypted_compression = safe_get(json_body, {"data_batch_encrypted", "value_format", "compression"});
-        auto encrypted_value = safe_get(json_body, {"data_batch_encrypted", "value"});
-        auto datatype = safe_get(json_body, {"data_batch", "datatype"});
-        auto compression = safe_get(json_body, {"data_batch", "value_format", "compression"});
-        auto format = safe_get(json_body, {"data_batch", "value_format", "format"});
-        auto encoding = safe_get(json_body, {"data_batch", "value_format", "encoding"});
-        auto key_id = safe_get(json_body, {"encryption", "key_id"});
-        auto user_id = safe_get(json_body, {"access", "user_id"});
+        auto column_name = SafeGetFromJsonPath(json_body, {"column_reference", "name"});
+        auto encrypted_compression = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value_format", "compression"});
+        auto encrypted_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value"});
+        auto datatype = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"});
+        auto compression = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"});
+        auto format = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "format"});
+        auto encoding = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "encoding"});
+        auto key_id = SafeGetFromJsonPath(json_body, {"encryption", "key_id"});
+        auto user_id = SafeGetFromJsonPath(json_body, {"access", "user_id"});
         
         // Check for missing required fields and return error response
         if (!column_name) return createErrorResponse("Missing required field: column_reference.name");
@@ -164,7 +165,7 @@ int main() {
         response["access"] = std::move(access);
 
         // Build debug structure only if reference_id was provided in request
-        auto request_reference_id = safe_get(json_body, {"debug", "reference_id"});
+        auto request_reference_id = SafeGetFromJsonPath(json_body, {"debug", "reference_id"});
         if (request_reference_id) {
             crow::json::wvalue debug;
             debug["reference_id"] = *request_reference_id;
