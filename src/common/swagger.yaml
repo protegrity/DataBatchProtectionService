@@ -9,6 +9,7 @@ paths:
       summary: Encrypts a column data_batch using a specified key and data type
       security:
         - bearer_auth: []
+      operationId: encryptBatch
       requestBody:
         required: true
         content:
@@ -45,7 +46,7 @@ paths:
                   The debug block includes a UUID and a pretty-printed helper for development.
                 value:
                   column_reference:
-                    column: email
+                    name: email
                   data_batch:
                     datatype: BYTE_ARRAY
                     value_format:
@@ -119,7 +120,10 @@ paths:
                     $ref: '#/components/schemas/access_response'
                   error_string:
                     type: string
-                    description: Description of the access control failure
+                    description: Description of the access control or encryption failure
+                  error_code:
+                    type: string
+                    description: Code of the access control or encryption failure
               examples:
                 unauthorized:
                   summary: Access denied
@@ -135,6 +139,7 @@ paths:
       summary: Decrypts a previously encrypted value using the provided metadata
       security:
         - bearer_auth: []
+      operationId: decryptBatch
       requestBody:
         required: true
         content:
@@ -167,7 +172,7 @@ paths:
                 summary: Decrypt the encrypted Base64 blob back to a base64-encoded byte array of emails
                 value:
                   column_reference:
-                    column: email
+                    name: email
                   data_batch_encrypted:
                     value_format:
                       compression: ZSTD
@@ -244,7 +249,10 @@ paths:
                     $ref: '#/components/schemas/access_response'
                   error_string:
                     type: string
-                    description: Description of the access control failure
+                    description: Description of the access control or decryption failure
+                  error_code:
+                    type: string
+                    description: Code of the access control or decryption failure
               examples:
                 unauthorized:
                   summary: Access denied
@@ -269,7 +277,7 @@ components:
       properties:
         column_schema:
           type: object
-          description: Reference to a column schema without the column name
+          description: Reference to a database column schema
           properties:
             database:
               type: string
@@ -407,6 +415,9 @@ components:
           description: Role that was applied during access evaluation
         access_control:
           type: string
+          enum:
+            - granted
+            - denied
           example: granted
           description: Result of the access control check
 
@@ -452,7 +463,9 @@ components:
         - $ref: '#/components/schemas/data_batch_base'
 
     data_batch_with_value:
-      description: '`value` is present since it is used for responses.'
+      description: >
+        '`value` is present; used in /encrypt requests (plaintext input) and in
+        /decrypt responses (decrypted output).'
       allOf:
         - $ref: '#/components/schemas/data_batch_base'
         - type: object
