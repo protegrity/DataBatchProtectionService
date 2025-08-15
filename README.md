@@ -1,6 +1,10 @@
 # Data Batch Protection Service
 
-Development Dockerfile:
+## API server
+
+[View API Swagger file](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/protegrity/DataBatchProtectionService/dev_phase2/src/common/swagger.yaml)
+
+## Development Dockerfile
 - `Dockerfile` is configured for development. Although Docker is mostly used for production deployments, it can also provide a stable environment during development.
 - Docker images can be created but these are primarily for testing. In these cases, code on the local development environment is copied to the Docker container and built.
 - For faster development the local directories can be mounted on the docker container to be built.
