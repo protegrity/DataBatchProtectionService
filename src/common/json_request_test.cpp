@@ -22,7 +22,7 @@ public:
 #define ASSERT_FALSE(condition) assert(!(condition))
 
 // Test utilities
-void print_test_result(const std::string& test_name, bool passed) {
+void PrintTestResult(const std::string& test_name, bool passed) {
     std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
 }
 
@@ -86,7 +86,7 @@ const std::string VALID_DECRYPT_JSON = R"({
 })";
 
 // Test cases for JsonRequest base class
-TEST(json_request_valid_parse) {
+TEST(JsonRequestValidParse) {
     EncryptJsonRequest request;
     request.Parse(VALID_ENCRYPT_JSON);
     
@@ -108,7 +108,7 @@ TEST(json_request_valid_parse) {
     ASSERT_EQ("", request.GetValidationError());
 }
 
-TEST(json_request_missing_required_fields) {
+TEST(JsonRequestMissingRequiredFields) {
     const std::string incomplete_json = R"({
         "column_reference": {
             "name": "email"
@@ -135,7 +135,7 @@ TEST(json_request_missing_required_fields) {
     ASSERT_TRUE(error.find("encryption.key_id") != std::string::npos);
 }
 
-TEST(json_request_invalid_json) {
+TEST(JsonRequestInvalidJson) {
     const std::string invalid_json = "{ invalid json }";
     
     EncryptJsonRequest request;
@@ -155,7 +155,7 @@ TEST(json_request_invalid_json) {
     ASSERT_FALSE(request.IsValid());
 }
 
-TEST(json_request_optional_reference_id_missing) {
+TEST(JsonRequestOptionalReferenceIdMissing) {
     const std::string json_without_ref = R"({
         "column_reference": {
             "name": "email"
@@ -203,7 +203,7 @@ TEST(json_request_optional_reference_id_missing) {
 }
 
 // Test cases for EncryptJsonRequest
-TEST(encrypt_json_request_valid_parse) {
+TEST(EncryptJsonRequestValidParse) {
     EncryptJsonRequest request;
     request.Parse(VALID_ENCRYPT_JSON);
     
@@ -226,7 +226,7 @@ TEST(encrypt_json_request_valid_parse) {
     ASSERT_EQ("", request.GetValidationError());
 }
 
-TEST(encrypt_json_request_missing_value) {
+TEST(EncryptJsonRequestMissingValue) {
     const std::string json_without_value = R"({
         "column_reference": {
             "name": "email"
@@ -274,7 +274,7 @@ TEST(encrypt_json_request_missing_value) {
 }
 
 // Test cases for DecryptJsonRequest
-TEST(decrypt_json_request_valid_parse) {
+TEST(DecryptJsonRequestValidParse) {
     DecryptJsonRequest request;
     request.Parse(VALID_DECRYPT_JSON);
     
@@ -297,7 +297,7 @@ TEST(decrypt_json_request_valid_parse) {
     ASSERT_EQ("", request.GetValidationError());
 }
 
-TEST(decrypt_json_request_missing_encrypted_value) {
+TEST(DecryptJsonRequestMissingEncryptedValue) {
     const std::string json_without_encrypted_value = R"({
         "column_reference": {
             "name": "email"
@@ -345,7 +345,7 @@ TEST(decrypt_json_request_missing_encrypted_value) {
 }
 
 // Test SafeGetFromJsonPath functionality
-TEST(safe_get_from_json_path_valid) {
+TEST(SafeGetFromJsonPathValid) {
     TestableJsonRequest request;
     auto json_body = crow::json::load(VALID_ENCRYPT_JSON);
     ASSERT_TRUE(json_body);
@@ -359,7 +359,7 @@ TEST(safe_get_from_json_path_valid) {
     ASSERT_EQ("test@example.com", *result);
 }
 
-TEST(safe_get_from_json_path_invalid_path) {
+TEST(SafeGetFromJsonPathInvalidPath) {
     TestableJsonRequest request;
     auto json_body = crow::json::load(VALID_ENCRYPT_JSON);
     ASSERT_TRUE(json_body);
@@ -382,82 +382,82 @@ int main() {
     
     // Run all tests
     try {
-        test_json_request_valid_parse();
-        print_test_result("JsonRequest valid parse", true);
+        test_JsonRequestValidParse();
+        PrintTestResult("JsonRequest valid parse", true);
     } catch (...) {
-        print_test_result("JsonRequest valid parse", false);
+        PrintTestResult("JsonRequest valid parse", false);
         all_tests_passed = false;
     }
     
     try {
-        test_json_request_missing_required_fields();
-        print_test_result("JsonRequest missing required fields", true);
+        test_JsonRequestMissingRequiredFields();
+        PrintTestResult("JsonRequest missing required fields", true);
     } catch (...) {
-        print_test_result("JsonRequest missing required fields", false);
+        PrintTestResult("JsonRequest missing required fields", false);
         all_tests_passed = false;
     }
     
     try {
-        test_json_request_invalid_json();
-        print_test_result("JsonRequest invalid JSON", true);
+        test_JsonRequestInvalidJson();
+        PrintTestResult("JsonRequest invalid JSON", true);
     } catch (...) {
-        print_test_result("JsonRequest invalid JSON", false);
+        PrintTestResult("JsonRequest invalid JSON", false);
         all_tests_passed = false;
     }
     
     try {
-        test_json_request_optional_reference_id_missing();
-        print_test_result("JsonRequest optional reference_id missing", true);
+        test_JsonRequestOptionalReferenceIdMissing();
+        PrintTestResult("JsonRequest optional reference_id missing", true);
     } catch (...) {
-        print_test_result("JsonRequest optional reference_id missing", false);
+        PrintTestResult("JsonRequest optional reference_id missing", false);
         all_tests_passed = false;
     }
     
     try {
-        test_encrypt_json_request_valid_parse();
-        print_test_result("EncryptJsonRequest valid parse", true);
+        test_EncryptJsonRequestValidParse();
+        PrintTestResult("EncryptJsonRequest valid parse", true);
     } catch (...) {
-        print_test_result("EncryptJsonRequest valid parse", false);
+        PrintTestResult("EncryptJsonRequest valid parse", false);
         all_tests_passed = false;
     }
     
     try {
-        test_encrypt_json_request_missing_value();
-        print_test_result("EncryptJsonRequest missing value", true);
+        test_EncryptJsonRequestMissingValue();
+        PrintTestResult("EncryptJsonRequest missing value", true);
     } catch (...) {
-        print_test_result("EncryptJsonRequest missing value", false);
+        PrintTestResult("EncryptJsonRequest missing value", false);
         all_tests_passed = false;
     }
     
     try {
-        test_decrypt_json_request_valid_parse();
-        print_test_result("DecryptJsonRequest valid parse", true);
+        test_DecryptJsonRequestValidParse();
+        PrintTestResult("DecryptJsonRequest valid parse", true);
     } catch (...) {
-        print_test_result("DecryptJsonRequest valid parse", false);
+        PrintTestResult("DecryptJsonRequest valid parse", false);
         all_tests_passed = false;
     }
     
     try {
-        test_decrypt_json_request_missing_encrypted_value();
-        print_test_result("DecryptJsonRequest missing encrypted value", true);
+        test_DecryptJsonRequestMissingEncryptedValue();
+        PrintTestResult("DecryptJsonRequest missing encrypted value", true);
     } catch (...) {
-        print_test_result("DecryptJsonRequest missing encrypted value", false);
+        PrintTestResult("DecryptJsonRequest missing encrypted value", false);
         all_tests_passed = false;
     }
     
     try {
-        test_safe_get_from_json_path_valid();
-        print_test_result("SafeGetFromJsonPath valid", true);
+        test_SafeGetFromJsonPathValid();
+        PrintTestResult("SafeGetFromJsonPath valid", true);
     } catch (...) {
-        print_test_result("SafeGetFromJsonPath valid", false);
+        PrintTestResult("SafeGetFromJsonPath valid", false);
         all_tests_passed = false;
     }
     
     try {
-        test_safe_get_from_json_path_invalid_path();
-        print_test_result("SafeGetFromJsonPath invalid path", true);
+        test_SafeGetFromJsonPathInvalidPath();
+        PrintTestResult("SafeGetFromJsonPath invalid path", true);
     } catch (...) {
-        print_test_result("SafeGetFromJsonPath invalid path", false);
+        PrintTestResult("SafeGetFromJsonPath invalid path", false);
         all_tests_passed = false;
     }
     
