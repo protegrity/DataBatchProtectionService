@@ -40,3 +40,16 @@ Then build and run manually from inside the docker container bash
 # cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
 # ./build/dbps_api_server
 ```
+
+## Running Tests
+
+The project includes unit tests for the JSON request parsing classes. To run the tests:
+
+### Build and Run Tests
+```
+# Build the test executable
+cmake -B build -S . -G Ninja && cmake --build build --target json_request_test
+
+# Run the tests
+./build/json_request_test
+```

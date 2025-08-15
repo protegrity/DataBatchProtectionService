@@ -3,12 +3,14 @@ info:
   title: Encryption API
   version: 1.0.0
 
+# Global security so every operation requires JWT
+security:
+  - bearer_auth: []
+
 paths:
   /encrypt:
     post:
       summary: Encrypts a column data_batch using a specified key and data type
-      security:
-        - bearer_auth: []
       operationId: encryptBatch
       requestBody:
         required: true
@@ -75,6 +77,38 @@ paths:
                   debug:
                     pretty_printed_value: "user1@example.com\nuser2@example.com"
                     reference_id: 550e8400-e29b-41d4-a716-446655440000
+              ints_csv_utf8:
+                summary: Encrypt CSV of INT32 IDs (UTF-8, uncompressed)
+                description: |
+                  Three INT32 values provided as a CSV string. The plaintext is UTF-8 (not base64).
+                  Encrypted output will be returned in `data_batch_encrypted.value`.
+                value:
+                  column_reference:
+                    name: CustomerID
+                  data_batch:
+                    value: "3344,5566,7788"
+                    datatype: INT32
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: csv
+                      encoding: utf-8
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                  encryption:
+                    key_id: NumericID001
+                  access:
+                    user_id: GRM_009
+                  application_context:
+                    column_schema:
+                      database: public
+                      schema: Federation
+                      table: Customers
+                    location:
+                      country: US
+                      region: CA
+                      lat: 37.7749
+                      lon: -122.4194
       responses:
         '200':
           description: Successful encryption
@@ -106,6 +140,22 @@ paths:
                       access_control: granted
                     debug:
                       reference_id: 550e8400-e29b-41d4-a716-446655440000
+                ints_csv_utf8_success:
+                  summary: Encrypted INT32 CSV IDs
+                  description: |
+                    Encrypted output for the INT32 CSV "3344,5566,7788".
+                    `data_batch_encrypted.value` contains the Base64-encoded ciphertext.
+                  value:
+                    data_batch_encrypted:
+                      value_format:
+                        compression: ZSTD
+                      value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                    access:
+                      user_id: GRM_009
+                      role: IDReader
+                      access_control: granted
+                    debug:
+                      reference_id: 123e4567-e89b-12d3-a456-426614174000
         '401':
           description: Unauthorized request due to failed access control
           content:
@@ -137,8 +187,6 @@ paths:
   /decrypt:
     post:
       summary: Decrypts a previously encrypted value using the provided metadata
-      security:
-        - bearer_auth: []
       operationId: decryptBatch
       requestBody:
         required: true
@@ -200,6 +248,35 @@ paths:
                       lon: -122.4194
                   debug:
                     reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
+              ints_csv_utf8:
+                summary: Decrypt CSV of INT32 IDs (UTF-8, uncompressed)
+                description: |
+                  Takes an encrypted Base64 blob and decrypts it back into the plaintext CSV
+                  "3344,5566,7788" as UTF-8 text.
+                value:
+                  column_reference:
+                    name: CustomerID
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                    value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                  data_batch:
+                    datatype: INT32
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: csv
+                      encoding: utf-8
+                  encryption:
+                    key_id: NumericID001
+                  access:
+                    user_id: GRM_009
+                  application_context:
+                    column_schema:
+                      database: public
+                      schema: Federation
+                      table: Customers
+                  debug:
+                    reference_id: 123e4567-e89b-12d3-a456-426614174000
       responses:
         '200':
           description: Successful decryption
@@ -235,6 +312,24 @@ paths:
                     debug:
                       pretty_printed_value: "user1@example.com\nuser2@example.com"
                       reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
+                ints_csv_utf8_success:
+                  summary: Decrypted INT32 CSV IDs
+                  description: |
+                    Decrypted back into the original UTF-8 CSV string "3344,5566,7788".
+                  value:
+                    data_batch:
+                      datatype: INT32
+                      value_format:
+                        compression: UNCOMPRESSED
+                        format: csv
+                        encoding: utf-8
+                      value: "3344,5566,7788"
+                    access:
+                      user_id: GRM_009
+                      role: IDReader
+                      access_control: granted
+                    debug:
+                      reference_id: 123e4567-e89b-12d3-a456-426614174000
         '401':
           description: Unauthorized request due to failed access control
           content:
@@ -378,7 +473,7 @@ components:
 
     value_format_encrypted:
       type: object
-      description: > 
+      description: >
         Details on how the data was serialized for encrypted values. Format is assumed to be binary and encoded as base64.
       required:
         - compression

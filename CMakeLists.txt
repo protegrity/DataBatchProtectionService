@@ -15,9 +15,23 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(crow)
 
-add_executable(dbps_api_server src/server/dbps_api_server.cpp)
+add_executable(dbps_api_server 
+  src/server/dbps_api_server.cpp
+  src/common/json_request.cpp
+)
 
 target_include_directories(dbps_api_server PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  src/common
+)
+
+# Add test executable
+add_executable(json_request_test
+  src/common/json_request_test.cpp
+  src/common/json_request.cpp
+)
+
+target_include_directories(json_request_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   src/common
 )
