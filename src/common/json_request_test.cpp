@@ -6,8 +6,6 @@
 // Test-specific derived class to access protected methods
 class TestableJsonRequest : public JsonRequest {
 public:
-    using JsonRequest::SafeGetFromJsonPath; // Make protected method public for testing
-    
     // Implement the pure virtual method for testing
     void Parse(const std::string& request_body) override {
         ParseCommon(request_body);
@@ -17,6 +15,17 @@ public:
     crow::json::wvalue ToJsonObject() const override {
         crow::json::wvalue json;
         json["test"] = "testable_request";
+        return json;
+    }
+};
+
+// Test-specific derived class for JsonResponse base class testing
+class TestableJsonResponse : public JsonResponse {
+public:
+    // Implement the pure virtual ToJsonObject method for testing
+    crow::json::wvalue ToJsonObject() const override {
+        crow::json::wvalue json;
+        json["test"] = "testable_response";
         return json;
     }
 };
@@ -358,28 +367,26 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
 
 // Test SafeGetFromJsonPath functionality
 TEST(SafeGetFromJsonPathValid) {
-    TestableJsonRequest request;
     auto json_body = crow::json::load(VALID_ENCRYPT_JSON);
     ASSERT_TRUE(json_body);
     
-    auto result = request.SafeGetFromJsonPath(json_body, {"column_reference", "name"});
+    auto result = SafeGetFromJsonPath(json_body, {"column_reference", "name"});
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ("email", *result);
     
-    result = request.SafeGetFromJsonPath(json_body, {"data_batch", "value"});
+    result = SafeGetFromJsonPath(json_body, {"data_batch", "value"});
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ("test@example.com", *result);
 }
 
 TEST(SafeGetFromJsonPathInvalidPath) {
-    TestableJsonRequest request;
     auto json_body = crow::json::load(VALID_ENCRYPT_JSON);
     ASSERT_TRUE(json_body);
     
-    auto result = request.SafeGetFromJsonPath(json_body, {"nonexistent", "field"});
+    auto result = SafeGetFromJsonPath(json_body, {"nonexistent", "field"});
     ASSERT_FALSE(result.has_value());
     
-    result = request.SafeGetFromJsonPath(json_body, {"column_reference", "nonexistent"});
+    result = SafeGetFromJsonPath(json_body, {"column_reference", "nonexistent"});
     ASSERT_FALSE(result.has_value());
 }
 
@@ -416,6 +423,228 @@ TEST(DecryptJsonRequestToJson) {
     ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
     ASSERT_TRUE(json_string.find("key123") != std::string::npos);
     ASSERT_TRUE(json_string.find("user456") != std::string::npos);
+}
+
+// Test data for JsonResponse parsing
+const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
+    "data_batch_encrypted": {
+        "value_format": {
+            "compression": "gzip"
+        },
+        "value": "ENCRYPTED_test@example.com"
+    },
+    "access": {
+        "user_id": "user456",
+        "role": "admin",
+        "access_control": "read_write"
+    },
+    "debug": {
+        "reference_id": "ref789"
+    }
+})";
+
+const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
+    "data_batch": {
+        "datatype": "string",
+        "value": "test@example.com",
+        "value_format": {
+            "compression": "none",
+            "format": "text",
+            "encoding": "utf8"
+        }
+    },
+    "access": {
+        "user_id": "user456",
+        "role": "admin",
+        "access_control": "read_write"
+    },
+    "debug": {
+        "reference_id": "ref789"
+    }
+})";
+
+// Test cases for JsonResponse parsing
+TEST(EncryptJsonResponseValidParse) {
+    EncryptJsonResponse response;
+    response.Parse(VALID_ENCRYPT_RESPONSE_JSON);
+    
+    ASSERT_EQ("user456", response.user_id_);
+    ASSERT_EQ("admin", response.role_);
+    ASSERT_EQ("read_write", response.access_control_);
+    ASSERT_EQ("ref789", response.reference_id_);
+    ASSERT_EQ("gzip", response.encrypted_compression_);
+    ASSERT_EQ("ENCRYPTED_test@example.com", response.encrypted_value_);
+    
+    ASSERT_TRUE(response.IsValid());
+    ASSERT_EQ("", response.GetValidationError());
+}
+
+TEST(DecryptJsonResponseValidParse) {
+    DecryptJsonResponse response;
+    response.Parse(VALID_DECRYPT_RESPONSE_JSON);
+    
+    ASSERT_EQ("user456", response.user_id_);
+    ASSERT_EQ("admin", response.role_);
+    ASSERT_EQ("read_write", response.access_control_);
+    ASSERT_EQ("ref789", response.reference_id_);
+    ASSERT_EQ("string", response.datatype_);
+    ASSERT_EQ("none", response.compression_);
+    ASSERT_EQ("text", response.format_);
+    ASSERT_EQ("utf8", response.encoding_);
+    ASSERT_EQ("test@example.com", response.decrypted_value_);
+    
+    ASSERT_TRUE(response.IsValid());
+    ASSERT_EQ("", response.GetValidationError());
+}
+
+TEST(JsonResponseInvalidJson) {
+    EncryptJsonResponse response;
+    response.Parse("invalid json");
+    
+    // Should handle invalid JSON gracefully
+    ASSERT_FALSE(response.IsValid());
+}
+
+// JsonResponse test cases
+TEST(JsonResponseMissingRequiredFields) {
+    TestableJsonResponse response;
+    response.Parse("{}"); // Empty JSON
+    
+    ASSERT_FALSE(response.IsValid());
+    std::string error = response.GetValidationError();
+    ASSERT_TRUE(error.find("access.user_id") != std::string::npos);
+    ASSERT_TRUE(error.find("access.role") != std::string::npos);
+    ASSERT_TRUE(error.find("access.access_control") != std::string::npos);
+    ASSERT_TRUE(error.find("debug.reference_id") != std::string::npos);
+}
+
+TEST(EncryptJsonResponseMissingEncryptedValue) {
+    EncryptJsonResponse response;
+    response.Parse(R"({
+        "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
+        "debug": {"reference_id": "ref456"},
+        "data_batch_encrypted": {"value_format": {"compression": "gzip"}}
+    })");
+    
+    ASSERT_FALSE(response.IsValid());
+    ASSERT_TRUE(response.GetValidationError().find("data_batch_encrypted.value") != std::string::npos);
+}
+
+TEST(DecryptJsonResponseMissingDecryptedValue) {
+    DecryptJsonResponse response;
+    response.Parse(R"({
+        "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
+        "debug": {"reference_id": "ref456"},
+        "data_batch": {
+            "datatype": "string",
+            "value_format": {"compression": "none", "format": "text", "encoding": "utf8"}
+        }
+    })");
+    
+    ASSERT_FALSE(response.IsValid());
+    ASSERT_TRUE(response.GetValidationError().find("data_batch.value") != std::string::npos);
+}
+
+TEST(EncryptJsonResponseMissingEncryptedCompression) {
+    EncryptJsonResponse response;
+    response.Parse(R"({
+        "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
+        "debug": {"reference_id": "ref456"},
+        "data_batch_encrypted": {"value": "ENCRYPTED_data"}
+    })");
+    
+    ASSERT_FALSE(response.IsValid());
+    ASSERT_TRUE(response.GetValidationError().find("data_batch_encrypted.value_format.compression") != std::string::npos);
+}
+
+TEST(DecryptJsonResponseMissingDatatype) {
+    DecryptJsonResponse response;
+    response.Parse(R"({
+        "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
+        "debug": {"reference_id": "ref456"},
+        "data_batch": {
+            "value": "decrypted_data",
+            "value_format": {"compression": "none", "format": "text", "encoding": "utf8"}
+        }
+    })");
+    
+    ASSERT_FALSE(response.IsValid());
+    ASSERT_TRUE(response.GetValidationError().find("data_batch.datatype") != std::string::npos);
+}
+
+TEST(EncryptJsonResponseToJson) {
+    EncryptJsonResponse response;
+    response.user_id_ = "user123";
+    response.role_ = "admin";
+    response.access_control_ = "read_write";
+    response.reference_id_ = "ref456";
+    response.encrypted_compression_ = "gzip";
+    response.encrypted_value_ = "ENCRYPTED_data";
+    
+    ASSERT_TRUE(response.IsValid());
+    
+    std::string json_string = response.ToJson();
+    ASSERT_TRUE(json_string.find("user123") != std::string::npos);
+    ASSERT_TRUE(json_string.find("admin") != std::string::npos);
+    ASSERT_TRUE(json_string.find("read_write") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ref456") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ENCRYPTED_data") != std::string::npos);
+    ASSERT_TRUE(json_string.find("gzip") != std::string::npos);
+}
+
+TEST(DecryptJsonResponseToJson) {
+    DecryptJsonResponse response;
+    response.user_id_ = "user123";
+    response.role_ = "admin";
+    response.access_control_ = "read_write";
+    response.reference_id_ = "ref456";
+    response.datatype_ = "string";
+    response.compression_ = "none";
+    response.format_ = "text";
+    response.encoding_ = "utf8";
+    response.decrypted_value_ = "decrypted_data";
+    
+    ASSERT_TRUE(response.IsValid());
+    
+    std::string json_string = response.ToJson();
+    ASSERT_TRUE(json_string.find("user123") != std::string::npos);
+    ASSERT_TRUE(json_string.find("admin") != std::string::npos);
+    ASSERT_TRUE(json_string.find("read_write") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ref456") != std::string::npos);
+    ASSERT_TRUE(json_string.find("decrypted_data") != std::string::npos);
+    ASSERT_TRUE(json_string.find("string") != std::string::npos);
+    ASSERT_TRUE(json_string.find("none") != std::string::npos);
+    ASSERT_TRUE(json_string.find("text") != std::string::npos);
+    ASSERT_TRUE(json_string.find("utf8") != std::string::npos);
+}
+
+TEST(JsonResponsePartialParsing) {
+    EncryptJsonResponse response;
+    response.Parse(R"({
+        "access": {"user_id": "user123"},
+        "data_batch_encrypted": {"value": "ENCRYPTED_data"}
+    })");
+    
+    // Should parse what it can, but validation should fail
+    ASSERT_EQ("user123", response.user_id_);
+    ASSERT_EQ("ENCRYPTED_data", response.encrypted_value_);
+    ASSERT_FALSE(response.IsValid()); // Missing other required fields
+}
+
+TEST(JsonResponseEmptyStringHandling) {
+    EncryptJsonResponse response;
+    response.Parse("");
+    
+    ASSERT_FALSE(response.IsValid());
+    // Should handle gracefully without crashing
+}
+
+TEST(JsonResponseNullJsonHandling) {
+    EncryptJsonResponse response;
+    response.Parse("null");
+    
+    ASSERT_FALSE(response.IsValid());
+    // Should handle gracefully without crashing
 }
 
 // Main test runner
@@ -522,6 +751,110 @@ int main() {
         all_tests_passed = false;
     }
     
+    try {
+        test_EncryptJsonResponseValidParse();
+        PrintTestResult("EncryptJsonResponse valid parse", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonResponse valid parse", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DecryptJsonResponseValidParse();
+        PrintTestResult("DecryptJsonResponse valid parse", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonResponse valid parse", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_JsonResponseInvalidJson();
+        PrintTestResult("JsonResponse invalid JSON", true);
+    } catch (...) {
+        PrintTestResult("JsonResponse invalid JSON", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_JsonResponseMissingRequiredFields();
+        PrintTestResult("JsonResponse missing required fields", true);
+    } catch (...) {
+        PrintTestResult("JsonResponse missing required fields", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_EncryptJsonResponseMissingEncryptedValue();
+        PrintTestResult("EncryptJsonResponse missing encrypted value", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonResponse missing encrypted value", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_DecryptJsonResponseMissingDecryptedValue();
+        PrintTestResult("DecryptJsonResponse missing decrypted value", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonResponse missing decrypted value", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_EncryptJsonResponseMissingEncryptedCompression();
+        PrintTestResult("EncryptJsonResponse missing encrypted compression", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonResponse missing encrypted compression", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_DecryptJsonResponseMissingDatatype();
+        PrintTestResult("DecryptJsonResponse missing datatype", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonResponse missing datatype", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_EncryptJsonResponseToJson();
+        PrintTestResult("EncryptJsonResponse ToJson", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonResponse ToJson", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_DecryptJsonResponseToJson();
+        PrintTestResult("DecryptJsonResponse ToJson", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonResponse ToJson", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_JsonResponsePartialParsing();
+        PrintTestResult("JsonResponse partial parsing", true);
+    } catch (...) {
+        PrintTestResult("JsonResponse partial parsing", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_JsonResponseEmptyStringHandling();
+        PrintTestResult("JsonResponse empty string handling", true);
+    } catch (...) {
+        PrintTestResult("JsonResponse empty string handling", false);
+        all_tests_passed = false;
+    }
+
+    try {
+        test_JsonResponseNullJsonHandling();
+        PrintTestResult("JsonResponse null json handling", true);
+    } catch (...) {
+        PrintTestResult("JsonResponse null json handling", false);
+        all_tests_passed = false;
+    }
+    
 
     
     std::cout << "==================================" << std::endl;
@@ -533,3 +866,4 @@ int main() {
         return 1;
     }
 }
+
