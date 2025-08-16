@@ -57,7 +57,7 @@ int main() {
         access["access_control"] = "granted";
         response["access"] = std::move(access);
 
-        // Build debug structure with reference_id (now mandatory)
+        // Build debug structure with reference_id
         crow::json::wvalue debug;
         debug["reference_id"] = request.reference_id_;
         response["debug"] = std::move(debug);
@@ -105,7 +105,7 @@ int main() {
         access["access_control"] = "granted";
         response["access"] = std::move(access);
 
-        // Build debug structure with reference_id (now mandatory)
+        // Build debug structure with reference_id
         crow::json::wvalue debug;
         debug["reference_id"] = request.reference_id_;
         // Add pretty_printed_value for decryption (simulate human-readable output)
