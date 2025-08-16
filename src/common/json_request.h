@@ -59,7 +59,18 @@ public:
      */
     virtual std::string GetValidationError() const;
 
+    /**
+     * Converts the parsed request object to a JSON string.
+     * @return String representation of the JSON
+     */
+    std::string ToJson() const;
+
 protected:
+    /**
+     * Converts the parsed request object back to JSON format.
+     * @return crow::json::wvalue representing the current state of the object
+     */
+    virtual crow::json::wvalue ToJsonObject() const = 0;
     /**
      * Safely extracts a string value from a nested JSON path.
      *
@@ -105,6 +116,13 @@ public:
      * @return String describing which fields are missing
      */
     std::string GetValidationError() const override;
+
+protected:
+    /**
+     * Converts the parsed request object back to JSON format.
+     * @return crow::json::wvalue representing the current state of the object
+     */
+    crow::json::wvalue ToJsonObject() const override;
 };
 
 /**
@@ -138,4 +156,11 @@ public:
      * @return String describing which fields are missing
      */
     std::string GetValidationError() const override;
+
+protected:
+    /**
+     * Converts the parsed request object back to JSON format.
+     * @return crow::json::wvalue representing the current state of the object
+     */
+    crow::json::wvalue ToJsonObject() const override;
 };

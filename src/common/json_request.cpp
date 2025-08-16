@@ -74,6 +74,10 @@ std::string JsonRequest::GetValidationError() const {
     return error_msg;
 }
 
+std::string JsonRequest::ToJson() const {
+    return ToJsonObject().dump();
+}
+
 std::optional<std::string> JsonRequest::SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path) const {
     try {
         const crow::json::rvalue* current = &json_body;
@@ -122,6 +126,52 @@ std::string EncryptJsonRequest::GetValidationError() const {
     return "";
 }
 
+crow::json::wvalue EncryptJsonRequest::ToJsonObject() const {
+    crow::json::wvalue json;
+    
+    // Build column_reference
+    crow::json::wvalue column_reference;
+    column_reference["name"] = column_name_;
+    json["column_reference"] = std::move(column_reference);
+    
+    // Build data_batch
+    crow::json::wvalue data_batch;
+    data_batch["datatype"] = datatype_;
+    data_batch["value"] = value_;
+    
+    crow::json::wvalue value_format;
+    value_format["compression"] = compression_;
+    value_format["format"] = format_;
+    value_format["encoding"] = encoding_;
+    data_batch["value_format"] = std::move(value_format);
+    
+    json["data_batch"] = std::move(data_batch);
+    
+    // Build data_batch_encrypted
+    crow::json::wvalue data_batch_encrypted;
+    crow::json::wvalue encrypted_value_format;
+    encrypted_value_format["compression"] = encrypted_compression_;
+    data_batch_encrypted["value_format"] = std::move(encrypted_value_format);
+    json["data_batch_encrypted"] = std::move(data_batch_encrypted);
+    
+    // Build encryption
+    crow::json::wvalue encryption;
+    encryption["key_id"] = key_id_;
+    json["encryption"] = std::move(encryption);
+    
+    // Build access
+    crow::json::wvalue access;
+    access["user_id"] = user_id_;
+    json["access"] = std::move(access);
+    
+    // Build debug
+    crow::json::wvalue debug;
+    debug["reference_id"] = reference_id_;
+    json["debug"] = std::move(debug);
+    
+    return json;
+}
+
 // DecryptJsonRequest implementation
 void DecryptJsonRequest::Parse(const std::string& request_body) {
     // Parse common fields first
@@ -152,4 +202,51 @@ std::string DecryptJsonRequest::GetValidationError() const {
     }
     
     return "";
+}
+
+crow::json::wvalue DecryptJsonRequest::ToJsonObject() const {
+    crow::json::wvalue json;
+    
+    // Build column_reference
+    crow::json::wvalue column_reference;
+    column_reference["name"] = column_name_;
+    json["column_reference"] = std::move(column_reference);
+    
+    // Build data_batch
+    crow::json::wvalue data_batch;
+    data_batch["datatype"] = datatype_;
+    
+    crow::json::wvalue value_format;
+    value_format["compression"] = compression_;
+    value_format["format"] = format_;
+    value_format["encoding"] = encoding_;
+    data_batch["value_format"] = std::move(value_format);
+    
+    json["data_batch"] = std::move(data_batch);
+    
+    // Build data_batch_encrypted
+    crow::json::wvalue data_batch_encrypted;
+    data_batch_encrypted["value"] = encrypted_value_;
+    
+    crow::json::wvalue encrypted_value_format;
+    encrypted_value_format["compression"] = encrypted_compression_;
+    data_batch_encrypted["value_format"] = std::move(encrypted_value_format);
+    json["data_batch_encrypted"] = std::move(data_batch_encrypted);
+    
+    // Build encryption
+    crow::json::wvalue encryption;
+    encryption["key_id"] = key_id_;
+    json["encryption"] = std::move(encryption);
+    
+    // Build access
+    crow::json::wvalue access;
+    access["user_id"] = user_id_;
+    json["access"] = std::move(access);
+    
+    // Build debug
+    crow::json::wvalue debug;
+    debug["reference_id"] = reference_id_;
+    json["debug"] = std::move(debug);
+    
+    return json;
 }

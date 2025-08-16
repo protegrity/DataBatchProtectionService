@@ -12,6 +12,13 @@ public:
     void Parse(const std::string& request_body) override {
         ParseCommon(request_body);
     }
+    
+    // Implement the pure virtual ToJsonObject method for testing
+    crow::json::wvalue ToJsonObject() const override {
+        crow::json::wvalue json;
+        json["test"] = "testable_request";
+        return json;
+    }
 };
 
 // Simple test framework
@@ -376,7 +383,40 @@ TEST(SafeGetFromJsonPathInvalidPath) {
     ASSERT_FALSE(result.has_value());
 }
 
+// Test JSON generation functionality
+TEST(EncryptJsonRequestToJson) {
+    EncryptJsonRequest request;
+    request.Parse(VALID_ENCRYPT_JSON);
+    
+    ASSERT_TRUE(request.IsValid());
+    
+    // Generate JSON from the parsed object
+    std::string json_string = request.ToJson();
+    
+    // Verify the generated JSON contains expected fields
+    ASSERT_TRUE(json_string.find("email") != std::string::npos);
+    ASSERT_TRUE(json_string.find("test@example.com") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
+    ASSERT_TRUE(json_string.find("key123") != std::string::npos);
+    ASSERT_TRUE(json_string.find("user456") != std::string::npos);
+}
 
+TEST(DecryptJsonRequestToJson) {
+    DecryptJsonRequest request;
+    request.Parse(VALID_DECRYPT_JSON);
+    
+    ASSERT_TRUE(request.IsValid());
+    
+    // Generate JSON from the parsed object
+    std::string json_string = request.ToJson();
+    
+    // Verify the generated JSON contains expected fields
+    ASSERT_TRUE(json_string.find("email") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ENCRYPTED_test@example.com") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
+    ASSERT_TRUE(json_string.find("key123") != std::string::npos);
+    ASSERT_TRUE(json_string.find("user456") != std::string::npos);
+}
 
 // Main test runner
 int main() {
@@ -463,6 +503,22 @@ int main() {
         PrintTestResult("SafeGetFromJsonPath invalid path", true);
     } catch (...) {
         PrintTestResult("SafeGetFromJsonPath invalid path", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptJsonRequestToJson();
+        PrintTestResult("EncryptJsonRequest ToJson", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonRequest ToJson", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DecryptJsonRequestToJson();
+        PrintTestResult("DecryptJsonRequest ToJson", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonRequest ToJson", false);
         all_tests_passed = false;
     }
     
