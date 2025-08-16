@@ -15,6 +15,12 @@
 $ docker build -t dbps_server .
 ```
 
+or with no cache
+```
+$ docker build --no-cache -t dbps_server .
+```
+
+
 This compiles the dbps_api_server binary and builds the image using the Dockerfile.
 
 ## Running the server locally from the docker image
@@ -29,7 +35,7 @@ then open a browser to check: http://localhost:18080/statusz
 
 Build the image once:
 ```
-$ docker build -t dbps_server .
+$ docker build --no-cache -t dbps_server .
 ```
 
 Run docker container with source files mounted:
