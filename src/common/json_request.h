@@ -21,9 +21,7 @@ public:
     std::string encrypted_compression_;
     std::string key_id_;
     std::string user_id_;
-    
-    // Common optional fields
-    std::optional<std::string> reference_id_;
+    std::string reference_id_;
     
     /**
      * Default constructor.

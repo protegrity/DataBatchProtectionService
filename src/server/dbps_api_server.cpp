@@ -57,12 +57,10 @@ int main() {
         access["access_control"] = "granted";
         response["access"] = std::move(access);
 
-        // Build debug structure only if reference_id was provided in request
-        if (request.reference_id_) {
-            crow::json::wvalue debug;
-            debug["reference_id"] = *request.reference_id_;
-            response["debug"] = std::move(debug);
-        }
+        // Build debug structure with reference_id
+        crow::json::wvalue debug;
+        debug["reference_id"] = request.reference_id_;
+        response["debug"] = std::move(debug);
 
         return crow::response(200, response);
     });
@@ -107,14 +105,12 @@ int main() {
         access["access_control"] = "granted";
         response["access"] = std::move(access);
 
-        // Build debug structure only if reference_id was provided in request
-        if (request.reference_id_) {
-            crow::json::wvalue debug;
-            debug["reference_id"] = *request.reference_id_;
-            // Add pretty_printed_value for decryption (simulate human-readable output)
-            debug["pretty_printed_value"] = "user1@example.com\nuser2@example.com";
-            response["debug"] = std::move(debug);
-        }
+        // Build debug structure with reference_id
+        crow::json::wvalue debug;
+        debug["reference_id"] = request.reference_id_;
+        // Add pretty_printed_value for decryption (simulate human-readable output)
+        debug["pretty_printed_value"] = "user1@example.com\nuser2@example.com";
+        response["debug"] = std::move(debug);
 
         return crow::response(200, response);
     });
