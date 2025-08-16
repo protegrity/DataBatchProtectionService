@@ -98,8 +98,7 @@ TEST(JsonRequestValidParse) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
-    ASSERT_TRUE(request.reference_id_.has_value());
-    ASSERT_EQ("ref789", *request.reference_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific field
     ASSERT_EQ("test@example.com", request.value_);
@@ -126,7 +125,7 @@ TEST(JsonRequestMissingRequiredFields) {
     ASSERT_EQ("", request.encrypted_compression_);
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
-    ASSERT_FALSE(request.reference_id_.has_value());
+    ASSERT_EQ("", request.reference_id_);
     
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
@@ -150,12 +149,12 @@ TEST(JsonRequestInvalidJson) {
     ASSERT_EQ("", request.encrypted_compression_);
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
-    ASSERT_FALSE(request.reference_id_.has_value());
+    ASSERT_EQ("", request.reference_id_);
     
     ASSERT_FALSE(request.IsValid());
 }
 
-TEST(JsonRequestOptionalReferenceIdMissing) {
+TEST(JsonRequestRequiredReferenceIdMissing) {
     const std::string json_without_ref = R"({
         "column_reference": {
             "name": "email"
@@ -192,14 +191,14 @@ TEST(JsonRequestOptionalReferenceIdMissing) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
-    ASSERT_FALSE(request.reference_id_.has_value());
+    ASSERT_EQ("", request.reference_id_);
     
     // Check encrypt-specific field (should be empty since no value in JSON)
     ASSERT_EQ("", request.value_);
     
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
-    ASSERT_TRUE(error.find("Missing required field: data_batch.value") != std::string::npos);
+    ASSERT_TRUE(error.find("debug.reference_id") != std::string::npos);
 }
 
 // Test cases for EncryptJsonRequest
@@ -216,8 +215,7 @@ TEST(EncryptJsonRequestValidParse) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
-    ASSERT_TRUE(request.reference_id_.has_value());
-    ASSERT_EQ("ref789", *request.reference_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific fields
     ASSERT_EQ("test@example.com", request.value_);
@@ -249,6 +247,9 @@ TEST(EncryptJsonRequestMissingValue) {
         },
         "access": {
             "user_id": "user456"
+        },
+        "debug": {
+            "reference_id": "ref789"
         }
     })";
     
@@ -264,6 +265,7 @@ TEST(EncryptJsonRequestMissingValue) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
     
     // Encrypt-specific field should be empty
     ASSERT_EQ("", request.value_);
@@ -287,8 +289,7 @@ TEST(DecryptJsonRequestValidParse) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
-    ASSERT_TRUE(request.reference_id_.has_value());
-    ASSERT_EQ("ref789", *request.reference_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
     
     // Check decrypt-specific fields
     ASSERT_EQ("ENCRYPTED_test@example.com", request.encrypted_value_);
@@ -320,6 +321,9 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
         },
         "access": {
             "user_id": "user456"
+        },
+        "debug": {
+            "reference_id": "ref789"
         }
     })";
     
@@ -335,6 +339,7 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
     ASSERT_EQ("gzip", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
     
     // Decrypt-specific field should be empty
     ASSERT_EQ("", request.encrypted_value_);
@@ -406,10 +411,10 @@ int main() {
     }
     
     try {
-        test_JsonRequestOptionalReferenceIdMissing();
-        PrintTestResult("JsonRequest optional reference_id missing", true);
+        test_JsonRequestRequiredReferenceIdMissing();
+        PrintTestResult("JsonRequest required reference_id missing", true);
     } catch (...) {
-        PrintTestResult("JsonRequest optional reference_id missing", false);
+        PrintTestResult("JsonRequest required reference_id missing", false);
         all_tests_passed = false;
     }
     

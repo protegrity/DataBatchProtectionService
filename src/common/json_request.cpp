@@ -32,9 +32,9 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"access", "user_id"})) {
         user_id_ = *parsed_value;
     }
-    
-    // Extract common optional fields
-    reference_id_ = SafeGetFromJsonPath(json_body, {"debug", "reference_id"});
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"debug", "reference_id"})) {
+        reference_id_ = *parsed_value;
+    }
 }
 
 bool JsonRequest::IsValid() const {
@@ -45,7 +45,8 @@ bool JsonRequest::IsValid() const {
            !encoding_.empty() && 
            !encrypted_compression_.empty() && 
            !key_id_.empty() && 
-           !user_id_.empty();
+           !user_id_.empty() && 
+           !reference_id_.empty();
 }
 
 std::string JsonRequest::GetValidationError() const {
@@ -59,6 +60,7 @@ std::string JsonRequest::GetValidationError() const {
     if (encrypted_compression_.empty()) missing_fields.push_back("data_batch_encrypted.value_format.compression");
     if (key_id_.empty()) missing_fields.push_back("encryption.key_id");
     if (user_id_.empty()) missing_fields.push_back("access.user_id");
+    if (reference_id_.empty()) missing_fields.push_back("debug.reference_id");
     
     if (missing_fields.empty()) {
         return "";
