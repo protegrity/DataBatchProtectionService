@@ -39,30 +39,23 @@ int main() {
             return CreateErrorResponse(error_msg);
         }
 
+        // Create response using our JsonResponse class
+        EncryptJsonResponse response;
+        
+        // Set common fields
+        response.user_id_ = request.user_id_;
+        response.role_ = "EmailReader";  // This would be determined by access control logic
+        response.access_control_ = "granted";
+        response.reference_id_ = request.reference_id_;
+        response.encrypted_compression_ = request.encrypted_compression_;
+
         // For now, we'll simulate encryption by creating a "processed" version of the input
-        // In a real implementation, this would involve actual encryption logic        
-        crow::json::wvalue response;
-
-        // Build data_batch_encrypted structure using the requested compression
-        crow::json::wvalue data_batch_encrypted;
-        data_batch_encrypted["value_format"]["compression"] = request.encrypted_compression_;
         // Simulate encryption by adding "ENCRYPTED_" prefix to the value
-        data_batch_encrypted["value"] = "ENCRYPTED_" + request.value_;
-        response["data_batch_encrypted"] = std::move(data_batch_encrypted);
-
-        // Build access structure using the actual user_id
-        crow::json::wvalue access;
-        access["user_id"] = request.user_id_;
-        access["role"] = "EmailReader";  // This would be determined by access control logic
-        access["access_control"] = "granted";
-        response["access"] = std::move(access);
-
-        // Build debug structure with reference_id
-        crow::json::wvalue debug;
-        debug["reference_id"] = request.reference_id_;
-        response["debug"] = std::move(debug);
-
-        return crow::response(200, response);
+        response.encrypted_value_ = "ENCRYPTED_" + request.value_;
+        
+        // Generate JSON response using our class
+        std::string response_json = response.ToJson();
+        return crow::response(200, response_json);
     });
 
     // Decryption endpoint - POST /decrypt
@@ -79,40 +72,33 @@ int main() {
             return CreateErrorResponse(error_msg);
         }
 
-        // For now, we'll simulate decryption by removing the "ENCRYPTED_" prefix
-        // In a real implementation, this would involve actual decryption logic        
-        crow::json::wvalue response;
-
-        // Build data_batch structure using the requested format
-        crow::json::wvalue data_batch;
-        data_batch["datatype"] = request.datatype_;
-        data_batch["value_format"]["compression"] = request.compression_;
-        data_batch["value_format"]["format"] = request.format_;
-        data_batch["value_format"]["encoding"] = request.encoding_;
+        // Create response using our JsonResponse class
+        DecryptJsonResponse response;
+        
+        // Set common fields
+        response.user_id_ = request.user_id_;
+        response.role_ = "EmailReader";  // This would be determined by access control logic
+        response.access_control_ = "granted";
+        response.reference_id_ = request.reference_id_;
+        
+        // Set decrypt-specific fields
+        response.datatype_ = request.datatype_;
+        response.compression_ = request.compression_;
+        response.format_ = request.format_;
+        response.encoding_ = request.encoding_;
+        
+        // For now, we'll simulate decryption by creating a "processed" version of the input
         // Simulate decryption by removing "ENCRYPTED_" prefix if present
         std::string decrypted_value = request.encrypted_value_;
         const std::string encrypted_prefix = "ENCRYPTED_";
         if (decrypted_value.starts_with(encrypted_prefix)) {
             decrypted_value = decrypted_value.substr(encrypted_prefix.length());
         }
-        data_batch["value"] = decrypted_value;
-        response["data_batch"] = std::move(data_batch);
-
-        // Build access structure using the actual user_id
-        crow::json::wvalue access;
-        access["user_id"] = request.user_id_;
-        access["role"] = "EmailReader";  // This would be determined by access control logic
-        access["access_control"] = "granted";
-        response["access"] = std::move(access);
-
-        // Build debug structure with reference_id
-        crow::json::wvalue debug;
-        debug["reference_id"] = request.reference_id_;
-        // Add pretty_printed_value for decryption (simulate human-readable output)
-        debug["pretty_printed_value"] = "user1@example.com\nuser2@example.com";
-        response["debug"] = std::move(debug);
-
-        return crow::response(200, response);
+        response.decrypted_value_ = decrypted_value;
+        
+        // Generate JSON response using our class
+        std::string response_json = response.ToJson();
+        return crow::response(200, response_json);
     });
 
     app.port(18080).multithreaded().run();
