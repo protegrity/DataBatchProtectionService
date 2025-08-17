@@ -34,6 +34,10 @@ public:
     std::string error_stage_;
     std::string error_message_;
     
+    // Result storage
+    std::string encrypted_result_;
+    std::string decrypted_result_;
+    
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
         const std::string& datatype,
@@ -77,8 +81,9 @@ private:
      */
     bool ValidateParameters();
     
-    // Decode base64 string to binary data using cppcodec library
+    // Encode-decode base64 string to binary data using cppcodec library
     std::vector<uint8_t> DecodeBase64(const std::string& base64_string);
+    std::string EncodeBase64(const std::vector<uint8_t>& data);
     
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);

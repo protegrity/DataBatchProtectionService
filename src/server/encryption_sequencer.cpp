@@ -48,7 +48,14 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         return false;
     }
     
-    // TODO: Store encrypted_data or return it
+    // Encode encrypted data back to base64
+    encrypted_result_ = EncodeBase64(encrypted_data);
+    if (encrypted_result_.empty()) {
+        error_stage_ = "base64_encoding";
+        error_message_ = "Failed to encode encrypted data to base64";
+        return false;
+    }
+    
     return true;
 }
 
@@ -81,7 +88,14 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::string& cipherte
         return false;
     }
     
-    // TODO: Store decrypted_data or return it
+    // Encode decrypted data back to base64
+    decrypted_result_ = EncodeBase64(decrypted_data);
+    if (decrypted_result_.empty()) {
+        error_stage_ = "base64_encoding";
+        error_message_ = "Failed to encode decrypted data to base64";
+        return false;
+    }
+    
     return true;
 }
 
@@ -178,6 +192,16 @@ std::vector<uint8_t> DataBatchEncryptionSequencer::DecodeBase64(const std::strin
     } catch (const std::exception& e) {
         // Return empty vector on any decoding error
         return std::vector<uint8_t>();
+    }
+}
+
+std::string DataBatchEncryptionSequencer::EncodeBase64(const std::vector<uint8_t>& data) {
+    try {
+        // Use cppcodec library for robust base64 encoding
+        return cppcodec::base64_rfc4648::encode(data);
+    } catch (const std::exception& e) {
+        // Return empty string on any encoding error
+        return "";
     }
 }
 
