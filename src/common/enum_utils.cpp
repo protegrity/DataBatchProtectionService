@@ -50,7 +50,7 @@ inline constexpr std::array<std::pair<T, std::string_view>, 8> kTypePairs{{
 std::string_view to_string(T v) {
     return lookup::to_string_impl(v, kTypePairs);
 }
-std::optional<T> from_string_type(std::string_view s) {
+std::optional<T> to_datatype_enum(std::string_view s) {
     return lookup::from_string_impl<T>(s, kTypePairs);
 }
 
@@ -72,7 +72,7 @@ inline constexpr std::array<std::pair<C, std::string_view>, 8> kCodecPairs{{
 std::string_view to_string(C v) {
     return lookup::to_string_impl(v, kCodecPairs);
 }
-std::optional<C> from_string_codec(std::string_view s) {
+std::optional<C> to_compression_enum(std::string_view s) {
     return lookup::from_string_impl<C>(s, kCodecPairs);
 }
 
@@ -89,7 +89,7 @@ inline constexpr std::array<std::pair<F, std::string_view>, 3> kFormatPairs{{
 std::string_view to_string(F v) {
     return lookup::to_string_impl(v, kFormatPairs);
 }
-std::optional<F> from_string_format(std::string_view s) {
+std::optional<F> to_format_enum(std::string_view s) {
     return lookup::from_string_impl<F>(s, kFormatPairs);
 }
 
@@ -105,7 +105,7 @@ inline constexpr std::array<std::pair<E, std::string_view>, 2> kEncodingPairs{{
 std::string_view to_string(E v) {
     return lookup::to_string_impl(v, kEncodingPairs);
 }
-std::optional<E> from_string_encoding(std::string_view s) {
+std::optional<E> to_encoding_enum(std::string_view s) {
     return lookup::from_string_impl<E>(s, kEncodingPairs);
 }
 

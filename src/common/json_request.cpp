@@ -98,6 +98,13 @@ std::string JsonRequest::GetValidationError() const {
 }
 
 std::string JsonRequest::ToJson() const {
+    if (!IsValid()) {
+        // Return a fixed error JSON indicating invalid state
+        crow::json::wvalue error_json;
+        error_json["error"] = "Invalid JSON request";
+        error_json["details"] = GetValidationError();
+        return error_json.dump();
+    }
     return ToJsonObject().dump();
 }
 
@@ -342,6 +349,13 @@ std::string JsonResponse::GetValidationError() const {
 }
 
 std::string JsonResponse::ToJson() const {
+    if (!IsValid()) {
+        // Return a fixed error JSON indicating invalid state
+        crow::json::wvalue error_json;
+        error_json["error"] = "Invalid JSON response";
+        error_json["details"] = GetValidationError();
+        return error_json.dump();
+    }
     return ToJsonObject().dump();
 }
 

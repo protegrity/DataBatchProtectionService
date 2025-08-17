@@ -1,6 +1,8 @@
 #include "enum_utils.h"
 #include <iostream>
 #include <cassert>
+#include <set>
+#include <algorithm>
 
 // Simple test framework
 #define TEST(name) void test_##name()
@@ -37,53 +39,53 @@ TEST(TypeToStringConversion) {
 }
 
 TEST(TypeFromStringConversion) {
-    auto result = from_string_type("BOOLEAN");
+    auto result = to_datatype_enum("BOOLEAN");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::BOOLEAN, result.value());
     
-    result = from_string_type("INT32");
+    result = to_datatype_enum("INT32");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::INT32, result.value());
     
-    result = from_string_type("INT64");
+    result = to_datatype_enum("INT64");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::INT64, result.value());
     
-    result = from_string_type("INT96");
+    result = to_datatype_enum("INT96");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::INT96, result.value());
     
-    result = from_string_type("FLOAT");
+    result = to_datatype_enum("FLOAT");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::FLOAT, result.value());
     
-    result = from_string_type("DOUBLE");
+    result = to_datatype_enum("DOUBLE");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::DOUBLE, result.value());
     
-    result = from_string_type("BYTE_ARRAY");
+    result = to_datatype_enum("BYTE_ARRAY");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::BYTE_ARRAY, result.value());
     
-    result = from_string_type("FIXED_LEN_BYTE_ARRAY");
+    result = to_datatype_enum("FIXED_LEN_BYTE_ARRAY");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::FIXED_LEN_BYTE_ARRAY, result.value());
 }
 
 TEST(TypeInvalidFromString) {
-    auto result = from_string_type("INVALID");
+    auto result = to_datatype_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_type("boolean");  // lowercase
+    result = to_datatype_enum("boolean");  // lowercase
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_type("BYTEARRAY");  // missing underscore
+    result = to_datatype_enum("BYTEARRAY");  // missing underscore
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_type("");
+    result = to_datatype_enum("");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_type("UNKNOWN");
+    result = to_datatype_enum("UNKNOWN");
     ASSERT_FALSE(result.has_value());
 }
 
@@ -100,53 +102,53 @@ TEST(CompressionCodecToStringConversion) {
 }
 
 TEST(CompressionCodecFromStringConversion) {
-    auto result = from_string_codec("UNCOMPRESSED");
+    auto result = to_compression_enum("UNCOMPRESSED");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, result.value());
     
-    result = from_string_codec("SNAPPY");
+    result = to_compression_enum("SNAPPY");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::SNAPPY, result.value());
     
-    result = from_string_codec("GZIP");
+    result = to_compression_enum("GZIP");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::GZIP, result.value());
     
-    result = from_string_codec("LZO");
+    result = to_compression_enum("LZO");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::LZO, result.value());
     
-    result = from_string_codec("BROTLI");
+    result = to_compression_enum("BROTLI");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::BROTLI, result.value());
     
-    result = from_string_codec("LZ4");
+    result = to_compression_enum("LZ4");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::LZ4, result.value());
     
-    result = from_string_codec("ZSTD");
+    result = to_compression_enum("ZSTD");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::ZSTD, result.value());
     
-    result = from_string_codec("LZ4_RAW");
+    result = to_compression_enum("LZ4_RAW");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::LZ4_RAW, result.value());
 }
 
 TEST(CompressionCodecInvalidFromString) {
-    auto result = from_string_codec("INVALID");
+    auto result = to_compression_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_codec("gzip");  // lowercase
+    result = to_compression_enum("gzip");  // lowercase
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_codec("LZ4RAW");  // missing underscore
+    result = to_compression_enum("LZ4RAW");  // missing underscore
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_codec("");
+    result = to_compression_enum("");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_codec("NONE");  // common alternative
+    result = to_compression_enum("NONE");  // common alternative
     ASSERT_FALSE(result.has_value());
 }
 
@@ -158,33 +160,33 @@ TEST(FormatToStringConversion) {
 }
 
 TEST(FormatFromStringConversion) {
-    auto result = from_string_format("JSON");
+    auto result = to_format_enum("JSON");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Format::JSON, result.value());
     
-    result = from_string_format("CSV");
+    result = to_format_enum("CSV");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Format::CSV, result.value());
     
-    result = from_string_format("RAW_C_DATA");
+    result = to_format_enum("RAW_C_DATA");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Format::RAW_C_DATA, result.value());
 }
 
 TEST(FormatInvalidFromString) {
-    auto result = from_string_format("INVALID");
+    auto result = to_format_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_format("json");  // lowercase
+    result = to_format_enum("json");  // lowercase
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_format("RAWC_DATA");  // missing underscore
+    result = to_format_enum("RAWC_DATA");  // missing underscore
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_format("");
+    result = to_format_enum("");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_format("XML");  // common format
+    result = to_format_enum("XML");  // common format
     ASSERT_FALSE(result.has_value());
 }
 
@@ -195,29 +197,29 @@ TEST(EncodingToStringConversion) {
 }
 
 TEST(EncodingFromStringConversion) {
-    auto result = from_string_encoding("UTF8");
+    auto result = to_encoding_enum("UTF8");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Encoding::UTF8, result.value());
     
-    result = from_string_encoding("BASE64");
+    result = to_encoding_enum("BASE64");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Encoding::BASE64, result.value());
 }
 
 TEST(EncodingInvalidFromString) {
-    auto result = from_string_encoding("INVALID");
+    auto result = to_encoding_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_encoding("utf8");  // lowercase
+    result = to_encoding_enum("utf8");  // lowercase
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_encoding("UTF-8");  // with hyphen
+    result = to_encoding_enum("UTF-8");  // with hyphen
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_encoding("");
+    result = to_encoding_enum("");
     ASSERT_FALSE(result.has_value());
     
-    result = from_string_encoding("ASCII");  // common encoding
+    result = to_encoding_enum("ASCII");  // common encoding
     ASSERT_FALSE(result.has_value());
 }
 
@@ -231,7 +233,7 @@ TEST(RoundTripTypeConversion) {
     
     for (auto type : types) {
         auto str = to_string(type);
-        auto converted = from_string_type(str);
+        auto converted = to_datatype_enum(str);
         ASSERT_TRUE(converted.has_value());
         ASSERT_EQ(type, converted.value());
     }
@@ -247,7 +249,7 @@ TEST(RoundTripCompressionCodecConversion) {
     
     for (auto codec : codecs) {
         auto str = to_string(codec);
-        auto converted = from_string_codec(str);
+        auto converted = to_compression_enum(str);
         ASSERT_TRUE(converted.has_value());
         ASSERT_EQ(codec, converted.value());
     }
@@ -261,7 +263,7 @@ TEST(RoundTripFormatConversion) {
     
     for (auto format : formats) {
         auto str = to_string(format);
-        auto converted = from_string_format(str);
+        auto converted = to_format_enum(str);
         ASSERT_TRUE(converted.has_value());
         ASSERT_EQ(format, converted.value());
     }
@@ -275,7 +277,7 @@ TEST(RoundTripEncodingConversion) {
     
     for (auto encoding : encodings) {
         auto str = to_string(encoding);
-        auto converted = from_string_encoding(str);
+        auto converted = to_encoding_enum(str);
         ASSERT_TRUE(converted.has_value());
         ASSERT_EQ(encoding, converted.value());
     }
@@ -283,42 +285,42 @@ TEST(RoundTripEncodingConversion) {
 
 // Test edge cases
 TEST(EmptyStringHandling) {
-    ASSERT_FALSE(from_string_type("").has_value());
-    ASSERT_FALSE(from_string_codec("").has_value());
-    ASSERT_FALSE(from_string_format("").has_value());
-    ASSERT_FALSE(from_string_encoding("").has_value());
+    ASSERT_FALSE(to_datatype_enum("").has_value());
+    ASSERT_FALSE(to_compression_enum("").has_value());
+    ASSERT_FALSE(to_format_enum("").has_value());
+    ASSERT_FALSE(to_encoding_enum("").has_value());
 }
 
 TEST(WhitespaceHandling) {
-    ASSERT_FALSE(from_string_type(" BYTE_ARRAY").has_value());
-    ASSERT_FALSE(from_string_type("BYTE_ARRAY ").has_value());
-    ASSERT_FALSE(from_string_type(" BYTE_ARRAY ").has_value());
+    ASSERT_FALSE(to_datatype_enum(" BYTE_ARRAY").has_value());
+    ASSERT_FALSE(to_datatype_enum("BYTE_ARRAY ").has_value());
+    ASSERT_FALSE(to_datatype_enum(" BYTE_ARRAY ").has_value());
     
-    ASSERT_FALSE(from_string_codec(" GZIP").has_value());
-    ASSERT_FALSE(from_string_codec("GZIP ").has_value());
-    ASSERT_FALSE(from_string_codec(" GZIP ").has_value());
+    ASSERT_FALSE(to_compression_enum(" GZIP").has_value());
+    ASSERT_FALSE(to_compression_enum("GZIP ").has_value());
+    ASSERT_FALSE(to_compression_enum(" GZIP ").has_value());
 }
 
 TEST(CaseSensitivity) {
     // Test that conversions are case-sensitive
-    ASSERT_FALSE(from_string_type("byte_array").has_value());
-    ASSERT_FALSE(from_string_type("Byte_Array").has_value());
-    ASSERT_FALSE(from_string_type("BYTE_array").has_value());
+    ASSERT_FALSE(to_datatype_enum("byte_array").has_value());
+    ASSERT_FALSE(to_datatype_enum("Byte_Array").has_value());
+    ASSERT_FALSE(to_datatype_enum("BYTE_array").has_value());
     
-    ASSERT_FALSE(from_string_codec("gzip").has_value());
-    ASSERT_FALSE(from_string_codec("Gzip").has_value());
-    ASSERT_FALSE(from_string_codec("GZIp").has_value());
+    ASSERT_FALSE(to_compression_enum("gzip").has_value());
+    ASSERT_FALSE(to_compression_enum("Gzip").has_value());
+    ASSERT_FALSE(to_compression_enum("GZIp").has_value());
 }
 
 TEST(StringViewCompatibility) {
     // Test that string_view works correctly
     std::string_view type_str = "BYTE_ARRAY";
-    auto result = from_string_type(type_str);
+    auto result = to_datatype_enum(type_str);
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::BYTE_ARRAY, result.value());
     
     std::string_view codec_str = "GZIP";
-    auto codec_result = from_string_codec(codec_str);
+    auto codec_result = to_compression_enum(codec_str);
     ASSERT_TRUE(codec_result.has_value());
     ASSERT_EQ(CompressionCodec::GZIP, codec_result.value());
 }
@@ -336,6 +338,165 @@ TEST(RuntimeEvaluation) {
     ASSERT_EQ("GZIP", std::string(codec_str));
     ASSERT_EQ("CSV", std::string(format_str));
     ASSERT_EQ("UTF8", std::string(encoding_str));
+}
+
+// Protection tests: ensure enum_utils stays in sync with enum definitions
+TEST(TypeEnumCompleteness) {
+    // Define all known Type enum values
+    Type::type all_types[] = {
+        Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
+    };
+    
+    // Test that every enum value can be converted to string and back
+    for (auto type : all_types) {
+        auto str = to_string(type);
+        ASSERT_TRUE(str != "UNKNOWN");  // Should not return UNKNOWN for valid enum
+        
+        auto converted = to_datatype_enum(str);
+        ASSERT_TRUE(converted.has_value());
+        ASSERT_EQ(type, converted.value());
+    }
+}
+
+TEST(CompressionCodecEnumCompleteness) {
+    // Define all known CompressionCodec enum values
+    CompressionCodec::type all_codecs[] = {
+        CompressionCodec::UNCOMPRESSED, CompressionCodec::SNAPPY, CompressionCodec::GZIP,
+        CompressionCodec::LZO, CompressionCodec::BROTLI, CompressionCodec::LZ4,
+        CompressionCodec::ZSTD, CompressionCodec::LZ4_RAW
+    };
+    
+    // Test that every enum value can be converted to string and back
+    for (auto codec : all_codecs) {
+        auto str = to_string(codec);
+        ASSERT_TRUE(str != "UNKNOWN");  // Should not return UNKNOWN for valid enum
+        
+        auto converted = to_compression_enum(str);
+        ASSERT_TRUE(converted.has_value());
+        ASSERT_EQ(codec, converted.value());
+    }
+}
+
+TEST(FormatEnumCompleteness) {
+    // Define all known Format enum values
+    Format::type all_formats[] = {
+        Format::JSON, Format::CSV, Format::RAW_C_DATA
+    };
+    
+    // Test that every enum value can be converted to string and back
+    for (auto format : all_formats) {
+        auto str = to_string(format);
+        ASSERT_TRUE(str != "UNKNOWN");  // Should not return UNKNOWN for valid enum
+        
+        auto converted = to_format_enum(str);
+        ASSERT_TRUE(converted.has_value());
+        ASSERT_EQ(format, converted.value());
+    }
+}
+
+TEST(EncodingEnumCompleteness) {
+    // Define all known Encoding enum values
+    Encoding::type all_encodings[] = {
+        Encoding::UTF8, Encoding::BASE64
+    };
+    
+    // Test that every enum value can be converted to string and back
+    for (auto encoding : all_encodings) {
+        auto str = to_string(encoding);
+        ASSERT_TRUE(str != "UNKNOWN");  // Should not return UNKNOWN for valid enum
+        
+        auto converted = to_encoding_enum(str);
+        ASSERT_TRUE(converted.has_value());
+        ASSERT_EQ(encoding, converted.value());
+    }
+}
+
+TEST(StringUniqueness) {
+    // Test that all string representations are unique
+    std::set<std::string> type_strings;
+    std::set<std::string> codec_strings;
+    std::set<std::string> format_strings;
+    std::set<std::string> encoding_strings;
+    
+    // Collect all Type strings
+    Type::type all_types[] = {
+        Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
+    };
+    for (auto type : all_types) {
+        type_strings.insert(std::string(to_string(type)));
+    }
+    ASSERT_EQ(8, type_strings.size());  // All strings should be unique
+    
+    // Collect all CompressionCodec strings
+    CompressionCodec::type all_codecs[] = {
+        CompressionCodec::UNCOMPRESSED, CompressionCodec::SNAPPY, CompressionCodec::GZIP,
+        CompressionCodec::LZO, CompressionCodec::BROTLI, CompressionCodec::LZ4,
+        CompressionCodec::ZSTD, CompressionCodec::LZ4_RAW
+    };
+    for (auto codec : all_codecs) {
+        codec_strings.insert(std::string(to_string(codec)));
+    }
+    ASSERT_EQ(8, codec_strings.size());  // All strings should be unique
+    
+    // Collect all Format strings
+    Format::type all_formats[] = {
+        Format::JSON, Format::CSV, Format::RAW_C_DATA
+    };
+    for (auto format : all_formats) {
+        format_strings.insert(std::string(to_string(format)));
+    }
+    ASSERT_EQ(3, format_strings.size());  // All strings should be unique
+    
+    // Collect all Encoding strings
+    Encoding::type all_encodings[] = {
+        Encoding::UTF8, Encoding::BASE64
+    };
+    for (auto encoding : all_encodings) {
+        encoding_strings.insert(std::string(to_string(encoding)));
+    }
+    ASSERT_EQ(2, encoding_strings.size());  // All strings should be unique
+}
+
+TEST(CrossEnumStringCollision) {
+    // Test that strings from different enums don't collide
+    std::set<std::string> all_strings;
+    
+    // Collect all strings from all enums
+    Type::type all_types[] = {
+        Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
+    };
+    for (auto type : all_types) {
+        all_strings.insert(std::string(to_string(type)));
+    }
+    
+    CompressionCodec::type all_codecs[] = {
+        CompressionCodec::UNCOMPRESSED, CompressionCodec::SNAPPY, CompressionCodec::GZIP,
+        CompressionCodec::LZO, CompressionCodec::BROTLI, CompressionCodec::LZ4,
+        CompressionCodec::ZSTD, CompressionCodec::LZ4_RAW
+    };
+    for (auto codec : all_codecs) {
+        all_strings.insert(std::string(to_string(codec)));
+    }
+    
+    Format::type all_formats[] = {
+        Format::JSON, Format::CSV, Format::RAW_C_DATA
+    };
+    for (auto format : all_formats) {
+        all_strings.insert(std::string(to_string(format)));
+    }
+    
+    Encoding::type all_encodings[] = {
+        Encoding::UTF8, Encoding::BASE64
+    };
+    for (auto encoding : all_encodings) {
+        all_strings.insert(std::string(to_string(encoding)));
+    }
+    
+    // Total should be 8 + 8 + 3 + 2 = 21 unique strings
+    ASSERT_EQ(21, all_strings.size());
 }
 
 int main() {
@@ -373,6 +534,14 @@ int main() {
     test_CaseSensitivity();
     test_StringViewCompatibility();
     test_RuntimeEvaluation();
+    
+    // Protection tests
+    test_TypeEnumCompleteness();
+    test_CompressionCodecEnumCompleteness();
+    test_FormatEnumCompleteness();
+    test_EncodingEnumCompleteness();
+    test_StringUniqueness();
+    test_CrossEnumStringCollision();
     
     std::cout << "All enum utils tests passed!" << std::endl;
     return 0;
