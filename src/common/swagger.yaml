@@ -53,8 +53,8 @@ paths:
                     datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
-                      format: raw-c-data
-                      encoding: base64
+                      format: RAW_C_DATA
+                      encoding: BASE64
                     value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                   data_batch_encrypted:
                     value_format:
@@ -90,8 +90,8 @@ paths:
                     datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
-                      format: csv
-                      encoding: utf-8
+                      format: CSV
+                      encoding: UTF8
                   data_batch_encrypted:
                     value_format:
                       compression: ZSTD
@@ -229,8 +229,8 @@ paths:
                     datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
-                      format: raw-c-data
-                      encoding: base64
+                      format: RAW_C_DATA
+                      encoding: BASE64
                   encryption:
                     key_id: EMAIL_KEY_001
                   access:
@@ -264,8 +264,8 @@ paths:
                     datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
-                      format: csv
-                      encoding: utf-8
+                      format: CSV
+                      encoding: UTF8
                   encryption:
                     key_id: NumericID001
                   access:
@@ -302,8 +302,8 @@ paths:
                       datatype: BYTE_ARRAY
                       value_format:
                         compression: UNCOMPRESSED
-                        format: raw-c-data
-                        encoding: base64
+                        format: RAW_C_DATA
+                        encoding: BASE64
                       value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                     access:
                       user_id: user123
@@ -321,8 +321,8 @@ paths:
                       datatype: INT32
                       value_format:
                         compression: UNCOMPRESSED
-                        format: csv
-                        encoding: utf-8
+                        format: CSV
+                        encoding: UTF8
                       value: "3344,5566,7788"
                     access:
                       user_id: GRM_009
@@ -444,16 +444,16 @@ components:
     serialization_format:
       type: string
       enum:
-        - json
-        - csv
-        - raw-c-data
+        - JSON
+        - CSV
+        - RAW_C_DATA
       description: Format used for serializing the data
 
     encoding:
       type: string
       enum:
-        - utf-8
-        - base64
+        - UTF8
+        - BASE64
       description: Encoding applied to the data
 
     value_format:
