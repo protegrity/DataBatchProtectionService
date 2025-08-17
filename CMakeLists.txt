@@ -35,3 +35,13 @@ target_include_directories(json_request_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   src/common
 )
+
+# Add enum utils test executable
+add_executable(enum_utils_test
+  src/common/enum_utils_test.cpp
+  src/common/enum_utils.cpp
+)
+
+target_include_directories(enum_utils_test PRIVATE
+  src/common
+)
