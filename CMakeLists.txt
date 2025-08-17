@@ -26,6 +26,7 @@ add_executable(dbps_api_server
   src/server/dbps_api_server.cpp
   src/server/encryption_sequencer.cpp
   src/common/json_request.cpp
+  src/common/enum_utils.cpp
 )
 
 target_include_directories(dbps_api_server PRIVATE
