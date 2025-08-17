@@ -13,15 +13,24 @@ FetchContent_Declare(
   GIT_TAG v1.0+2
 )
 
-FetchContent_MakeAvailable(crow)
+# cppcodec is a header-only base64 library
+FetchContent_Declare(
+  cppcodec
+  GIT_REPOSITORY https://github.com/tplgy/cppcodec.git
+  GIT_TAG v0.2
+)
+
+FetchContent_MakeAvailable(crow cppcodec)
 
 add_executable(dbps_api_server 
   src/server/dbps_api_server.cpp
+  src/server/encryption_sequencer.cpp
   src/common/json_request.cpp
 )
 
 target_include_directories(dbps_api_server PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   src/common
 )
 
@@ -45,3 +54,17 @@ add_executable(enum_utils_test
 target_include_directories(enum_utils_test PRIVATE
   src/common
 )
+
+# Add encryption sequencer test executable
+add_executable(encryption_sequencer_test
+  src/server/encryption_sequencer_test.cpp
+  src/server/encryption_sequencer.cpp
+  src/common/enum_utils.cpp
+)
+
+target_include_directories(encryption_sequencer_test PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  src/common
+)
+
+
