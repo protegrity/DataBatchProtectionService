@@ -133,7 +133,7 @@ paths:
                     data_batch_encrypted:
                       value_format:
                         compression: ZSTD
-                      value: RW5jcnlwdGVkQmFzZTY0QmxvYg==
+                      value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
                     access:
                       user_id: user123
                       role: EmailReader
@@ -224,7 +224,7 @@ paths:
                   data_batch_encrypted:
                     value_format:
                       compression: ZSTD
-                    value: RW5jcnlwdGVkQmFzZTY0QmxvYg==
+                    value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
                   data_batch:
                     datatype: BYTE_ARRAY
                     value_format:
