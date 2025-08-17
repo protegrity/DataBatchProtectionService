@@ -61,8 +61,10 @@ The project includes unit tests for the JSON request parsing classes. To run the
 # Build the test executables
 cmake -B build -S . -G Ninja && cmake --build build --target json_request_test
 cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test
+cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test
 
 # Run the tests
 ./build/json_request_test
 ./build/enum_utils_test
+./build/encryption_sequencer_test
 ```
