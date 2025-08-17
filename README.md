@@ -47,8 +47,9 @@ Make changes to source files as needed.
 
 Then build and run manually from inside the docker container bash
 ```
-# cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
-# ./build/dbps_api_server
+# Build then run server
+cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
+./build/dbps_api_server
 ```
 
 ## Running Tests
