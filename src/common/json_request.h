@@ -66,7 +66,7 @@ public:
 
 protected:
     /**
-     * Converts the parsed request object back to JSON format.
+     * Generates a JSON string from the member variables representing the request.
      * @return String representation of the JSON
      */
     virtual std::string ToJsonString() const = 0;
@@ -106,7 +106,7 @@ public:
 
 protected:
     /**
-     * Converts the parsed request object back to JSON format.
+     * Generates a JSON string from the member variables representing the request.
      * @return String representation of the JSON
      */
     std::string ToJsonString() const override;
@@ -146,7 +146,7 @@ public:
 
 protected:
     /**
-     * Converts the parsed request object back to JSON format.
+     * Generates a JSON string from the member variables representing the request.
      * @return String representation of the JSON
      */
     std::string ToJsonString() const override;
@@ -202,7 +202,7 @@ public:
 
 protected:
     /**
-     * Converts the response object back to JSON format.
+     * Generates a JSON string from the member variables representing the response.
      * @return String representation of the JSON
      */
     virtual std::string ToJsonString() const = 0;
@@ -243,7 +243,7 @@ public:
 
 protected:
     /**
-     * Converts the response object back to JSON format.
+     * Generates a JSON string from the member variables representing the response.
      * @return String representation of the JSON
      */
     std::string ToJsonString() const override;
@@ -287,7 +287,7 @@ public:
 
 protected:
     /**
-     * Converts the response object back to JSON format.
+     * Generates a JSON string from the member variables representing the response.
      * @return String representation of the JSON
      */
     std::string ToJsonString() const override;

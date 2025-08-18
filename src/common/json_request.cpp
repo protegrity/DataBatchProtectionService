@@ -194,6 +194,7 @@ std::string EncryptJsonRequest::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
+    // Converts crow json object to a string
     return json.dump();
 }
 
@@ -272,7 +273,8 @@ std::string DecryptJsonRequest::ToJsonString() const {
     crow::json::wvalue debug;
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
-    
+
+    // Converts crow json object to a string
     return json.dump();
 }
 
@@ -415,6 +417,7 @@ std::string EncryptJsonResponse::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
+    // Converts crow json object to a string
     return json.dump();
 }
 
@@ -474,5 +477,6 @@ std::string DecryptJsonResponse::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
+    // Converts crow json object to a string
     return json.dump();
 }
