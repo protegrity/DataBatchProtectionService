@@ -81,5 +81,3 @@ target_include_directories(dpba_interface_test PRIVATE
   src/common
   src/common/tcb
 )
-
-
