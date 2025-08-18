@@ -1,22 +1,8 @@
 #pragma once
 
-#include <crow/app.h>
 #include <vector>
 #include <string>
 #include <optional>
-
-/**
-* Safely extracts a string value from a nested JSON path.
-*
-* Traverses a JSON object following a specified path and returns
-* the string value at the end of the path. If any part of the path doesn't exist
-* or if an exception occurs during traversal, it returns std::nullopt.
-*
-* @param json_body The JSON object to traverse
-* @param path Vector of strings representing the path to traverse
-* @return std::optional<std::string> containing the value if found, std::nullopt otherwise
-*/
-std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
 
 /**
  * Base class for parsing and validating JSON request fields.
@@ -81,9 +67,9 @@ public:
 protected:
     /**
      * Converts the parsed request object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    virtual crow::json::wvalue ToJsonObject() const = 0;
+    virtual std::string ToJsonString() const = 0;
 };
 
 /**
@@ -121,9 +107,9 @@ public:
 protected:
     /**
      * Converts the parsed request object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    crow::json::wvalue ToJsonObject() const override;
+    std::string ToJsonString() const override;
 };
 
 /**
@@ -161,9 +147,9 @@ public:
 protected:
     /**
      * Converts the parsed request object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    crow::json::wvalue ToJsonObject() const override;
+    std::string ToJsonString() const override;
 };
 
 /**
@@ -217,9 +203,9 @@ public:
 protected:
     /**
      * Converts the response object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    virtual crow::json::wvalue ToJsonObject() const = 0;
+    virtual std::string ToJsonString() const = 0;
 };
 
 /**
@@ -258,9 +244,9 @@ public:
 protected:
     /**
      * Converts the response object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    crow::json::wvalue ToJsonObject() const override;
+    std::string ToJsonString() const override;
 };
 
 /**
@@ -302,7 +288,7 @@ public:
 protected:
     /**
      * Converts the response object back to JSON format.
-     * @return crow::json::wvalue representing the current state of the object
+     * @return String representation of the JSON
      */
-    crow::json::wvalue ToJsonObject() const override;
+    std::string ToJsonString() const override;
 };

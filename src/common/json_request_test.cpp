@@ -1,7 +1,11 @@
 #include <iostream>
 #include <string>
 #include <cassert>
+#include <crow/app.h>
 #include "json_request.h"
+
+// Forward declaration for internal function from json_request.cpp
+std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
 
 // Test-specific derived class to access protected methods
 class TestableJsonRequest : public JsonRequest {
@@ -11,22 +15,22 @@ public:
         ParseCommon(request_body);
     }
     
-    // Implement the pure virtual ToJsonObject method for testing
-    crow::json::wvalue ToJsonObject() const override {
+    // Implement the pure virtual ToJsonString method for testing
+    std::string ToJsonString() const override {
         crow::json::wvalue json;
         json["test"] = "testable_request";
-        return json;
+        return json.dump();
     }
 };
 
 // Test-specific derived class for JsonResponse base class testing
 class TestableJsonResponse : public JsonResponse {
 public:
-    // Implement the pure virtual ToJsonObject method for testing
-    crow::json::wvalue ToJsonObject() const override {
+    // Implement the pure virtual ToJsonString method for testing
+    std::string ToJsonString() const override {
         crow::json::wvalue json;
         json["test"] = "testable_response";
-        return json;
+        return json.dump();
     }
 };
 
