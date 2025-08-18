@@ -168,6 +168,13 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
         return false;
     }
     
+    // Check encrypted_compression: must be UNCOMPRESSED
+    if (encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
+        error_stage_ = "parameter_validation";
+        error_message_ = "Only UNCOMPRESSED encrypted_compression is supported";
+        return false;
+    }
+    
     // Check encoding: must be BASE64
     if (encoding_enum_ != dbps::external::Encoding::BASE64) {
         error_stage_ = "parameter_validation";
