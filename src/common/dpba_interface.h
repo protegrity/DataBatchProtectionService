@@ -23,7 +23,8 @@ namespace dbps::external {
  * - While handle to EncryptionResult/DecryptionResult exists, ciphertext()/plaintext() is guaranteed to return valid data
  * - Read operations are not destructive. Multiple calls return the same data
  * - Destructor must dispose of internal memory (either by delegation or cleanup)
- * - No throwing exceptions. Errors reported via success() flag and error methods
+ * - No throwing exceptions. Errors reported via success() flag and error methods.
+ * - Library users must check size() to ensure the actual size of the returned payload.
  */
 
 class DBPS_EXPORT EncryptionResult {
@@ -31,6 +32,7 @@ public:
     virtual span<const uint8_t> ciphertext() const = 0;
 
     // Allows a larger backing buffer than the exact ciphertext size.
+    // Library users must check size() to ensure the actual size of the returned payload.
     virtual std::size_t size() const = 0;
 
     // Success flag; false indicates an error.
@@ -48,6 +50,7 @@ public:
     virtual span<const uint8_t> plaintext() const = 0;
 
     // Allows a larger backing buffer than the exact plaintext size.
+    // Library users must check size() to ensure the actual size of the returned payload.
     virtual std::size_t size() const = 0;
 
     // Success flag; false indicates an error.
