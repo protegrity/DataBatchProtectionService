@@ -1,6 +1,7 @@
 #include <crow/app.h>
 #include <string>
 #include "json_request.h"
+#include "encryption_sequencer.h"
 
 
 
@@ -49,9 +50,22 @@ int main() {
         response.reference_id_ = request.reference_id_;
         response.encrypted_compression_ = request.encrypted_compression_;
 
-        // For now, we'll simulate encryption by creating a "processed" version of the input
-        // Simulate encryption by adding "ENCRYPTED_" prefix to the value
-        response.encrypted_value_ = "ENCRYPTED_" + request.value_;
+        // Use DataBatchEncryptionSequencer for actual encryption
+        DataBatchEncryptionSequencer sequencer(
+            request.datatype_,
+            request.compression_,
+            request.format_,
+            request.encoding_,
+            request.encrypted_compression_,
+            request.key_id_
+        );
+        
+        bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
+        if (!encrypt_result) {
+            return CreateErrorResponse("Encryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
+        }
+        
+        response.encrypted_value_ = sequencer.encrypted_result_;
         
         // Generate JSON response using our class
         std::string response_json = response.ToJson();
@@ -87,14 +101,22 @@ int main() {
         response.format_ = request.format_;
         response.encoding_ = request.encoding_;
         
-        // For now, we'll simulate decryption by creating a "processed" version of the input
-        // Simulate decryption by removing "ENCRYPTED_" prefix if present
-        std::string decrypted_value = request.encrypted_value_;
-        const std::string encrypted_prefix = "ENCRYPTED_";
-        if (decrypted_value.starts_with(encrypted_prefix)) {
-            decrypted_value = decrypted_value.substr(encrypted_prefix.length());
+        // Use DataBatchEncryptionSequencer for actual decryption
+        DataBatchEncryptionSequencer sequencer(
+            request.datatype_,
+            request.compression_,
+            request.format_,
+            request.encoding_,
+            request.encrypted_compression_,
+            request.key_id_
+        );
+        
+        bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);
+        if (!decrypt_result) {
+            return CreateErrorResponse("Decryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
         }
-        response.decrypted_value_ = decrypted_value;
+        
+        response.decrypted_value_ = sequencer.decrypted_result_;
         
         // Generate JSON response using our class
         std::string response_json = response.ToJson();
