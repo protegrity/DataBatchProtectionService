@@ -33,6 +33,7 @@ target_include_directories(dbps_api_server PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   src/common
+  src/common/tcb
 )
 
 # Add test executable
@@ -44,6 +45,7 @@ add_executable(json_request_test
 target_include_directories(json_request_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   src/common
+  src/common/tcb
 )
 
 # Add enum utils test executable
@@ -54,6 +56,7 @@ add_executable(enum_utils_test
 
 target_include_directories(enum_utils_test PRIVATE
   src/common
+  src/common/tcb
 )
 
 # Add encryption sequencer test executable
@@ -66,4 +69,15 @@ add_executable(encryption_sequencer_test
 target_include_directories(encryption_sequencer_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   src/common
+  src/common/tcb
+)
+
+# Add dpba interface test executable
+add_executable(dpba_interface_test
+  src/common/dpba_interface_test.cpp
+)
+
+target_include_directories(dpba_interface_test PRIVATE
+  src/common
+  src/common/tcb
 )
