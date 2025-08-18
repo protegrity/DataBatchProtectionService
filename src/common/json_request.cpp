@@ -1,21 +1,18 @@
 #include "json_request.h"
+#include <crow/app.h>
 #include <sstream>
 
-// Helper function to build validation error message from missing fields
-static std::string BuildValidationError(const std::vector<std::string>& missing_fields) {
-    if (missing_fields.empty()) {
-        return "";
-    }
-    std::ostringstream oss;
-    oss << "Missing required fields: ";
-    for (size_t i = 0; i < missing_fields.size(); ++i) {
-        if (i > 0) oss << ", ";
-        oss << missing_fields[i];
-    }
-    return oss.str();
-}
-
-// Utility function to safely extract a string value from a nested JSON path
+/**
+* Safely extracts a string value from a nested JSON path.
+*
+* Traverses a JSON object following a specified path and returns
+* the string value at the end of the path. If any part of the path doesn't exist
+* or if an exception occurs during traversal, it returns std::nullopt.
+*
+* @param json_body The JSON object to traverse
+* @param path Vector of strings representing the path to traverse
+* @return std::optional<std::string> containing the value if found, std::nullopt otherwise
+*/
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path) {
     try {
         const crow::json::rvalue* current = &json_body;
@@ -30,6 +27,20 @@ std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_bo
         CROW_LOG_ERROR << "Exception in SafeGetFromJsonPath: " << e.what();
         return std::nullopt;
     }
+}
+
+// Helper function to build validation error message from missing fields
+static std::string BuildValidationError(const std::vector<std::string>& missing_fields) {
+    if (missing_fields.empty()) {
+        return "";
+    }
+    std::ostringstream oss;
+    oss << "Missing required fields: ";
+    for (size_t i = 0; i < missing_fields.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << missing_fields[i];
+    }
+    return oss.str();
 }
 
 // JsonRequest implementation
@@ -105,7 +116,7 @@ std::string JsonRequest::ToJson() const {
         error_json["details"] = GetValidationError();
         return error_json.dump();
     }
-    return ToJsonObject().dump();
+    return ToJsonString();
 }
 
 // EncryptJsonRequest implementation
@@ -140,7 +151,7 @@ std::string EncryptJsonRequest::GetValidationError() const {
     return "";
 }
 
-crow::json::wvalue EncryptJsonRequest::ToJsonObject() const {
+std::string EncryptJsonRequest::ToJsonString() const {
     crow::json::wvalue json;
     
     // Build column_reference
@@ -183,7 +194,8 @@ crow::json::wvalue EncryptJsonRequest::ToJsonObject() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    return json;
+    // Converts crow json object to a string
+    return json.dump();
 }
 
 // DecryptJsonRequest implementation
@@ -218,7 +230,7 @@ std::string DecryptJsonRequest::GetValidationError() const {
     return "";
 }
 
-crow::json::wvalue DecryptJsonRequest::ToJsonObject() const {
+std::string DecryptJsonRequest::ToJsonString() const {
     crow::json::wvalue json;
     
     // Build column_reference
@@ -261,8 +273,9 @@ crow::json::wvalue DecryptJsonRequest::ToJsonObject() const {
     crow::json::wvalue debug;
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
-    
-    return json;
+
+    // Converts crow json object to a string
+    return json.dump();
 }
 
 // JsonResponse implementations
@@ -356,7 +369,7 @@ std::string JsonResponse::ToJson() const {
         error_json["details"] = GetValidationError();
         return error_json.dump();
     }
-    return ToJsonObject().dump();
+    return ToJsonString();
 }
 
 bool EncryptJsonResponse::IsValid() const {
@@ -381,7 +394,7 @@ std::string EncryptJsonResponse::GetValidationError() const {
     return BuildValidationError(missing_fields);
 }
 
-crow::json::wvalue EncryptJsonResponse::ToJsonObject() const {
+std::string EncryptJsonResponse::ToJsonString() const {
     crow::json::wvalue json;
     
     // Build data_batch_encrypted
@@ -404,7 +417,8 @@ crow::json::wvalue EncryptJsonResponse::ToJsonObject() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    return json;
+    // Converts crow json object to a string
+    return json.dump();
 }
 
 bool DecryptJsonResponse::IsValid() const {
@@ -435,7 +449,7 @@ std::string DecryptJsonResponse::GetValidationError() const {
     return BuildValidationError(missing_fields);
 }
 
-crow::json::wvalue DecryptJsonResponse::ToJsonObject() const {
+std::string DecryptJsonResponse::ToJsonString() const {
     crow::json::wvalue json;
     
     // Build data_batch
@@ -463,5 +477,6 @@ crow::json::wvalue DecryptJsonResponse::ToJsonObject() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    return json;
+    // Converts crow json object to a string
+    return json.dump();
 }
