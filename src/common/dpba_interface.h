@@ -1,12 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
 #include <map>
 #include <memory>
-#include <span>
 #include <string>
 #include <utility>
+#include "tcb/span.hpp"
 #include "enums.h"
+
+template <typename T>
+using span = tcb::span<T>;
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
@@ -14,17 +18,20 @@
 
 namespace dbps::external {
 
-// ++++ To docs:
-// - While handle to EncryptionResult exists, ciphertext() is guaranteed to return the result.
-// - Read operations are not destructive.
-// - Destructor should dispose of internal memory (either by delegation or by destruction).
-// - No throwing exceptions.
+/*
+ * DataBatchProtectionAgentInterface, EncryptionResult and DecryptionResult implementation contracts:
+ * - While handle to EncryptionResult/DecryptionResult exists, ciphertext()/plaintext() is guaranteed to return valid data
+ * - Read operations are not destructive. Multiple calls return the same data
+ * - Destructor must dispose of internal memory (either by delegation or cleanup)
+ * - No throwing exceptions. Errors reported via success() flag and error methods
+ */
+
 class DBPS_EXPORT EncryptionResult {
 public:
-    virtual std::span<uint8_t> ciphertext() = 0;
+    virtual span<const uint8_t> ciphertext() const = 0;
 
     // Allows a larger backing buffer than the exact ciphertext size.
-    virtual int size() = 0;
+    virtual std::size_t size() const = 0;
 
     // Success flag; false indicates an error.
     virtual bool success() const = 0;
@@ -38,10 +45,10 @@ public:
 
 class DBPS_EXPORT DecryptionResult {
 public:
-    virtual std::span<uint8_t> plaintext() = 0;
+    virtual span<const uint8_t> plaintext() const = 0;
 
-    // Allows a larger backing buffer than the exact ciphertext size.
-    virtual int size() = 0;
+    // Allows a larger backing buffer than the exact plaintext size.
+    virtual std::size_t size() const = 0;
 
     // Success flag; false indicates an error.
     virtual bool success() const = 0;
@@ -57,7 +64,8 @@ class DBPS_EXPORT DataBatchProtectionAgentInterface {
 public:
     DataBatchProtectionAgentInterface() = default;
 
-    // user_id is not stored as a member, but it is expected to be in the app_context map.
+    // user_id is not stored as a member; it is expected to be embedded into app_context
+    // (e.g., as a serialized map/JSON field).
     void init(
         std::string column_name,
         std::map<std::string, std::string> connection_config,
@@ -75,10 +83,10 @@ public:
     }
 
     virtual std::unique_ptr<EncryptionResult> Encrypt(
-        std::span<const uint8_t> plaintext) = 0;
+        span<const uint8_t> plaintext) = 0;
 
     virtual std::unique_ptr<DecryptionResult> Decrypt(
-        std::span<const uint8_t> ciphertext) = 0;
+        span<const uint8_t> ciphertext) = 0;
 
     virtual ~DataBatchProtectionAgentInterface() = default;
 
