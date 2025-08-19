@@ -69,7 +69,7 @@ public:
 
     // user_id is not stored as a member; it is expected to be embedded into app_context
     // (e.g., as a serialized map/JSON field).
-    void init(
+    virtual void init(
         std::string column_name,
         std::map<std::string, std::string> connection_config,
         std::string app_context,
