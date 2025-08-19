@@ -72,12 +72,12 @@ target_include_directories(encryption_sequencer_test PRIVATE
   src/common/tcb
 )
 
-# Add dpba interface test executable
-add_executable(dpba_interface_test
-  src/common/dpba_interface_test.cpp
+# Add dbpa interface test executable
+add_executable(dbpa_interface_test
+  src/common/dbpa_interface_test.cpp
 )
 
-target_include_directories(dpba_interface_test PRIVATE
+target_include_directories(dbpa_interface_test PRIVATE
   src/common
   src/common/tcb
 )
