@@ -16,24 +16,24 @@ using tcb::span;
 
 
 // Auxiliary function for base64 encoding
-std::string EncodeBase64(span<const uint8_t> data) {
+std::optional<std::string> EncodeBase64(span<const uint8_t> data) {
     try {
         // Use cppcodec library for robust base64 encoding
         return cppcodec::base64_rfc4648::encode(data);
     } catch (const std::exception& e) {
-        // Return empty string on any encoding error
-        return "";
+        // Return empty optional on any encoding error
+        return std::nullopt;
     }
 }
 
 // Auxiliary function for base64 decoding
-std::vector<uint8_t> DecodeBase64(const std::string& base64_string) {
+std::optional<std::vector<uint8_t>> DecodeBase64(const std::string& base64_string) {
     try {
         // Use cppcodec library for robust base64 decoding
         return cppcodec::base64_rfc4648::decode(base64_string);
     } catch (const std::exception& e) {
-        // Return empty vector on any decoding error
-        return {};
+        // Return empty optional on any decoding error
+        return std::nullopt;
     }
 }
 
@@ -103,7 +103,12 @@ std::map<std::string, std::string> ApiResponse::ErrorFields() const {
 void EncryptApiResponse::SetJsonResponse(const EncryptJsonResponse& response) { 
     encrypt_response_ = response; 
     if (response.IsValid()) {
-        decoded_ciphertext_ = DecodeBase64(response.encrypted_value_);
+        auto decoded = DecodeBase64(response.encrypted_value_);
+        if (decoded.has_value()) {
+            decoded_ciphertext_ = decoded.value();
+        } else {
+            decoded_ciphertext_.reset();
+        }
     } else {
         decoded_ciphertext_.reset();
     }
@@ -114,6 +119,7 @@ bool EncryptApiResponse::HasJsonResponse() const { return encrypt_response_.has_
 span<const uint8_t> EncryptApiResponse::GetResponseCiphertext() const {
     // Adding the null check for safety, but in regular flows, the method is not called unless various checks pass.
     if (!decoded_ciphertext_.has_value()) {
+        std::cerr << "ERROR: GetResponseCiphertext() called but decoded_ciphertext_ is not available" << std::endl;
         return span<const uint8_t>();
     }
     return span<const uint8_t>(decoded_ciphertext_.value());
@@ -127,7 +133,12 @@ const EncryptJsonResponse& EncryptApiResponse::GetResponseAttributes() const {
 void DecryptApiResponse::SetJsonResponse(const DecryptJsonResponse& response) { 
     decrypt_response_ = response; 
     if (response.IsValid()) {
-        decoded_plaintext_ = DecodeBase64(response.decrypted_value_);
+        auto decoded = DecodeBase64(response.decrypted_value_);
+        if (decoded.has_value()) {
+            decoded_plaintext_ = decoded.value();
+        } else {
+            decoded_plaintext_.reset();
+        }
     } else {
         decoded_plaintext_.reset();
     }
@@ -138,6 +149,7 @@ bool DecryptApiResponse::HasJsonResponse() const { return decrypt_response_.has_
 span<const uint8_t> DecryptApiResponse::GetResponsePlaintext() const {
     // Adding the null check for safety, but in regular flows, the method is not called unless various checks pass.
     if (!decoded_plaintext_.has_value()) {
+        std::cerr << "ERROR: GetResponsePlaintext() called but decoded_plaintext_ is not available" << std::endl;
         return span<const uint8_t>();
     }
     return span<const uint8_t>(decoded_plaintext_.value());
@@ -191,21 +203,23 @@ EncryptApiResponse DBPSApiClient::Encrypt(
     // TODO: Add support for other formats and encodings.
     // Encode the plaintext as base64 and set the encoding param to BASE64.
     json_request.encoding_ = std::string(to_string(Encoding::BASE64));
-    json_request.value_ = EncodeBase64(plaintext);
     
     EncryptApiResponse api_response;
     try {
         api_response.SetJsonRequest(json_request);
 
+        // Encode the plaintext as base64 and set the value_ param and 
+        // check if it's valid before setting it.
+        auto plaintext_b64 = EncodeBase64(plaintext);
+        if (!plaintext_b64.has_value()) {
+            api_response.SetApiClientError("Encrypt plaintext request - invalid base64 encoding");
+            return api_response;
+        }
+        json_request.value_ = plaintext_b64.value();
+
         // Check if only RAW_C_DATA format is implemented
         if (format != Format::RAW_C_DATA) {
             api_response.SetApiClientError("On request, only RAW_C_DATA format is currently implemented");
-            return api_response;
-        }
-
-        // Check if the request value is not empty (valid base64)
-        if (json_request.value_.empty()) {
-            api_response.SetApiClientError("Request value is empty - invalid base64 encoding");
             return api_response;
         }
 
@@ -275,21 +289,23 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     // TODO: Add support for other formats and encodings.
     // Encode the ciphertext as base64 and set the encoding param to BASE64.
     json_request.encoding_ = std::string(to_string(Encoding::BASE64));
-    json_request.encrypted_value_ = EncodeBase64(ciphertext);
     
     DecryptApiResponse api_response;
     try {
         api_response.SetJsonRequest(json_request);
 
+        // Encode the ciphertext as base64 and set the encrypted_value_ param and 
+        // check if it's valid before setting it.
+        auto ciphertext_b64 = EncodeBase64(ciphertext);
+        if (!ciphertext_b64.has_value()) {
+            api_response.SetApiClientError("Decrypt ciphertext request  - invalid base64 encoding");
+            return api_response;
+        }
+        json_request.encrypted_value_ = ciphertext_b64.value();
+
         // Check if only RAW_C_DATA format is implemented
         if (format != Format::RAW_C_DATA) {
             api_response.SetApiClientError("On request, only RAW_C_DATA format is currently implemented");
-            return api_response;
-        }
-
-        // Check if the request value is not empty (valid base64)
-        if (json_request.encrypted_value_.empty()) {
-            api_response.SetApiClientError("Request encrypted value is empty - invalid base64 encoding");
             return api_response;
         }
 
