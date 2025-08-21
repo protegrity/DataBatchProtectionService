@@ -20,7 +20,14 @@ FetchContent_Declare(
   GIT_TAG v0.2
 )
 
-FetchContent_MakeAvailable(crow cppcodec)
+# httplib is a header-only HTTP client library
+FetchContent_Declare(
+  httplib
+  GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+  GIT_TAG v0.14.3
+)
+
+FetchContent_MakeAvailable(crow cppcodec httplib)
 
 add_executable(dbps_api_server 
   src/server/dbps_api_server.cpp
@@ -78,6 +85,21 @@ add_executable(dbpa_interface_test
 )
 
 target_include_directories(dbpa_interface_test PRIVATE
+  src/common
+  src/common/tcb
+)
+
+# Client test executable
+add_executable(dbps_api_client_test
+  src/client/dbps_api_client_test.cpp
+  src/client/dbps_api_client.cpp
+  src/client/httplib_client.cpp
+)
+
+target_include_directories(dbps_api_client_test PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+  src/client
   src/common
   src/common/tcb
 )

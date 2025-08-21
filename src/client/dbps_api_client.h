@@ -1,0 +1,168 @@
+#pragma once
+
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "../common/enums.h"
+#include "../common/enum_utils.h"
+#include "../common/json_request.h"
+#include "http_client_interface.h"
+
+using namespace dbps::external;
+using namespace dbps::enum_utils;
+using tcb::span;
+
+// API response wrapper that contains comprehensive information about the client-server call
+class ApiResponse {
+public:
+    // Empty constructor
+    ApiResponse() = default;
+    
+    // Success check - consider success if we have a response, no client error, 2xx HTTP status code, 
+    // and valid response
+    bool Success() const;
+    
+    // Returns an error message for the condition that caused the failure.
+    std::string ErrorMessage() const;
+    
+    // Returns a map of error fields for debugging
+    std::map<std::string, std::string> ErrorFields() const;
+
+private:
+    // Virtual methods for subclasses to implement (internal use)
+    virtual bool HasJsonResponse() const = 0;
+    virtual const JsonResponse& GetJsonResponse() const = 0;
+    
+    // Setters for response data (internal use)
+    void SetHttpStatusCode(int code);
+    void SetApiClientError(const std::string& error);
+    void SetJsonRequest(const JsonRequest& request);
+    void SetRawResponse(const std::string& raw_response);
+    
+    // Check methods (internal use)
+    bool HasHttpStatusCode() const;
+    bool HasApiClientError() const;
+    bool HasJsonRequest() const;
+    bool HasRawResponse() const;
+    
+    // Getters (internal use)
+    int GetHttpStatusCode() const;
+    const std::string& GetApiClientError() const;
+    const JsonRequest& GetJsonRequest() const;
+    const std::string& GetRawResponse() const;
+    
+    std::optional<int> http_status_code_;
+    std::optional<std::string> api_client_error_;
+    std::optional<JsonRequest> json_request_;
+    std::optional<std::string> raw_response_;
+};
+
+// Encryption API response wrapper
+class EncryptApiResponse : public ApiResponse {
+public:
+    // Returns the encrypted value as binary data (decoded from base64)
+    span<const uint8_t> GetResponseCiphertext() const;
+    
+    const EncryptJsonResponse& GetResponseAttributes() const;
+
+private:
+    // Getters for encryption-specific response (override private base methods)
+    const EncryptJsonResponse& GetJsonResponse() const override;
+    bool HasJsonResponse() const override;
+    
+    // Setters for encryption-specific response
+    void SetJsonResponse(const EncryptJsonResponse& response);
+    
+    std::optional<EncryptJsonResponse> encrypt_response_;
+    std::optional<std::vector<uint8_t>> decoded_ciphertext_;
+};
+
+// Decryption API response wrapper
+class DecryptApiResponse : public ApiResponse {
+public:
+    // Returns the decrypted value as binary data (decoded from base64)
+    span<const uint8_t> GetResponsePlaintext() const;
+    
+    const DecryptJsonResponse& GetResponseAttributes() const;
+
+private:
+    // Getters for decryption-specific response (override private base methods)
+    const DecryptJsonResponse& GetJsonResponse() const override;
+    bool HasJsonResponse() const override;
+    
+    // Setters for decryption-specific response
+    void SetJsonResponse(const DecryptJsonResponse& response);
+    
+    std::optional<DecryptJsonResponse> decrypt_response_;
+    std::optional<std::vector<uint8_t>> decoded_plaintext_;
+};
+
+/**
+ * API Client for DataBatchProtectionService
+ * Provides a library level interface for making HTTP calls to the DBPS API server
+ */
+class DBPSApiClient {
+public:
+    /**
+     * Constructor
+     * @param base_url The base URL of the API server (e.g., "http://localhost:18080")
+     */
+    explicit DBPSApiClient(const std::string& base_url);
+    
+    /**
+     * Constructor with dependency injection
+     * @param http_client Custom HTTP client implementation
+     */
+    explicit DBPSApiClient(std::unique_ptr<HttpClientInterface> http_client);
+    
+    /**
+     * Destructor
+     */
+    ~DBPSApiClient() = default;
+    
+    /**
+     * Health check endpoint
+     * @return Response string from the health check
+     * @throws std::runtime_error if the request fails
+     */
+    std::string HealthCheck();
+    
+    /**
+     * Encryption endpoint - encrypts the provided plaintext using the given context and serialization parameters
+     * @return The encryption API response object containing comprehensive information about the call
+     */
+    EncryptApiResponse Encrypt(
+        span<const uint8_t> plaintext,
+        const std::string& column_name,
+        Type::type datatype,
+        CompressionCodec::type compression,
+        Format::type format,
+        CompressionCodec::type encrypted_compression,
+        const std::string& key_id,
+        const std::string& user_id
+    );
+    
+    /**
+     * Decryption endpoint - decrypts the provided ciphertext using the given context and serialization parameters
+     * @return The decryption API response object containing comprehensive information about the call
+     */
+    DecryptApiResponse Decrypt(
+        span<const uint8_t> ciphertext,
+        const std::string& column_name,
+        Type::type datatype,
+        CompressionCodec::type compression,
+        Format::type format,
+        CompressionCodec::type encrypted_compression,
+        const std::string& key_id,
+        const std::string& user_id
+    );
+
+private:
+    std::unique_ptr<HttpClientInterface> http_client_;
+    
+    // Helper methods for HTTP requests
+    HttpClientInterface::HttpResponse MakeGetRequest(const std::string& endpoint);
+    HttpClientInterface::HttpResponse MakePostRequest(const std::string& endpoint, const std::string& json_body);
+};
