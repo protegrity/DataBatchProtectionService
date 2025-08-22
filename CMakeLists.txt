@@ -162,3 +162,38 @@ target_include_directories(dbpa_remote_testapp PRIVATE
   src/common
   src/common/tcb
 )
+
+# #########################################################
+# Create the shared library (*.so) for the dbps client.
+# #########################################################
+
+# Create dynamic library with core components
+add_library(dbps_client_lib SHARED
+  src/common/dbps_remote_shared_lib_wrapper.cpp
+  src/common/dbpa_remote.cpp
+  src/client/dbps_api_client.cpp
+  src/client/httplib_client.cpp
+  src/common/json_request.cpp
+  src/common/enum_utils.cpp
+)
+
+# Set library properties
+set_target_properties(dbps_client_lib PROPERTIES
+  VERSION 1.0.0
+  SOVERSION 1
+  OUTPUT_NAME "dbpsClient"
+)
+
+# Include directories for the library
+# TODO: are these needed?
+target_include_directories(dbps_client_lib PUBLIC
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+
+  src/common
+  src/common/tcb
+)
+
+# Export symbols for the library
+#target_compile_definitions(dbps_client_lib PRIVATE DBPS_EXPORTS)

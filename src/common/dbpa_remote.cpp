@@ -240,6 +240,7 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(cons
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
     if (app_context.empty()) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - app_context is empty" << std::endl;
         return std::nullopt;
     }
     try {
