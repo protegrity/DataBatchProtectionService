@@ -14,8 +14,6 @@ using namespace dbps::external;
 using namespace dbps::enum_utils;
 using tcb::span;
 
-
-
 // Auxiliary function for base64 encoding
 std::optional<std::string> EncodeBase64(span<const uint8_t> data) {
     try {
