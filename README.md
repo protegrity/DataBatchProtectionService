@@ -56,16 +56,18 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
 
 The project includes unit tests for the JSON request parsing classes. To run the tests:
 
+### Build-n-run tests (Compact version)
+```
+cmake -B build -S . -G Ninja && cmake --build build --target json_request_test  && ./build/json_request_test
+cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test && ./build/enum_utils_test
+cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test && ./build/encryption_sequencer_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test && ./build/dbpa_interface_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test && ./build/dbps_api_client_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test && ./build/dbpa_rpc_test
+```
+
 ### Build the tests
 ```
-# Compact
-cmake -B build -S . -G Ninja && cmake --build build --target json_request_test
-cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test
-cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test
-
-# Verbose
 echo "----- build: json_request_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target json_request_test \
   || { echo "XXXX FAILED: json_request_test"; false; } && echo
@@ -85,18 +87,14 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test
 echo "----- build: dbps_api_client_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test \
   || { echo "XXXX FAILED: dbps_api_client_test"; false; } && echo
+
+echo "----- build: dbpa_rpc_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test \
+  || { echo "XXXX FAILED: dbpa_rpc_test"; false; } && echo
 ```
 
 ### Run the tests
 ```
-# Compact
-./build/json_request_test
-./build/enum_utils_test
-./build/encryption_sequencer_test
-./build/dbpa_interface_test
-./build/dbps_api_client_test
-
-# Verbose
 echo "----- run: json_request_test -----" && \
 ./build/json_request_test \
   || { echo "XXXXX FAILED: json_request_test"; false; } && echo
@@ -116,4 +114,8 @@ echo "----- run: dbpa_interface_test -----" && \
 echo "----- run: dbps_api_client_test -----" && \
 ./build/dbps_api_client_test \
   || { echo "XXXXX FAILED: dbps_api_client_test"; false; } && echo
+
+echo "----- run: dbpa_rpc_test -----" && \
+./build/dbpa_rpc_test \
+  || { echo "XXXXX FAILED: dbpa_rpc_test"; false; } && echo
 ```
