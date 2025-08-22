@@ -80,9 +80,23 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_tes
   || { echo "XXXX FAILED: dbps_api_client_test"; false; } && echo
 
 # Run the tests
-./build/json_request_test
-./build/enum_utils_test
-./build/encryption_sequencer_test
-./build/dbpa_interface_test
-./build/dbps_api_client_test
+echo "----- run: json_request_test -----" && \
+./build/json_request_test \
+  || { echo "XXXXX FAILED: json_request_test"; false; } && echo
+
+echo "----- run: enum_utils_test -----" && \
+./build/enum_utils_test \
+  || { echo "XXXXX FAILED: enum_utils_test"; false; } && echo
+
+echo "----- run: encryption_sequencer_test -----" && \
+./build/encryption_sequencer_test \
+  || { echo "XXXXX FAILED: encryption_sequencer_test"; false; } && echo
+
+echo "----- run: dbpa_interface_test -----" && \
+./build/dbpa_interface_test \
+  || { echo "XXXXX FAILED: dbpa_interface_test"; false; } && echo
+
+echo "----- run: dbps_api_client_test -----" && \
+./build/dbps_api_client_test \
+  || { echo "XXXXX FAILED: dbps_api_client_test"; false; } && echo
 ```
