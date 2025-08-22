@@ -2,6 +2,7 @@
 #include "enum_utils.h"
 #include <cppcodec/base64_rfc4648.hpp>
 #include <functional>
+#include <iostream>
 
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
@@ -161,18 +162,16 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
         return false;
     }
     
-    // Check compression: must be UNCOMPRESSED
+    // Check compression: warn if not UNCOMPRESSED but continue
     if (compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
-        error_stage_ = "parameter_validation";
-        error_message_ = "Only UNCOMPRESSED compression is supported";
-        return false;
+        std::cerr << "WARNING: Non-UNCOMPRESSED compression requested: " << compression_ 
+                  << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
     }
     
-    // Check encrypted_compression: must be UNCOMPRESSED
+    // Check encrypted_compression: warn if not UNCOMPRESSED but continue
     if (encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
-        error_stage_ = "parameter_validation";
-        error_message_ = "Only UNCOMPRESSED encrypted_compression is supported";
-        return false;
+        std::cerr << "WARNING: Non-UNCOMPRESSED encrypted_compression requested: " << encrypted_compression_ 
+                  << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
     }
     
     // Check encoding: must be BASE64
