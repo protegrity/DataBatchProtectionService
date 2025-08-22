@@ -10,14 +10,6 @@
 #include "enums.h"
 #include "dbpa_interface.h"
 
-// Forward declarations
-namespace dbps::external {
-    class DBPSApiClient;
-    class EncryptApiResponse;
-    class DecryptApiResponse;
-    class HttpClientInterface;
-}
-
 using tcb::span;
 
 #ifndef DBPS_EXPORT
@@ -26,13 +18,19 @@ using tcb::span;
 
 namespace dbps::external {
 
+// Forward declarations
+class DBPSApiClient;
+class EncryptApiResponse;
+class DecryptApiResponse;
+class HttpClientInterface;
+
 /**
- * RPC implementation of EncryptionResult that wraps EncryptApiResponse
+ * Implementation of EncryptionResult for remote calls that wraps EncryptApiResponse
  * Provides the required interface for encryption results from network calls
  */
-class DBPS_EXPORT RPCEncryptionResult : public EncryptionResult {
+class DBPS_EXPORT RemoteEncryptionResult : public EncryptionResult {
 public:
-    explicit RPCEncryptionResult(std::unique_ptr<EncryptApiResponse> response);
+    explicit RemoteEncryptionResult(std::unique_ptr<EncryptApiResponse> response);
     
     // EncryptionResult interface implementation
     span<const uint8_t> ciphertext() const override;
@@ -50,12 +48,12 @@ private:
 };
 
 /**
- * RPC implementation of DecryptionResult that wraps DecryptApiResponse
+ * Implementation of DecryptionResult for remote calls that wraps DecryptApiResponse
  * Provides the required interface for decryption results from network calls
  */
-class DBPS_EXPORT RPCDecryptionResult : public DecryptionResult {
+class DBPS_EXPORT RemoteDecryptionResult : public DecryptionResult {
 public:
-    explicit RPCDecryptionResult(std::unique_ptr<DecryptApiResponse> response);
+    explicit RemoteDecryptionResult(std::unique_ptr<DecryptApiResponse> response);
     
     // DecryptionResult interface implementation
     span<const uint8_t> plaintext() const override;
@@ -73,16 +71,16 @@ private:
 };
 
 /**
- * RPC implementation of DataBatchProtectionAgentInterface
+ * Implementation of DataBatchProtectionAgentInterface for remote calls
  * Uses DBPSApiClient to make network calls to the DBPS server for encryption/decryption
  */
-class DBPS_EXPORT RPCDataBatchProtectionAgent : public DataBatchProtectionAgentInterface {
+class DBPS_EXPORT RemoteDataBatchProtectionAgent : public DataBatchProtectionAgentInterface {
 public:
     // Constructor (default). Creates API_client during init() using server_url from connection_config
-    RPCDataBatchProtectionAgent() = default;
+    RemoteDataBatchProtectionAgent() = default;
     
     // Constructor with HTTP client passed. Creates API_client immediately on the contructor.
-    explicit RPCDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client);
+    explicit RemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client);
     
     // DataBatchProtectionAgentInterface implementation
     void init(

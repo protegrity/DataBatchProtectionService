@@ -57,7 +57,7 @@ bool TestBasicInitialization() {
     auto mock_client = std::make_unique<MockHttpClient>();
     mock_client->health_response = {200, "OK", ""};
     
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
     std::string app_context = "{\"user_id\": \"test_user\"}";
@@ -78,7 +78,7 @@ bool TestBasicInitialization() {
 // Test initialization with missing server URL
 bool TestMissingServerUrl() {
     auto mock_client = std::make_unique<MockHttpClient>();
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {}; // No server_url
     std::string app_context = "{\"user_id\": \"test_user\"}";
@@ -99,7 +99,7 @@ bool TestMissingServerUrl() {
 // Test initialization with missing user ID
 bool TestMissingUserId() {
     auto mock_client = std::make_unique<MockHttpClient>();
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
     std::string app_context = "{}"; // No user_id
@@ -122,7 +122,7 @@ bool TestHealthCheckFailure() {
     auto mock_client = std::make_unique<MockHttpClient>();
     mock_client->health_response = {500, "", "Server error"};
     
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
     std::string app_context = "{\"user_id\": \"test_user\"}";
@@ -150,7 +150,7 @@ bool TestSuccessfulEncryption() {
         ""
     };
     
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
     std::string app_context = "{\"user_id\": \"test_user\"}";
@@ -163,7 +163,8 @@ bool TestSuccessfulEncryption() {
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
     TEST_ASSERT(result->success(), "Encryption should succeed");
     TEST_ASSERT(result->size() > 0, "Encrypted data should have size > 0");
-    
+    TEST_ASSERT(result->ciphertext().size() > 0, "Encrypted data should have size > 0");
+    TEST_ASSERT(result->ciphertext().data() != nullptr, "Encrypted data should have non-null data");
     TEST_PASS("Successful Encryption");
     return true;
 }
@@ -178,7 +179,7 @@ bool TestSuccessfulDecryption() {
         ""
     };
     
-    auto agent = RPCDataBatchProtectionAgent(std::move(mock_client));
+    auto agent = RemoteDataBatchProtectionAgent(std::move(mock_client));
     
     std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
     std::string app_context = "{\"user_id\": \"test_user\"}";
@@ -191,14 +192,14 @@ bool TestSuccessfulDecryption() {
     TEST_ASSERT(result != nullptr, "Decrypt result should not be null");
     TEST_ASSERT(result->success(), "Decryption should succeed");
     TEST_ASSERT(result->size() > 0, "Decrypted data should have size > 0");
-    
+    TEST_ASSERT(result->plaintext().data() != nullptr, "Decrypted data should have non-null data"); 
     TEST_PASS("Successful Decryption");
     return true;
 }
 
 // Main test runner
 int main() {
-    std::cout << "Running RPC DataBatchProtectionAgent tests..." << std::endl;
+    std::cout << "Running Remote DataBatchProtectionAgent tests..." << std::endl;
     std::cout << "=============================================" << std::endl;
     
     bool all_tests_passed = true;

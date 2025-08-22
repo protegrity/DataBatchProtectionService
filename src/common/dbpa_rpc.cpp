@@ -5,29 +5,29 @@
 
 using namespace dbps::external;
 
-RPCEncryptionResult::RPCEncryptionResult(std::unique_ptr<EncryptApiResponse> response)
+RemoteEncryptionResult::RemoteEncryptionResult(std::unique_ptr<EncryptApiResponse> response)
     : response_(std::move(response)) {
 }
 
-span<const uint8_t> RPCEncryptionResult::ciphertext() const {
+span<const uint8_t> RemoteEncryptionResult::ciphertext() const {
     if (!response_ || !response_->Success()) {
         return span<const uint8_t>();
     }
     return response_->GetResponseCiphertext();
 }
 
-std::size_t RPCEncryptionResult::size() const {
+std::size_t RemoteEncryptionResult::size() const {
     if (!response_ || !response_->Success()) {
         return 0;
     }
     return response_->GetResponseCiphertext().size();
 }
 
-bool RPCEncryptionResult::success() const {
+bool RemoteEncryptionResult::success() const {
     return response_ && response_->Success();
 }
 
-const std::string& RPCEncryptionResult::error_message() const {
+const std::string& RemoteEncryptionResult::error_message() const {
     if (cached_error_message_.empty() && response_) {
         if (!response_->Success()) {
             cached_error_message_ = response_->ErrorMessage();
@@ -38,7 +38,7 @@ const std::string& RPCEncryptionResult::error_message() const {
     return cached_error_message_;
 }
 
-const std::map<std::string, std::string>& RPCEncryptionResult::error_fields() const {
+const std::map<std::string, std::string>& RemoteEncryptionResult::error_fields() const {
     if (cached_error_fields_.empty() && response_) {
         if (!response_->Success()) {
             cached_error_fields_ = response_->ErrorFields();
@@ -47,29 +47,29 @@ const std::map<std::string, std::string>& RPCEncryptionResult::error_fields() co
     return cached_error_fields_;
 }
 
-RPCDecryptionResult::RPCDecryptionResult(std::unique_ptr<DecryptApiResponse> response)
+RemoteDecryptionResult::RemoteDecryptionResult(std::unique_ptr<DecryptApiResponse> response)
     : response_(std::move(response)) {
 }
 
-span<const uint8_t> RPCDecryptionResult::plaintext() const {
+span<const uint8_t> RemoteDecryptionResult::plaintext() const {
     if (!response_ || !response_->Success()) {
         return span<const uint8_t>();
     }
     return response_->GetResponsePlaintext();
 }
 
-std::size_t RPCDecryptionResult::size() const {
+std::size_t RemoteDecryptionResult::size() const {
     if (!response_ || !response_->Success()) {
         return 0;
     }
     return response_->GetResponsePlaintext().size();
 }
 
-bool RPCDecryptionResult::success() const {
+bool RemoteDecryptionResult::success() const {
     return response_ && response_->Success();
 }
 
-const std::string& RPCDecryptionResult::error_message() const {
+const std::string& RemoteDecryptionResult::error_message() const {
     if (cached_error_message_.empty() && response_) {
         if (!response_->Success()) {
             cached_error_message_ = response_->ErrorMessage();
@@ -80,7 +80,7 @@ const std::string& RPCDecryptionResult::error_message() const {
     return cached_error_message_;
 }
 
-const std::map<std::string, std::string>& RPCDecryptionResult::error_fields() const {
+const std::map<std::string, std::string>& RemoteDecryptionResult::error_fields() const {
     if (cached_error_fields_.empty() && response_) {
         if (!response_->Success()) {
             cached_error_fields_ = response_->ErrorFields();
@@ -89,19 +89,21 @@ const std::map<std::string, std::string>& RPCDecryptionResult::error_fields() co
     return cached_error_fields_;
 }
 
-RPCDataBatchProtectionAgent::RPCDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client)
+RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client)
     : api_client_(std::make_unique<DBPSApiClient>(std::move(http_client))) {
     // API client is created immediately with the injected HTTP client
     // init() will still be called to set up configuration, but won't create a new client
 }
 
-void RPCDataBatchProtectionAgent::init(
+void RemoteDataBatchProtectionAgent::init(
     std::string column_name,
     std::map<std::string, std::string> connection_config,
     std::string app_context,
     std::string column_key_id,
     Type::type data_type,
     CompressionCodec::type compression_type) {
+    
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Starting initialization for column: " << column_name << std::endl;
     
     // Call the base class init to store the configuration
     // +++++ Check if needed since superclass is virtual ++++++++  
@@ -117,45 +119,54 @@ void RPCDataBatchProtectionAgent::init(
     // Either with the injected HTTP client or not, the server_url should be there.
     auto server_url_opt = ExtractServerUrl(connection_config_);
     if (!server_url_opt || server_url_opt->empty()) {
-        std::cerr << "ERROR: RPCDataBatchProtectionAgent::init() - No server URL provided in connection_config." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server URL provided in connection_config." << std::endl;
         return;
     }
     server_url_ = *server_url_opt;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Server URL extracted: [" << server_url_ << "]" << std::endl;
     
     // Extract user ID from app context
     auto user_id_opt = ExtractUserId(app_context_);
     if (!user_id_opt || user_id_opt->empty()) {
-        std::cerr << "ERROR: RPCDataBatchProtectionAgent::init() - No user ID provided in app_context." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No user ID provided in app_context." << std::endl;
         return;
     }
     user_id_ = *user_id_opt;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - User ID extracted: [" << user_id_ << "]" << std::endl;
     
-    // Create API_client if not already created
+    // Create API_client if not already created.
+    // The API client constructor does not attemp a HTTPconnection with the server. The first Get/Post calls creates the HTTP connection.
     if (!api_client_) {
+        std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating API client for server: " << server_url_ << std::endl;
         api_client_ = std::make_unique<DBPSApiClient>(server_url_);
+    } else {
+        std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Using existing API client" << std::endl;
     }
     
     // Perform health check to verify server connectivity
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Performing health check..." << std::endl;
     try {
         std::string health_response = api_client_->HealthCheck();
         if (health_response != "OK") {
-            std::cerr << "ERROR: RPCDataBatchProtectionAgent::init() - Health check returned unexpected response: " << health_response << std::endl;
+            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Health check returned unexpected response: " << health_response << std::endl;
             return;
         }
+        std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Health check successful: " << health_response << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "ERROR: RPCDataBatchProtectionAgent::init() - Health check failed: " << e.what() << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Health check failed: " << e.what() << std::endl;
         return;
     }
     
     initialized_ = true;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Initialization completed successfully" << std::endl;
 }
 
-std::unique_ptr<EncryptionResult> RPCDataBatchProtectionAgent::Encrypt(span<const uint8_t> plaintext) {
+std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<const uint8_t> plaintext) {
     if (!initialized_) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<EncryptApiResponse>();
         empty_response->SetApiClientError("Agent not properly initialized");
-        return std::make_unique<RPCEncryptionResult>(std::move(empty_response));
+        return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
     }
     
     // Make the encryption call to the server
@@ -171,15 +182,15 @@ std::unique_ptr<EncryptionResult> RPCDataBatchProtectionAgent::Encrypt(span<cons
     );
     
     // Wrap the response in our result class
-    return std::make_unique<RPCEncryptionResult>(std::make_unique<EncryptApiResponse>(std::move(response)));
+    return std::make_unique<RemoteEncryptionResult>(std::make_unique<EncryptApiResponse>(std::move(response)));
 }
 
-std::unique_ptr<DecryptionResult> RPCDataBatchProtectionAgent::Decrypt(span<const uint8_t> ciphertext) {
+std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<const uint8_t> ciphertext) {
     if (!initialized_) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<DecryptApiResponse>();
         empty_response->SetApiClientError("Agent not properly initialized");
-        return std::make_unique<RPCDecryptionResult>(std::move(empty_response));
+        return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
     }
     
     // Make the decryption call to the server
@@ -195,10 +206,10 @@ std::unique_ptr<DecryptionResult> RPCDataBatchProtectionAgent::Decrypt(span<cons
     );
 
     // Wrap the response in our result class
-    return std::make_unique<RPCDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
+    return std::make_unique<RemoteDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
 }
 
-std::optional<std::string> RPCDataBatchProtectionAgent::ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const {
+std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const {
     auto it = connection_config.find("server_url");
     if (it != connection_config.end()) {
         return it->second;
@@ -206,7 +217,7 @@ std::optional<std::string> RPCDataBatchProtectionAgent::ExtractServerUrl(const s
     return std::nullopt;
 }
 
-std::optional<std::string> RPCDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
+std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
     if (app_context.empty()) {
         return std::nullopt;
     }
@@ -219,7 +230,7 @@ std::optional<std::string> RPCDataBatchProtectionAgent::ExtractUserId(const std:
             }
         }
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << "ERROR: RPCDataBatchProtectionAgent::ExtractUserId() - Failed to parse app_context JSON: " << e.what() << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - Failed to parse app_context JSON: " << e.what() << std::endl;
     }
     return std::nullopt;
 }
