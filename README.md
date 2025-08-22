@@ -59,11 +59,25 @@ The project includes unit tests for the JSON request parsing classes. To run the
 ### Build and Run Tests
 ```
 # Build the test executables
-cmake -B build -S . -G Ninja && cmake --build build --target json_request_test
-cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test
-cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test
+echo "----- build: json_request_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target json_request_test \
+  || { echo "XXXX FAILED: json_request_test"; false; } && echo
+
+echo "----- build: enum_utils_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test \
+  || { echo "XXXX FAILED: enum_utils_test"; false; } && echo
+
+echo "----- build: encryption_sequencer_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test \
+  || { echo "XXXX FAILED: encryption_sequencer_test"; false; } && echo
+
+echo "----- build: dbpa_interface_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test \
+  || { echo "XXXX FAILED: dbpa_interface_test"; false; } && echo
+
+echo "----- build: dbps_api_client_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test \
+  || { echo "XXXX FAILED: dbps_api_client_test"; false; } && echo
 
 # Run the tests
 ./build/json_request_test
