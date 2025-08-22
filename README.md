@@ -63,10 +63,12 @@ cmake -B build -S . -G Ninja && cmake --build build --target json_request_test
 cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test
 cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test
 
 # Run the tests
 ./build/json_request_test
 ./build/enum_utils_test
 ./build/encryption_sequencer_test
 ./build/dbpa_interface_test
+./build/dbps_api_client_test
 ```
