@@ -8,6 +8,7 @@
 #include "../common/enums.h"
 #include "../common/enum_utils.h"
 #include "../common/json_request.h"
+#include "../common/tcb/span.hpp"
 #include "http_client_interface.h"
 
 using namespace dbps::external;
@@ -30,32 +31,31 @@ public:
     // Returns a map of error fields for debugging
     std::map<std::string, std::string> ErrorFields() const;
 
-private:
-    // Virtual methods for subclasses to implement (internal use)
-    virtual bool HasJsonResponse() const = 0;
-    virtual const JsonResponse& GetJsonResponse() const = 0;
-    
+public:
     // Setters for response data (internal use)
     void SetHttpStatusCode(int code);
     void SetApiClientError(const std::string& error);
-    void SetJsonRequest(const JsonRequest& request);
     void SetRawResponse(const std::string& raw_response);
+
+protected:
+    // Virtual methods for subclasses to implement (internal use)
+    virtual bool HasJsonResponse() const = 0;
+    virtual const JsonResponse& GetJsonResponse() const = 0;
+    virtual bool HasJsonRequest() const = 0;
+    virtual const JsonRequest& GetJsonRequest() const = 0;
     
     // Check methods (internal use)
     bool HasHttpStatusCode() const;
     bool HasApiClientError() const;
-    bool HasJsonRequest() const;
     bool HasRawResponse() const;
     
     // Getters (internal use)
     int GetHttpStatusCode() const;
     const std::string& GetApiClientError() const;
-    const JsonRequest& GetJsonRequest() const;
     const std::string& GetRawResponse() const;
     
     std::optional<int> http_status_code_;
     std::optional<std::string> api_client_error_;
-    std::optional<JsonRequest> json_request_;
     std::optional<std::string> raw_response_;
 };
 
@@ -67,15 +67,22 @@ public:
     
     const EncryptJsonResponse& GetResponseAttributes() const;
 
-private:
-    // Getters for encryption-specific response (override private base methods)
+public:
+    // Setters for encryption-specific response
+    void SetJsonResponse(const EncryptJsonResponse& response);
+    void SetJsonRequest(const EncryptJsonRequest& request);
+
+protected:
+    // Getters for encryption-specific response (override protected base methods)
     const EncryptJsonResponse& GetJsonResponse() const override;
     bool HasJsonResponse() const override;
     
-    // Setters for encryption-specific response
-    void SetJsonResponse(const EncryptJsonResponse& response);
+    // Check and get methods for encryption-specific request (override virtual base methods)
+    const JsonRequest& GetJsonRequest() const override;
+    bool HasJsonRequest() const override;    
     
     std::optional<EncryptJsonResponse> encrypt_response_;
+    std::optional<EncryptJsonRequest> json_request_;
     std::optional<std::vector<uint8_t>> decoded_ciphertext_;
 };
 
@@ -87,15 +94,22 @@ public:
     
     const DecryptJsonResponse& GetResponseAttributes() const;
 
-private:
-    // Getters for decryption-specific response (override private base methods)
+public:
+    // Setters for decryption-specific response
+    void SetJsonResponse(const DecryptJsonResponse& response);
+    void SetJsonRequest(const DecryptJsonRequest& request);
+
+protected:
+    // Getters for decryption-specific response (override protected base methods)
     const DecryptJsonResponse& GetJsonResponse() const override;
     bool HasJsonResponse() const override;
     
-    // Setters for decryption-specific response
-    void SetJsonResponse(const DecryptJsonResponse& response);
+    // Check and get methods for decryption-specific request (override virtual base methods)
+    bool HasJsonRequest() const override;
+    const JsonRequest& GetJsonRequest() const override;
     
     std::optional<DecryptJsonResponse> decrypt_response_;
+    std::optional<DecryptJsonRequest> json_request_;
     std::optional<std::vector<uint8_t>> decoded_plaintext_;
 };
 

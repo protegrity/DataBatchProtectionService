@@ -2,8 +2,11 @@
 #include <string>
 #include <cassert>
 #include <vector>
+#include <algorithm>
+#include "../common/tcb/span.hpp"
 #include "dbps_api_client.h"
 #include "http_client_interface.h"
+#include <nlohmann/json.hpp>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -19,6 +22,25 @@ using tcb::span;
 // Test utilities
 void PrintTestResult(const std::string& test_name, bool passed) {
     std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
+}
+
+// Utility function to compare JSON strings, ignoring specified fields
+bool CompareJsonStrings(const std::string& json1, const std::string& json2, const std::vector<std::string>& ignore_fields = {}) {
+    try {
+        auto json1_obj = nlohmann::json::parse(json1);
+        auto json2_obj = nlohmann::json::parse(json2);
+        
+        // Remove ignored fields from both objects
+        for (const auto& field : ignore_fields) {
+            json1_obj.erase(field);
+            json2_obj.erase(field);
+        }
+        
+        // nlohmann::json has built-in == operator that ignores field order
+        return json1_obj == json2_obj;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
 // Mock HTTP client for testing
@@ -45,9 +67,13 @@ public:
     HttpResponse Post(const std::string& endpoint, const std::string& json_body) override {
         auto it = mock_post_responses_.find(endpoint);
         if (it != mock_post_responses_.end()) {
-            if (it->second.first == json_body) {
+            if (CompareJsonStrings(it->second.first, json_body, {"debug"})) {
                 return it->second.second;
             }
+            // Debug: Print the actual vs expected request
+            std::cout << "DEBUG: Mock body mismatch!" << std::endl;
+            std::cout << "DEBUG: Expected: " << it->second.first << std::endl;
+            std::cout << "DEBUG: Actual:   " << json_body << std::endl;
             return HttpResponse(400, "", "Mock body mismatch for endpoint: " + endpoint);
         }
         return HttpResponse(404, "", "Mock POST endpoint not found: " + endpoint);
@@ -79,17 +105,6 @@ public:
     using DecryptApiResponse::SetJsonResponse;
 };
 
-// Test data
-const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
-    "encrypted_value": "dGVzdEBleGFtcGxlLmNvbQ==",
-    "encrypted_compression": "UNCOMPRESSED"
-})";
-
-const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
-    "decrypted_value": "dGVzdEBleGFtcGxlLmNvbQ==",
-    "datatype": "BYTE_ARRAY"
-})";
-
 // Test functions for ApiResponse base class
 TEST(ApiResponseSuccessWithValidResponse) {
     TestableEncryptApiResponse response;
@@ -101,6 +116,10 @@ TEST(ApiResponseSuccessWithValidResponse) {
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.user_id_ = "test_user";
+    json_response.role_ = "test_role";
+    json_response.access_control_ = "test_access";
+    json_response.reference_id_ = "test_ref";
     response.SetJsonResponse(json_response);
     
     // Test that Success() returns true for valid state
@@ -117,6 +136,10 @@ TEST(ApiResponseSuccessWithInvalidHttpStatus) {
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
     json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.user_id_ = "test_user";
+    json_response.role_ = "test_role";
+    json_response.access_control_ = "test_access";
+    json_response.reference_id_ = "test_ref";
     response.SetJsonResponse(json_response);
     
     // Test that Success() returns false for non-2xx status
@@ -134,6 +157,10 @@ TEST(ApiResponseSuccessWithApiClientError) {
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
     json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.user_id_ = "test_user";
+    json_response.role_ = "test_role";
+    json_response.access_control_ = "test_access";
+    json_response.reference_id_ = "test_ref";
     response.SetJsonResponse(json_response);
     
     // Test that Success() returns false when API client error is set
@@ -148,6 +175,10 @@ TEST(EncryptApiResponseGetResponseCiphertextWithValidData) {
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.user_id_ = "test_user";
+    json_response.role_ = "test_role";
+    json_response.access_control_ = "test_access";
+    json_response.reference_id_ = "test_ref";
     response.SetJsonResponse(json_response);
     
     // Get the decoded ciphertext
@@ -181,6 +212,13 @@ TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     DecryptJsonResponse json_response;
     json_response.decrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     json_response.datatype_ = "BYTE_ARRAY";
+    json_response.compression_ = "UNCOMPRESSED";
+    json_response.format_ = "RAW_C_DATA";
+    json_response.encoding_ = "BASE64";
+    json_response.user_id_ = "test_user";
+    json_response.role_ = "test_role";
+    json_response.access_control_ = "test_access";
+    json_response.reference_id_ = "test_ref";
     response.SetJsonResponse(json_response);
     
     // Get the decoded plaintext
@@ -212,20 +250,39 @@ TEST(EncryptWithValidData) {
     
     // Set up mock response for /encrypt endpoint
     std::string expected_request = R"({
-        "column_name": "email",
-        "datatype": "BYTE_ARRAY",
-        "compression": "UNCOMPRESSED",
-        "format": "RAW_C_DATA",
-        "encrypted_compression": "UNCOMPRESSED",
-        "key_id": "test_key_123",
-        "user_id": "test_user_456",
-        "encoding": "BASE64",
-        "value": "dGVzdEBleGFtcGxlLmNvbQ=="
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
     })";
     
     std::string mock_response = R"({
-        "encrypted_value": "ZW5jcnlwdGVkX3Rlc3RAZXhhbXBsZS5jb20=",
-        "encrypted_compression": "UNCOMPRESSED"
+        "data_batch_encrypted": {
+            "value": "ZW5jcnlwdGVkX3Rlc3RAZXhhbXBsZS5jb20=",
+            "value_format": {
+                "compression": "UNCOMPRESSED"
+            }
+        },
+        "access": {
+            "user_id": "test_user",
+            "role": "test_role",
+            "access_control": "test_access"
+        },
+        "debug": {
+            "reference_id": "test_ref"
+        }
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
@@ -251,6 +308,14 @@ TEST(EncryptWithValidData) {
     );
     
     // Verify the response
+    if (!response.Success()) {
+        std::cout << "DEBUG: Encrypt test failed with error: " << response.ErrorMessage() << std::endl;
+        std::cout << "DEBUG: Error fields: " << std::endl;
+        auto error_fields = response.ErrorFields();
+        for (const auto& field : error_fields) {
+            std::cout << "  " << field.first << ": [" << field.second << "]" << std::endl;
+        }
+    }
     ASSERT_TRUE(response.Success());
     
     // Get the encrypted data and verify it's not empty
@@ -268,20 +333,42 @@ TEST(DecryptWithValidData) {
     
     // Set up mock response for /decrypt endpoint
     std::string expected_request = R"({
-        "column_name": "email",
-        "datatype": "BYTE_ARRAY",
-        "compression": "UNCOMPRESSED",
-        "format": "RAW_C_DATA",
-        "encrypted_compression": "UNCOMPRESSED",
-        "key_id": "test_key_123",
-        "user_id": "test_user_456",
-        "encoding": "BASE64",
-        "encrypted_value": "dGVzdEBleGFtcGxlLmNvbQ=="
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
     })";
     
     std::string mock_response = R"({
-        "decrypted_value": "dGVzdEBleGFtcGxlLmNvbQ==",
-        "datatype": "BYTE_ARRAY"
+        "data_batch": {
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "datatype": "BYTE_ARRAY",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "access": {
+            "user_id": "test_user",
+            "role": "test_role",
+            "access_control": "test_access"
+        },
+        "debug": {
+            "reference_id": "test_ref"
+        }
     })";
     
     mock_client->SetMockPostResponse("/decrypt", expected_request, 
@@ -307,6 +394,14 @@ TEST(DecryptWithValidData) {
     );
     
     // Verify the response
+    if (!response.Success()) {
+        std::cout << "DEBUG: Decrypt test failed with error: " << response.ErrorMessage() << std::endl;
+        std::cout << "DEBUG: Error fields: " << std::endl;
+        auto error_fields = response.ErrorFields();
+        for (const auto& field : error_fields) {
+            std::cout << "  " << field.first << ": [" << field.second << "]" << std::endl;
+        }
+    }
     ASSERT_TRUE(response.Success());
     
     // Get the decrypted data and verify it's not empty
@@ -404,6 +499,267 @@ TEST(DecryptWithInvalidData) {
     ASSERT_FALSE(response2.Success());
 }
 
+TEST(EncryptWithInvalidBase64Response) {
+    // Create mock HTTP client
+    auto mock_client = std::make_unique<MockHttpClient>();
+    
+    // Set up mock response for /encrypt endpoint with invalid base64
+    std::string expected_request = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
+    })";
+    
+    // Response with valid JSON structure but invalid base64 value
+    std::string mock_response = R"({
+        "data_batch_encrypted": {
+            "value": "INVALID_BASE64_VALUE!!!",
+            "value_format": {
+                "compression": "UNCOMPRESSED"
+            }
+        },
+        "access": {
+            "user_id": "test_user",
+            "role": "test_role",
+            "access_control": "test_access"
+        },
+        "debug": {
+            "reference_id": "test_ref"
+        }
+    })";
+    
+    mock_client->SetMockPostResponse("/encrypt", expected_request, 
+        HttpClientInterface::HttpResponse(200, mock_response));
+    
+    // Create DBPSApiClient with mock client
+    DBPSApiClient client(std::move(mock_client));
+    
+    // Create test data
+    std::string test_plaintext = "test@example.com";
+    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    
+    // Call Encrypt() with valid parameters
+    auto response = client.Encrypt(
+        span<const uint8_t>(plaintext_data),
+        "email",                    // column_name
+        Type::BYTE_ARRAY,           // datatype
+        CompressionCodec::UNCOMPRESSED, // compression
+        Format::RAW_C_DATA,         // format
+        CompressionCodec::UNCOMPRESSED, // encrypted_compression
+        "test_key_123",             // key_id
+        "test_user_456"             // user_id
+    );
+    
+    // Verify the response indicates failure
+    ASSERT_FALSE(response.Success());
+}
+
+TEST(DecryptWithInvalidBase64Response) {
+    // Create mock HTTP client
+    auto mock_client = std::make_unique<MockHttpClient>();
+    
+    // Set up mock response for /decrypt endpoint with invalid base64
+    std::string expected_request = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
+    })";
+    
+    // Response with valid JSON structure but invalid base64 value
+    std::string mock_response = R"({
+        "data_batch": {
+            "value": "INVALID_BASE64_VALUE!!!",
+            "datatype": "BYTE_ARRAY",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "access": {
+            "user_id": "test_user",
+            "role": "test_role",
+            "access_control": "test_access"
+        },
+        "debug": {
+            "reference_id": "test_ref"
+        }
+    })";
+    
+    mock_client->SetMockPostResponse("/decrypt", expected_request, 
+        HttpClientInterface::HttpResponse(200, mock_response));
+    
+    // Create DBPSApiClient with mock client
+    DBPSApiClient client(std::move(mock_client));
+    
+    // Create test data
+    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
+    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
+    
+    // Call Decrypt() with valid parameters
+    auto response = client.Decrypt(
+        span<const uint8_t>(ciphertext_data),
+        "email",                    // column_name
+        Type::BYTE_ARRAY,           // datatype
+        CompressionCodec::UNCOMPRESSED, // compression
+        Format::RAW_C_DATA,         // format
+        CompressionCodec::UNCOMPRESSED, // encrypted_compression
+        "test_key_123",             // key_id
+        "test_user_456"             // user_id
+    );
+    
+    // Verify the response indicates failure
+    ASSERT_FALSE(response.Success());
+}
+
+TEST(EncryptWithInvalidJsonResponse) {
+    // Create mock HTTP client
+    auto mock_client = std::make_unique<MockHttpClient>();
+    
+    // Set up mock response for /encrypt endpoint with invalid JSON
+    std::string expected_request = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
+    })";
+    
+    // Response with valid JSON but completely different structure
+    std::string mock_response = R"({
+        "status": "error",
+        "message": "Internal server error",
+        "timestamp": "2024-01-15T10:30:00Z",
+        "details": {
+            "reason": "Database connection failed",
+            "suggestion": "Please try again later"
+        }
+    })";
+    
+    mock_client->SetMockPostResponse("/encrypt", expected_request, 
+        HttpClientInterface::HttpResponse(200, mock_response));
+    
+    // Create DBPSApiClient with mock client
+    DBPSApiClient client(std::move(mock_client));
+    
+    // Create test data
+    std::string test_plaintext = "test@example.com";
+    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    
+    // Call Encrypt() with valid parameters
+    auto response = client.Encrypt(
+        span<const uint8_t>(plaintext_data),
+        "email",                    // column_name
+        Type::BYTE_ARRAY,           // datatype
+        CompressionCodec::UNCOMPRESSED, // compression
+        Format::RAW_C_DATA,         // format
+        CompressionCodec::UNCOMPRESSED, // encrypted_compression
+        "test_key_123",             // key_id
+        "test_user_456"             // user_id
+    );
+    
+    // Verify the response indicates failure
+    ASSERT_FALSE(response.Success());
+}
+
+TEST(DecryptWithInvalidJsonResponse) {
+    // Create mock HTTP client
+    auto mock_client = std::make_unique<MockHttpClient>();
+    
+    // Set up mock response for /decrypt endpoint with invalid JSON
+    std::string expected_request = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype": "BYTE_ARRAY",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "RAW_C_DATA",
+                "encoding": "BASE64"
+            }
+        },
+        "data_batch_encrypted": {
+            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
+    })";
+    
+    // Response with valid JSON but completely different structure
+    std::string mock_response = R"({
+        "status": "error",
+        "message": "Internal server error",
+        "timestamp": "2024-01-15T10:30:00Z",
+        "details": {
+            "reason": "Database connection failed",
+            "suggestion": "Please try again later"
+        }
+    })";
+    
+    mock_client->SetMockPostResponse("/decrypt", expected_request, 
+        HttpClientInterface::HttpResponse(200, mock_response));
+    
+    // Create DBPSApiClient with mock client
+    DBPSApiClient client(std::move(mock_client));
+    
+    // Create test data
+    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
+    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
+    
+    // Call Decrypt() with valid parameters
+    auto response = client.Decrypt(
+        span<const uint8_t>(ciphertext_data),
+        "email",                    // column_name
+        Type::BYTE_ARRAY,           // datatype
+        CompressionCodec::UNCOMPRESSED, // compression
+        Format::RAW_C_DATA,         // format
+        CompressionCodec::UNCOMPRESSED, // encrypted_compression
+        "test_key_123",             // key_id
+        "test_user_456"             // user_id
+    );
+    
+    // Verify the response indicates failure
+    ASSERT_FALSE(response.Success());
+}
+
 int main() {
     std::cout << "Running DBPS API Client tests..." << std::endl;
     std::cout << "==================================" << std::endl;
@@ -498,6 +854,38 @@ int main() {
         PrintTestResult("Decrypt with invalid data", true);
     } catch (...) {
         PrintTestResult("Decrypt with invalid data", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptWithInvalidBase64Response();
+        PrintTestResult("Encrypt with invalid base64 response", true);
+    } catch (...) {
+        PrintTestResult("Encrypt with invalid base64 response", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DecryptWithInvalidBase64Response();
+        PrintTestResult("Decrypt with invalid base64 response", true);
+    } catch (...) {
+        PrintTestResult("Decrypt with invalid base64 response", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptWithInvalidJsonResponse();
+        PrintTestResult("Encrypt with invalid JSON response", true);
+    } catch (...) {
+        PrintTestResult("Encrypt with invalid JSON response", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DecryptWithInvalidJsonResponse();
+        PrintTestResult("Decrypt with invalid JSON response", true);
+    } catch (...) {
+        PrintTestResult("Decrypt with invalid JSON response", false);
         all_tests_passed = false;
     }
     

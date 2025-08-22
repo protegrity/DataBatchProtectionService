@@ -11,6 +11,8 @@ public:
         std::string result;
         std::string error_message;
         
+        HttpResponse() : status_code(0), result(""), error_message("") {}
+        
         HttpResponse(int code, std::string response_result) 
             : status_code(code), result(std::move(response_result)), error_message("") {}
         

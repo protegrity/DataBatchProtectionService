@@ -27,7 +27,14 @@ FetchContent_Declare(
   GIT_TAG v0.14.3
 )
 
-FetchContent_MakeAvailable(crow cppcodec httplib)
+# nlohmann/json is a header-only JSON library
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.3
+)
+
+FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json)
 
 add_executable(dbps_api_server 
   src/server/dbps_api_server.cpp
@@ -94,11 +101,15 @@ add_executable(dbps_api_client_test
   src/client/dbps_api_client_test.cpp
   src/client/dbps_api_client.cpp
   src/client/httplib_client.cpp
+  src/common/json_request.cpp
+  src/common/enum_utils.cpp
 )
 
 target_include_directories(dbps_api_client_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   ${CMAKE_BINARY_DIR}/_deps/httplib-src
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
   src/client
   src/common
   src/common/tcb
