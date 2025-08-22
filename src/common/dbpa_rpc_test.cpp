@@ -69,7 +69,23 @@ bool TestBasicInitialization() {
     auto result = agent.Encrypt(test_data);
     
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
+    
+    // Debug: Let's see what actually happened
+    std::cerr << "DEBUG: Basic initialization test - success: " << (result->success() ? "true" : "false") << std::endl;
+    std::cerr << "DEBUG: Basic initialization test - error message: '" << result->error_message() << "'" << std::endl;
+    
+    const auto& error_fields = result->error_fields();
+    std::cerr << "DEBUG: Basic initialization test - error fields:" << std::endl;
+    for (const auto& field : error_fields) {
+        std::cerr << "  " << field.first << ": " << field.second << std::endl;
+    }
+    
     TEST_ASSERT(!result->success(), "Should fail due to mock response not being set");
+    
+    // Check that the error fields contain the expected HTTP status code
+    auto http_status_it = error_fields.find("http_status_code");
+    TEST_ASSERT(http_status_it != error_fields.end(), "Error fields should contain HTTP status code");
+    TEST_ASSERT(http_status_it->second == "404", "HTTP status code should be 404 for missing endpoint");
     
     TEST_PASS("Basic Initialization");
     return true;
@@ -92,6 +108,13 @@ bool TestMissingServerUrl() {
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
     TEST_ASSERT(!result->success(), "Should fail due to missing server URL");
     
+    // Check that the error message contains expected content
+    std::string error_msg = result->error_message();
+    std::cerr << "DEBUG: Missing server URL test - error message: '" << error_msg << "'" << std::endl;
+    TEST_ASSERT(error_msg.find("initialized") != std::string::npos && 
+                error_msg.find("server_url") != std::string::npos,
+                "Error should indicate initialization and server URL failure");
+    
     TEST_PASS("Missing Server URL");
     return true;
 }
@@ -112,6 +135,13 @@ bool TestMissingUserId() {
     
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
     TEST_ASSERT(!result->success(), "Should fail due to missing user ID");
+    
+    // Check that the error message contains expected content
+    std::string error_msg = result->error_message();
+    std::cerr << "DEBUG: Missing user ID test - error message: '" << error_msg << "'" << std::endl;
+    TEST_ASSERT(error_msg.find("initialized") != std::string::npos && 
+                error_msg.find("user_id") != std::string::npos,
+                "Error should indicate initialization and user ID failure");
     
     TEST_PASS("Missing User ID");
     return true;
@@ -136,6 +166,13 @@ bool TestHealthCheckFailure() {
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
     TEST_ASSERT(!result->success(), "Should fail due to health check failure");
     
+    // Check that the error message contains expected content
+    std::string error_msg = result->error_message();
+    std::cerr << "DEBUG: Health check failure test - error message: '" << error_msg << "'" << std::endl;
+    TEST_ASSERT(error_msg.find("initialized") != std::string::npos && 
+                error_msg.find("healthz") != std::string::npos,
+                "Error should indicate initialization and health check failure");
+    
     TEST_PASS("Health Check Failure");
     return true;
 }
@@ -146,7 +183,7 @@ bool TestSuccessfulEncryption() {
     mock_client->health_response = {200, "OK", ""};
     mock_client->encrypt_response = {
         200, 
-        "{\"encrypted_value\":\"dGVzdF9kYXRh\",\"encrypted_compression\":\"UNCOMPRESSED\",\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\",\"reference_id\":\"123\"}", 
+        "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},\"debug\":{\"reference_id\":\"123\"},\"data_batch_encrypted\":{\"value_format\":{\"compression\":\"UNCOMPRESSED\"},\"value\":\"dGVzdF9kYXRh\"}}", 
         ""
     };
     
@@ -161,10 +198,22 @@ bool TestSuccessfulEncryption() {
     auto result = agent.Encrypt(test_data);
     
     TEST_ASSERT(result != nullptr, "Encrypt result should not be null");
+    if (!result->success()) {
+        std::cerr << "Encryption failed with error: " << result->error_message() << std::endl;
+        for (const auto& field : result->error_fields()) {
+            std::cerr << "  " << field.first << ": " << field.second << std::endl;
+        }
+    }
     TEST_ASSERT(result->success(), "Encryption should succeed");
     TEST_ASSERT(result->size() > 0, "Encrypted data should have size > 0");
     TEST_ASSERT(result->ciphertext().size() > 0, "Encrypted data should have size > 0");
     TEST_ASSERT(result->ciphertext().data() != nullptr, "Encrypted data should have non-null data");
+    
+    // Check that the encrypted data contains the expected content
+    std::string ciphertext_str(reinterpret_cast<const char*>(result->ciphertext().data()), result->ciphertext().size());
+    TEST_ASSERT(result->ciphertext().size() > 0, "Encrypted data should have size > 0");
+    TEST_ASSERT(ciphertext_str == "test_data", "Encrypted data should contain 'test_data'");
+    
     TEST_PASS("Successful Encryption");
     return true;
 }
@@ -175,7 +224,7 @@ bool TestSuccessfulDecryption() {
     mock_client->health_response = {200, "OK", ""};
     mock_client->decrypt_response = {
         200, 
-        "{\"decrypted_value\":\"dGVzdF9kYXRh\",\"datatype\":\"BYTE_ARRAY\",\"compression\":\"UNCOMPRESSED\",\"format\":\"RAW_C_DATA\",\"encoding\":\"BASE64\",\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\",\"reference_id\":\"123\"}", 
+        "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},\"debug\":{\"reference_id\":\"123\"},\"data_batch\":{\"datatype\":\"BYTE_ARRAY\",\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"RAW_C_DATA\",\"encoding\":\"BASE64\"},\"value\":\"dGVzdF9kYXRh\"}}", 
         ""
     };
     
@@ -190,9 +239,21 @@ bool TestSuccessfulDecryption() {
     auto result = agent.Decrypt(test_data);
     
     TEST_ASSERT(result != nullptr, "Decrypt result should not be null");
+    if (!result->success()) {
+        std::cerr << "Decryption failed with error: " << result->error_message() << std::endl;
+        for (const auto& field : result->error_fields()) {
+            std::cerr << "  " << field.first << ": " << field.second << std::endl;
+        }
+    }
     TEST_ASSERT(result->success(), "Decryption should succeed");
     TEST_ASSERT(result->size() > 0, "Decrypted data should have size > 0");
-    TEST_ASSERT(result->plaintext().data() != nullptr, "Decrypted data should have non-null data"); 
+    TEST_ASSERT(result->plaintext().data() != nullptr, "Decrypted data should have non-null data");
+    
+    // Check that the decrypted data contains the expected content
+    std::string plaintext_str(reinterpret_cast<const char*>(result->plaintext().data()), result->plaintext().size());
+    TEST_ASSERT(result->plaintext().size() > 0, "Decrypted data should have size > 0");
+    TEST_ASSERT(plaintext_str == "test_data", "Decrypted data should contain 'test_data'");
+    
     TEST_PASS("Successful Decryption");
     return true;
 }

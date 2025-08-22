@@ -13,7 +13,9 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-using tcb::span;
+
+template <typename T>
+using span = tcb::span<T>;
 
 // API response wrapper that contains comprehensive information about the client-server call
 class ApiResponse {

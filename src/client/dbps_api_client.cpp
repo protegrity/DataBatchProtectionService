@@ -12,7 +12,6 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-using tcb::span;
 
 // Auxiliary function for base64 encoding
 std::optional<std::string> EncodeBase64(span<const uint8_t> data) {
@@ -71,9 +70,9 @@ bool ApiResponse::Success() const {
 }
 
 std::string ApiResponse::ErrorMessage() const {
-    if (HasApiClientError()) return "API client error";
+    if (HasApiClientError()) return "API client error: " + GetApiClientError();
     if (!HasHttpStatusCode()) return "No HTTP status code";
-    if (!IsHttpSuccess(GetHttpStatusCode())) return "Non-2xx HTTP status code";
+    if (!IsHttpSuccess(GetHttpStatusCode())) return "Non-2xx HTTP status code: " + std::to_string(GetHttpStatusCode());
     if (!HasJsonResponse()) return "No JSON response";
     if (!GetJsonResponse().IsValid()) return "Invalid JSON response";
     return "Successful call";

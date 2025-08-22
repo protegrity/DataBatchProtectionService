@@ -6,23 +6,17 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <optional>
 #include "tcb/span.hpp"
 #include "enums.h"
 #include "dbpa_interface.h"
-
-using tcb::span;
+#include "../client/dbps_api_client.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
 
 namespace dbps::external {
-
-// Forward declarations
-class DBPSApiClient;
-class EncryptApiResponse;
-class DecryptApiResponse;
-class HttpClientInterface;
 
 /**
  * Implementation of EncryptionResult for remote calls that wraps EncryptApiResponse
@@ -39,7 +33,7 @@ public:
     const std::string& error_message() const override;
     const std::map<std::string, std::string>& error_fields() const override;
     
-    ~RPCEncryptionResult() override = default;
+    ~RemoteEncryptionResult() override = default;
 
 private:
     std::unique_ptr<EncryptApiResponse> response_;
@@ -62,7 +56,7 @@ public:
     const std::string& error_message() const override;
     const std::map<std::string, std::string>& error_fields() const override;
     
-    ~RPCDecryptionResult() override = default;
+    ~RemoteDecryptionResult() override = default;
 
 private:
     std::unique_ptr<DecryptApiResponse> response_;
@@ -97,7 +91,7 @@ public:
     std::unique_ptr<DecryptionResult> Decrypt(
         span<const uint8_t> ciphertext) override;
     
-    ~RPCDataBatchProtectionAgent() override = default;
+    ~RemoteDataBatchProtectionAgent() override = default;
 
 private:
     // Helper methods for configuration parsing
@@ -108,7 +102,8 @@ private:
     std::unique_ptr<DBPSApiClient> api_client_;
     
     // Configuration state
-    bool initialized_ = false;
+    // std::nullopt = not initialized, "error message" = failed, "" = success
+    std::optional<std::string> initialized_;
     std::string server_url_;
     std::string user_id_;
 };

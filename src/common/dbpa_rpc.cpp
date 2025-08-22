@@ -106,7 +106,6 @@ void RemoteDataBatchProtectionAgent::init(
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Starting initialization for column: " << column_name << std::endl;
     
     // Call the base class init to store the configuration
-    // +++++ Check if needed since superclass is virtual ++++++++  
     DataBatchProtectionAgentInterface::init(
         std::move(column_name),
         std::move(connection_config),
@@ -119,20 +118,22 @@ void RemoteDataBatchProtectionAgent::init(
     // Either with the injected HTTP client or not, the server_url should be there.
     auto server_url_opt = ExtractServerUrl(connection_config_);
     if (!server_url_opt || server_url_opt->empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server URL provided in connection_config." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
+        initialized_ = "Agent not properly initialized - server_url missing";
         return;
     }
     server_url_ = *server_url_opt;
-    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Server URL extracted: [" << server_url_ << "]" << std::endl;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
     
-    // Extract user ID from app context
+    // Extract user_id from app_context
     auto user_id_opt = ExtractUserId(app_context_);
     if (!user_id_opt || user_id_opt->empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No user ID provided in app_context." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No user_id provided in app_context." << std::endl;
+        initialized_ = "Agent not properly initialized - user_id missing";
         return;
     }
     user_id_ = *user_id_opt;
-    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - User ID extracted: [" << user_id_ << "]" << std::endl;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - user_id extracted: [" << user_id_ << "]" << std::endl;
     
     // Create API_client if not already created.
     // The API client constructor does not attemp a HTTPconnection with the server. The first Get/Post calls creates the HTTP connection.
@@ -149,23 +150,32 @@ void RemoteDataBatchProtectionAgent::init(
         std::string health_response = api_client_->HealthCheck();
         if (health_response != "OK") {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Health check returned unexpected response: " << health_response << std::endl;
+            initialized_ = "Agent not properly initialized - healthz check failed";
             return;
         }
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Health check successful: " << health_response << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Health check failed: " << e.what() << std::endl;
+        initialized_ = "Agent not properly initialized - healthz check failed";
         return;
     }
     
-    initialized_ = true;
+    initialized_ = ""; // Empty string indicates successful initialization
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Initialization completed successfully" << std::endl;
 }
 
 std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<const uint8_t> plaintext) {
-    if (!initialized_) {
+    if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<EncryptApiResponse>();
         empty_response->SetApiClientError("Agent not properly initialized");
+        return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
+    }
+    
+    if (!initialized_->empty()) {
+        // Return a result indicating initialization failure with specific error
+        auto empty_response = std::make_unique<EncryptApiResponse>();
+        empty_response->SetApiClientError(*initialized_);
         return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
     }
     
@@ -186,10 +196,17 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
 }
 
 std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<const uint8_t> ciphertext) {
-    if (!initialized_) {
+    if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<DecryptApiResponse>();
         empty_response->SetApiClientError("Agent not properly initialized");
+        return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
+    }
+    
+    if (!initialized_->empty()) {
+        // Return a result indicating initialization failure with specific error
+        auto empty_response = std::make_unique<DecryptApiResponse>();
+        empty_response->SetApiClientError(*initialized_);
         return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
     }
     
