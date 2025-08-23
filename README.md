@@ -63,7 +63,7 @@ cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test && 
 cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test && ./build/encryption_sequencer_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test && ./build/dbpa_interface_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test && ./build/dbps_api_client_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test && ./build/dbpa_rpc_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test && ./build/dbpa_remote_test
 ```
 
 ### Build the tests
@@ -88,9 +88,9 @@ echo "----- build: dbps_api_client_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test \
   || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
 
-echo "----- build: dbpa_rpc_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test \
-  || { echo "❌ FAILED: dbpa_rpc_test"; false; } && echo
+echo "----- build: dbpa_remote_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test \
+  || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
 ```
 
 ### Run the tests
@@ -115,7 +115,7 @@ echo "----- run: dbps_api_client_test -----" && \
 ./build/dbps_api_client_test \
   || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
 
-echo "----- run: dbpa_rpc_test -----" && \
-./build/dbpa_rpc_test \
-  || { echo "❌ FAILED: dbpa_rpc_test"; false; } && echo
+echo "----- run: dbpa_remote_test -----" && \
+./build/dbpa_remote_test \
+  || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
 ```
