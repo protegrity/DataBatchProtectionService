@@ -81,7 +81,7 @@ public:
     RemoteDataBatchProtectionAgent() = default;
     
     // Constructor with HTTP client passed. Creates API_client immediately on the contructor.
-    explicit RemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client);
+    explicit RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientInterface> http_client);
     
     // DataBatchProtectionAgentInterface implementation
     void init(

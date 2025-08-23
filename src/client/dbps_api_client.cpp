@@ -177,10 +177,6 @@ void DecryptApiResponse::SetJsonRequest(const DecryptJsonRequest& request) { jso
 bool DecryptApiResponse::HasJsonRequest() const { return json_request_.has_value(); }
 const JsonRequest& DecryptApiResponse::GetJsonRequest() const { return json_request_.value(); }
 
-DBPSApiClient::DBPSApiClient(const std::string& base_url)
-    : http_client_(std::make_unique<HttplibClient>(base_url)) {
-}
-
 DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client)
     : http_client_(std::move(http_client)) {
 }

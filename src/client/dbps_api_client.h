@@ -122,13 +122,8 @@ protected:
 class DBPSApiClient {
 public:
     /**
-     * Constructor
-     * @param base_url The base URL of the API server (e.g., "http://localhost:18080")
-     */
-    explicit DBPSApiClient(const std::string& base_url);
-    
-    /**
-     * Constructor with dependency injection
+     * Constructor gets implementation of a HTTP client.
+     * The HTTP client is expected to be thread-safe.
      * @param http_client Custom HTTP client implementation
      */
     explicit DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client);

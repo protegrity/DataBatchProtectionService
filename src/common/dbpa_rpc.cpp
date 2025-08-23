@@ -1,5 +1,6 @@
 #include "dbpa_rpc.h"
 #include "../client/dbps_api_client.h"
+#include "../client/httplib_client.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -89,8 +90,8 @@ const std::map<std::string, std::string>& RemoteDecryptionResult::error_fields()
     return cached_error_fields_;
 }
 
-RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client)
-    : api_client_(std::make_unique<DBPSApiClient>(std::move(http_client))) {
+RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientInterface> http_client)
+    : api_client_(std::make_unique<DBPSApiClient>(http_client)) {
     // API client is created immediately with the injected HTTP client
     // init() will still be called to set up configuration, but won't create a new client
 }
@@ -141,7 +142,8 @@ void RemoteDataBatchProtectionAgent::init(
         // The API client constructor does not attemp a HTTPconnection with the server. The first Get/Post calls creates the HTTP connection.
         if (!api_client_) {
             std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating API client for server: " << server_url_ << std::endl;
-            api_client_ = std::make_unique<DBPSApiClient>(server_url_);
+            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            api_client_ = std::make_unique<DBPSApiClient>(http_client);
         } else {
             std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Using existing API client" << std::endl;
         }
