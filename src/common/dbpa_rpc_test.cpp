@@ -254,6 +254,7 @@ bool TestSuccessfulEncryption() {
     TEST_ASSERT(result->success(), "Encryption should succeed");
     TEST_ASSERT(result->size() > 0, "Encrypted data should have size > 0");
     TEST_ASSERT(result->ciphertext().size() > 0, "Encrypted data should have size > 0");
+    TEST_ASSERT(result->size() >= result->ciphertext().size(), "Encrypted data size should be >= than size of the ciphertext");
     TEST_ASSERT(result->ciphertext().data() != nullptr, "Encrypted data should have non-null data");
     
     // Check that the encrypted data contains the expected content
@@ -294,6 +295,8 @@ bool TestSuccessfulDecryption() {
     }
     TEST_ASSERT(result->success(), "Decryption should succeed");
     TEST_ASSERT(result->size() > 0, "Decrypted data should have size > 0");
+    TEST_ASSERT(result->plaintext().size() > 0, "Decrypted data should have size > 0");   
+    TEST_ASSERT(result->size() >= result->plaintext().size(), "Decrypted data size should be >= than size of the plaintext");
     TEST_ASSERT(result->plaintext().data() != nullptr, "Decrypted data should have non-null data");
     
     // Check that the decrypted data contains the expected content
