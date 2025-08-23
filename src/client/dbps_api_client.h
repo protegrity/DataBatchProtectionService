@@ -131,7 +131,7 @@ public:
      * Constructor with dependency injection
      * @param http_client Custom HTTP client implementation
      */
-    explicit DBPSApiClient(std::unique_ptr<HttpClientInterface> http_client);
+    explicit DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client);
     
     /**
      * Destructor
@@ -200,9 +200,5 @@ public:
     );
 
 private:
-    std::unique_ptr<HttpClientInterface> http_client_;
-    
-    // Helper methods for HTTP requests
-    HttpClientInterface::HttpResponse MakeGetRequest(const std::string& endpoint);
-    HttpClientInterface::HttpResponse MakePostRequest(const std::string& endpoint, const std::string& json_body);
+    const std::shared_ptr<HttpClientInterface> http_client_;
 };

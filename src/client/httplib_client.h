@@ -33,5 +33,5 @@ public:
     HttpResponse Post(const std::string& endpoint, const std::string& json_body) override;
 
 private:
-    std::string base_url_;
+    const std::string base_url_;
 };
