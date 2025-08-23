@@ -70,52 +70,52 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test && ./
 ```
 echo "----- build: json_request_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target json_request_test \
-  || { echo "XXXX FAILED: json_request_test"; false; } && echo
+  || { echo "❌ FAILED: json_request_test"; false; } && echo
 
 echo "----- build: enum_utils_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test \
-  || { echo "XXXX FAILED: enum_utils_test"; false; } && echo
+  || { echo "❌ FAILED: enum_utils_test"; false; } && echo
 
 echo "----- build: encryption_sequencer_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test \
-  || { echo "XXXX FAILED: encryption_sequencer_test"; false; } && echo
+  || { echo "❌ FAILED: encryption_sequencer_test"; false; } && echo
 
 echo "----- build: dbpa_interface_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test \
-  || { echo "XXXX FAILED: dbpa_interface_test"; false; } && echo
+  || { echo "❌ FAILED: dbpa_interface_test"; false; } && echo
 
 echo "----- build: dbps_api_client_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test \
-  || { echo "XXXX FAILED: dbps_api_client_test"; false; } && echo
+  || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
 
 echo "----- build: dbpa_rpc_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_rpc_test \
-  || { echo "XXXX FAILED: dbpa_rpc_test"; false; } && echo
+  || { echo "❌ FAILED: dbpa_rpc_test"; false; } && echo
 ```
 
 ### Run the tests
 ```
 echo "----- run: json_request_test -----" && \
 ./build/json_request_test \
-  || { echo "XXXXX FAILED: json_request_test"; false; } && echo
+  || { echo "❌ FAILED: json_request_test"; false; } && echo
 
 echo "----- run: enum_utils_test -----" && \
 ./build/enum_utils_test \
-  || { echo "XXXXX FAILED: enum_utils_test"; false; } && echo
+  || { echo "❌ FAILED: enum_utils_test"; false; } && echo
 
 echo "----- run: encryption_sequencer_test -----" && \
 ./build/encryption_sequencer_test \
-  || { echo "XXXXX FAILED: encryption_sequencer_test"; false; } && echo
+  || { echo "❌ FAILED: encryption_sequencer_test"; false; } && echo
 
 echo "----- run: dbpa_interface_test -----" && \
 ./build/dbpa_interface_test \
-  || { echo "XXXXX FAILED: dbpa_interface_test"; false; } && echo
+  || { echo "❌ FAILED: dbpa_interface_test"; false; } && echo
 
 echo "----- run: dbps_api_client_test -----" && \
 ./build/dbps_api_client_test \
-  || { echo "XXXXX FAILED: dbps_api_client_test"; false; } && echo
+  || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
 
 echo "----- run: dbpa_rpc_test -----" && \
 ./build/dbpa_rpc_test \
-  || { echo "XXXXX FAILED: dbpa_rpc_test"; false; } && echo
+  || { echo "❌ FAILED: dbpa_rpc_test"; false; } && echo
 ```
