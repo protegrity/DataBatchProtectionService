@@ -168,7 +168,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<EncryptApiResponse>();
-        empty_response->SetApiClientError("Agent not properly initialized");
+        empty_response->SetApiClientError("Agent not initialized - init() was not called");
         return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
     }
     
@@ -199,7 +199,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<DecryptApiResponse>();
-        empty_response->SetApiClientError("Agent not properly initialized");
+        empty_response->SetApiClientError("Agent not initialized - init() was not called");
         return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
     }
     

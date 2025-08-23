@@ -93,6 +93,13 @@ public:
     
     ~RemoteDataBatchProtectionAgent() override = default;
 
+protected:
+    // Configuration state
+    // std::nullopt = not initialized, "error message" = failed, "" = success
+    std::optional<std::string> initialized_;
+    std::string server_url_;
+    std::string user_id_;
+
 private:
     // Helper methods for configuration parsing
     std::optional<std::string> ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const;
@@ -100,12 +107,6 @@ private:
     
     // Client instance
     std::unique_ptr<DBPSApiClient> api_client_;
-    
-    // Configuration state
-    // std::nullopt = not initialized, "error message" = failed, "" = success
-    std::optional<std::string> initialized_;
-    std::string server_url_;
-    std::string user_id_;
 };
 
 } // namespace dbps::external
