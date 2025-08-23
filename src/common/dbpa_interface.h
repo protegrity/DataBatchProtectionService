@@ -93,7 +93,7 @@ public:
 
     virtual ~DataBatchProtectionAgentInterface() = default;
 
-private:
+protected:
     std::string column_name_;
     std::map<std::string, std::string> connection_config_;
     std::string app_context_;  // includes user_id

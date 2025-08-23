@@ -2,6 +2,12 @@
 
 #include <string>
 
+/**
+ * Interface for HTTP client implementations.
+ * 
+ * Thread Safety: Implementations must be thread-safe for concurrent calls.
+ * Multiple threads may call Get() and Post() methods simultaneously on the same instance.
+ */
 class HttpClientInterface {
 public:
     virtual ~HttpClientInterface() = default;

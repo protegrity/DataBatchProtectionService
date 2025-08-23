@@ -10,7 +10,6 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-using tcb::span;
 
 // Simple test framework (matching existing project style)
 #define TEST(name) void test_##name()

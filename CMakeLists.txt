@@ -114,3 +114,23 @@ target_include_directories(dbps_api_client_test PRIVATE
   src/common
   src/common/tcb
 )
+
+# Remote DBPA test executable
+add_executable(dbpa_remote_test
+  src/common/dbpa_remote_test.cpp
+  src/common/dbpa_remote.cpp
+  src/client/dbps_api_client.cpp
+  src/client/httplib_client.cpp
+  src/common/json_request.cpp
+  src/common/enum_utils.cpp
+)
+
+target_include_directories(dbpa_remote_test PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+  src/client
+  src/common
+  src/common/tcb
+)

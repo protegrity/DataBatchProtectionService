@@ -12,9 +12,6 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-using tcb::span;
-
-
 
 // Auxiliary function for base64 encoding
 std::optional<std::string> EncodeBase64(span<const uint8_t> data) {
@@ -39,6 +36,8 @@ std::optional<std::vector<uint8_t>> DecodeBase64(const std::string& base64_strin
 }
 
 // Generate a simple unique reference ID using timestamp
+// TODO: Potentially not-unique if concurrent calls are made on the same millisecond.
+//       Can use atomic counters but may not be an issue to justify the complexity.
 std::string GenerateReferenceId() {
     auto now = std::chrono::system_clock::now();
     auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -73,9 +72,9 @@ bool ApiResponse::Success() const {
 }
 
 std::string ApiResponse::ErrorMessage() const {
-    if (HasApiClientError()) return "API client error";
+    if (HasApiClientError()) return "API client error: " + GetApiClientError();
     if (!HasHttpStatusCode()) return "No HTTP status code";
-    if (!IsHttpSuccess(GetHttpStatusCode())) return "Non-2xx HTTP status code";
+    if (!IsHttpSuccess(GetHttpStatusCode())) return "Non-2xx HTTP status code: " + std::to_string(GetHttpStatusCode());
     if (!HasJsonResponse()) return "No JSON response";
     if (!GetJsonResponse().IsValid()) return "Invalid JSON response";
     return "Successful call";
@@ -178,11 +177,7 @@ void DecryptApiResponse::SetJsonRequest(const DecryptJsonRequest& request) { jso
 bool DecryptApiResponse::HasJsonRequest() const { return json_request_.has_value(); }
 const JsonRequest& DecryptApiResponse::GetJsonRequest() const { return json_request_.value(); }
 
-DBPSApiClient::DBPSApiClient(const std::string& base_url)
-    : http_client_(std::make_unique<HttplibClient>(base_url)) {
-}
-
-DBPSApiClient::DBPSApiClient(std::unique_ptr<HttpClientInterface> http_client)
+DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client)
     : http_client_(std::move(http_client)) {
 }
 
@@ -373,5 +368,3 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     
     return api_response;
 }
-
-
