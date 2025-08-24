@@ -1,5 +1,19 @@
 # Data Batch Protection Service
 
+## Table of Contents
+- [API server](#api-server)
+- [Development Dockerfile](#development-dockerfile)
+- [Building the server docker image](#building-the-server-docker-image)
+- [Running the server locally from the docker image](#running-the-server-locally-from-the-docker-image)
+- [For development](#for-development)
+- [Running Unittests](#running-unittests)
+  - [Build-n-run tests (Compact version)](#build-n-run-tests-compact-version)
+  - [Build the tests](#build-the-tests)
+  - [Run the tests](#run-the-tests)
+- [Running DBPA remote testing app](#running-dbpa-remote-testing-app)
+
+
+
 ## API server
 
 [View API Swagger file](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/protegrity/DataBatchProtectionService/dev_phase2/src/common/swagger.yaml)
