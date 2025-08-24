@@ -136,8 +136,7 @@ echo "----- run: dbpa_remote_test -----" && \
 ## Running DBPA remote testing app
 ```
 # Build the application
-cmake -B build -S . -G Ninja
-cmake --build build --target dbpa_remote_testapp
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_testapp
 
 # Run the application
 ./build/dbpa_remote_testapp
