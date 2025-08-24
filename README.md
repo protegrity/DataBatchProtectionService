@@ -60,9 +60,14 @@ Make changes to source files as needed.
 
 Then build and run manually from inside the docker container bash
 ```
-# Build then run server
+# Build server
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
+
+# then run it interactively
 ./build/dbps_api_server
+
+# .. or in the background with a logfile output
+./build/dbps_api_server > dbps_api_server_RUN.log 2>&1 &
 ```
 
 ## Running Unittests
