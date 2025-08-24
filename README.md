@@ -13,7 +13,6 @@
 - [Running DBPA remote testing app](#running-dbpa-remote-testing-app)
 
 
-
 ## API server
 
 [View API Swagger file](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/protegrity/DataBatchProtectionService/dev_phase2/src/common/swagger.yaml)
