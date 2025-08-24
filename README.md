@@ -52,7 +52,7 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
 ./build/dbps_api_server
 ```
 
-## Running Tests
+## Running Unittests
 
 The project includes unit tests for the JSON request parsing classes. To run the tests:
 
@@ -118,4 +118,16 @@ echo "----- run: dbps_api_client_test -----" && \
 echo "----- run: dbpa_remote_test -----" && \
 ./build/dbpa_remote_test \
   || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
+```
+
+## Running DBPA remote testing app
+```
+# Build the application
+cmake -B build -S . -G Ninja
+cmake --build build --target dbpa_remote_testapp
+
+# Run the application
+./build/dbpa_remote_testapp
+./build/dbpa_remote_testapp --server_url=http://localhost:18080
+./build/dbpa_remote_testapp --help
 ```
