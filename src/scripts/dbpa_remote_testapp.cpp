@@ -61,7 +61,7 @@ public:
                 CompressionCodec::UNCOMPRESSED  // compression_type
             );
             
-            std::cout << "SUCCESS: DBPA agent initialized successfully" << std::endl;
+            std::cout << "OK: DBPA agent initialized successfully" << std::endl;
             return true;
             
         } catch (const std::exception& e) {
@@ -79,7 +79,7 @@ public:
             "This is sample data for encryption",
             "Special chars: !@#$%^&*()",
             "Numbers: 1234567890",
-            "Long text: " + std::string(5000000, 'B'),
+            "Long text: " + std::string(50 * 1000 * 1000, 'B'),
             "Sample data for decryption demo",
             "Another piece of data to decrypt",
             "Final sample data"
@@ -106,12 +106,12 @@ public:
                     continue;
                 }
                 
-                std::cout << "  SUCCESS: Encrypted (" << encrypt_result->size() << " bytes)" << std::endl;
-                std::cout << "  SUCCESS: Ciphertext size: " << encrypt_result->size() << " bytes" << std::endl;
+                std::cout << "  OK: Encrypted (" << encrypt_result->size() << " bytes)" << std::endl;
+                std::cout << "  OK: Ciphertext size: " << encrypt_result->size() << " bytes" << std::endl;
 
                 // Show some details about the encrypted data
                 auto ciphertext = encrypt_result->ciphertext();
-                std::cout << "  SUCCESS: Ciphertext (first 32 bytes): ";
+                std::cout << "  OK: Ciphertext (first 32 bytes): ";
                 for (size_t j = 0; j < std::min(size_t(32), ciphertext.size()); ++j) {
                     printf("%02x", ciphertext[j]);
                 }
@@ -136,11 +136,11 @@ public:
                 std::string decrypted_string(decrypt_result->plaintext().begin(), 
                                            decrypt_result->plaintext().end());
                                 
-                std::cout << "  SUCCESS: Decrypted: " << (decrypted_string.length() > 50 ? decrypted_string.substr(0, 50) + "..." : decrypted_string) << std::endl;
+                std::cout << "  OK: Decrypted: " << (decrypted_string.length() > 50 ? decrypted_string.substr(0, 50) + "..." : decrypted_string) << std::endl;
                 
                 // Verify data integrity
                 if (decrypted_string == original_data) {
-                    std::cout << "  SUCCESS: Data integrity verified" << std::endl;
+                    std::cout << "  OK: Data integrity verified" << std::endl;
                 } else {
                     std::cout << "  ERROR: Data integrity check failed" << std::endl;
                     all_succeeded = false;
@@ -164,8 +164,7 @@ public:
             "Text with symbols: !@#$%^&*()",
             "Numbers: 1234567890",
             "Mixed: Hello123!@#",
-            "Empty string",
-            "Very long string: " + std::string(10000, 'X')
+            "Empty string"
         };
         
         int success_count = 0;
@@ -204,7 +203,7 @@ public:
                                            decrypt_result->plaintext().end());
                 
                 if (decrypted_string == test_data) {
-                    std::cout << "  SUCCESS: Round-trip successful" << std::endl;
+                    std::cout << "  OK: Round-trip successful" << std::endl;
                     success_count++;
                 } else {
                     std::cout << "  ERROR: Data mismatch" << std::endl;
@@ -231,14 +230,14 @@ public:
             auto result = agent_->Encrypt(span<const uint8_t>(empty_data));
             
             if (result && result->success()) {
-                std::cout << "  SUCCESS: Empty data handled successfully" << std::endl;
+                std::cout << "  OK: Empty data handled successfully" << std::endl;
             } else if (result && !result->success()) {
-                std::cout << "  SUCCESS: Empty data properly rejected: " << result->error_message() << std::endl;
+                std::cout << "  OK: Empty data properly rejected: " << result->error_message() << std::endl;
             } else {
                 std::cout << "  WARNING: Unexpected null result for empty data" << std::endl;
             }
         } catch (const std::exception& e) {
-            std::cout << "  SUCCESS: Exception caught for empty data: " << e.what() << std::endl;
+            std::cout << "  OK: Exception caught for empty data: " << e.what() << std::endl;
         }
         
         // Test with very large data
@@ -249,14 +248,14 @@ public:
             auto result = agent_->Encrypt(span<const uint8_t>(plaintext));
             
             if (result && result->success()) {
-                std::cout << "  SUCCESS: Large data (" << plaintext.size() << " bytes) encrypted successfully" << std::endl;
+                std::cout << "  OK: Large data (" << plaintext.size() << " bytes) encrypted successfully" << std::endl;
             } else if (result && !result->success()) {
-                std::cout << "  SUCCESS: Large data properly rejected: " << result->error_message() << std::endl;
+                std::cout << "  OK: Large data properly rejected: " << result->error_message() << std::endl;
             } else {
                 std::cout << "  WARNING: Unexpected null result for large data" << std::endl;
             }
         } catch (const std::exception& e) {
-            std::cout << "  SUCCESS: Exception caught for large data: " << e.what() << std::endl;
+            std::cout << "  OK: Exception caught for large data: " << e.what() << std::endl;
         }
         
         return true; // Error handling demo always succeeds (it's testing error conditions)
