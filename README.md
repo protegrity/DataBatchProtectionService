@@ -145,6 +145,6 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_testapp
 
 # Run the application
 ./build/dbpa_remote_testapp
-./build/dbpa_remote_testapp --server_url=http://localhost:18080
+./build/dbpa_remote_testapp --server_url=http://18.222.202.51:45001/
 ./build/dbpa_remote_testapp --help
 ```
