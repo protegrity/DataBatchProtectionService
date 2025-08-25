@@ -76,6 +76,8 @@ The project includes unit tests for the JSON request parsing classes. To run the
 
 ### Build-n-run tests (Compact version)
 ```
+# First, run docker container with source files mounted
+# Then, inside the container, run:
 cmake -B build -S . -G Ninja && cmake --build build --target json_request_test  && ./build/json_request_test
 cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test && ./build/enum_utils_test
 cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test && ./build/encryption_sequencer_test
@@ -86,6 +88,9 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test &&
 
 ### Build the tests
 ```
+# First, run docker container with source files mounted
+# Then, inside the container, run:
+
 echo "----- build: json_request_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target json_request_test \
   || { echo "❌ FAILED: json_request_test"; false; } && echo
@@ -113,6 +118,9 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test \
 
 ### Run the tests
 ```
+# First, run docker container with source files mounted
+# Then, inside the container, run:
+
 echo "----- run: json_request_test -----" && \
 ./build/json_request_test \
   || { echo "❌ FAILED: json_request_test"; false; } && echo
@@ -140,6 +148,9 @@ echo "----- run: dbpa_remote_test -----" && \
 
 ## Running DBPA remote testing app
 ```
+# First, run docker container with source files mounted
+# Then, inside the container...
+
 # Build the application
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_testapp
 
