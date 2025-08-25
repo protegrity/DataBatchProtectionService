@@ -127,7 +127,14 @@ void RemoteDataBatchProtectionAgent::init(
         }
         server_url_ = *server_url_opt;
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
-        
+
+        // check for app_context not empty (as user_id will be extracted from it)
+        if (app_context_.empty()) { 
+            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - app_context is empty" << std::endl;
+            initialized_ = "Agent not properly initialized - app_context is empty";
+            return;
+        }
+
         // Extract user_id from app_context
         auto user_id_opt = ExtractUserId(app_context_);
         if (!user_id_opt || user_id_opt->empty()) {
@@ -239,10 +246,6 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(cons
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
-    if (app_context.empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - app_context is empty" << std::endl;
-        return std::nullopt;
-    }
     try {
         auto json = nlohmann::json::parse(app_context);
         if (json.contains("user_id") && json["user_id"].is_string()) {
