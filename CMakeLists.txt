@@ -34,7 +34,14 @@ FetchContent_Declare(
   GIT_TAG v3.11.3
 )
 
-FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json)
+# cxxopts is a header-only command line parser
+FetchContent_Declare(
+  cxxopts
+  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+  GIT_TAG v3.1.0
+)
+
+FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json cxxopts)
 
 add_executable(dbps_api_server 
   src/server/dbps_api_server.cpp
@@ -130,6 +137,27 @@ target_include_directories(dbpa_remote_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/httplib-src
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+  src/client
+  src/common
+  src/common/tcb
+)
+
+# DBPA Remote Test Script executable
+add_executable(dbpa_remote_testapp
+  src/scripts/dbpa_remote_testapp.cpp
+  src/common/dbpa_remote.cpp
+  src/client/dbps_api_client.cpp
+  src/client/httplib_client.cpp
+  src/common/json_request.cpp
+  src/common/enum_utils.cpp
+)
+
+target_include_directories(dbpa_remote_testapp PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
   src/client
   src/common
   src/common/tcb
