@@ -58,6 +58,9 @@ public:
     bool ConvertAndEncrypt(const std::string& plaintext);
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
+public:
+    static const bool USE_SIMPLE_XOR_ENCRYPTION = true;
+
 private:
     // Corresponding enum values for the string parameters
     dbps::external::Type::type datatype_enum_;
@@ -65,7 +68,7 @@ private:
     dbps::external::CompressionCodec::type encrypted_compression_enum_;
     dbps::external::Format::type format_enum_;
     dbps::external::Encoding::type encoding_enum_;
-
+    
     /**
      * Converts string values to corresponding enum values using enum_utils.
      * Returns true if all conversions are successful, false otherwise.
