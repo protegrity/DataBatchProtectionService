@@ -41,7 +41,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         return false;
     }
     
-    // Simple encryption: XOR 
+    // Simple XOR encryption
     std::vector<uint8_t> encrypted_data = EncryptData(decoded_data);
     if (encrypted_data.empty()) {
         error_stage_ = "encryption";
@@ -81,7 +81,7 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::string& cipherte
         return false;
     }
     
-    // Simple decryption: XOR (same operation as encryption)
+    // Simple XOR decryption (same operation as encryption)
     std::vector<uint8_t> decrypted_data = DecryptData(encrypted_data);
     if (decrypted_data.empty()) {
         error_stage_ = "decryption";
@@ -215,13 +215,26 @@ std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector
     if (data.empty()) {
         return std::vector<uint8_t>();
     }
-
-    // XOR each byte 
+    
     std::vector<uint8_t> encrypted_data(data.size());
-    for (size_t i = 0; i < data.size(); ++i) {
-        encrypted_data[i] = data[i] ^ 0xAA;
-    }
 
+    if (use_simple_xor_encryption_) {
+        for (size_t i = 0; i < data.size(); ++i) {
+            encrypted_data[i] = data[i] ^ 0xAA;
+        }
+    }
+    else {
+        // Generate a simple key from key_id by hashing it
+        std::hash<std::string> hasher;
+        size_t key_hash = hasher(key_id_);
+        
+        // XOR each byte with the key hash
+        for (size_t i = 0; i < data.size(); ++i) {
+            encrypted_data[i] = data[i] ^ (key_hash & 0xFF);
+            // Rotate the key hash for next byte
+            key_hash = (key_hash << 1) | (key_hash >> 31);
+        }
+    }    
     return encrypted_data;
 }
 

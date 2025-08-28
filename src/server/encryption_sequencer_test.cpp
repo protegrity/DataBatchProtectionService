@@ -458,7 +458,15 @@ bool TestRoundTripEncryption() {
             std::cout << "Different keys test failed during encryption" << std::endl;
             return false;
         }
-                
+        
+        if (!DataBatchEncryptionSequencer::use_simple_xor_encryption_) {
+            // Key-aware XOR encryption should produce different results for different keys
+            if (sequencer1.encrypted_result_ == sequencer2.encrypted_result_) {
+                std::cout << "Simple XOR encryption should produce different results for different keys" << std::endl;
+                return false;
+            }
+        }
+        
         // But both should decrypt back to the same original
         bool decrypt1 = sequencer1.ConvertAndDecrypt(sequencer1.encrypted_result_);
         bool decrypt2 = sequencer2.ConvertAndDecrypt(sequencer2.encrypted_result_);
