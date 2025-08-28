@@ -459,7 +459,7 @@ bool TestRoundTripEncryption() {
             return false;
         }
         
-        if (!DataBatchEncryptionSequencer::use_simple_xor_encryption_) {
+        if (!DataBatchEncryptionSequencer::USE_SIMPLE_XOR_ENCRYPTION) {
             // Key-aware XOR encryption should produce different results for different keys
             if (sequencer1.encrypted_result_ == sequencer2.encrypted_result_) {
                 std::cout << "Simple XOR encryption should produce different results for different keys" << std::endl;

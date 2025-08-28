@@ -59,7 +59,7 @@ public:
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
 public:
-    static const bool use_simple_xor_encryption_ = true;
+    static const bool USE_SIMPLE_XOR_ENCRYPTION = true;
 
 private:
     // Corresponding enum values for the string parameters

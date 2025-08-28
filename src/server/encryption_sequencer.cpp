@@ -218,7 +218,7 @@ std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector
     
     std::vector<uint8_t> encrypted_data(data.size());
 
-    if (use_simple_xor_encryption_) {
+    if (USE_SIMPLE_XOR_ENCRYPTION) {
         for (size_t i = 0; i < data.size(); ++i) {
             encrypted_data[i] = data[i] ^ 0xAA;
         }
