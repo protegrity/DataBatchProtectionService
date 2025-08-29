@@ -1,5 +1,6 @@
 #include "encryption_sequencer.h"
 #include "enum_utils.h"
+#include "decoding_utils.h"
 #include <cppcodec/base64_rfc4648.hpp>
 #include <functional>
 #include <iostream>
@@ -39,6 +40,20 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         error_stage_ = "base64_decoding";
         error_message_ = "Failed to decode base64 plaintext";
         return false;
+    }
+    
+    // Debug: Print the decoded plaintext data (only for uncompressed data)
+    if (compression_enum_ == dbps::external::CompressionCodec::UNCOMPRESSED) {
+        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_);
+        if (debug_decoded.length() > 1000) {
+            std::cout << "Debug - Decoded plaintext data (first 1000 chars):\n" 
+                      << debug_decoded.substr(0, 1000) << "..." << std::endl;
+        } else {
+            std::cout << "Debug - Decoded plaintext data:\n" << debug_decoded << std::endl;
+        }
+    } else {
+        std::cout << "Debug - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
+                  << decoded_data.size() << " bytes" << std::endl;
     }
     
     // Simple XOR encryption
@@ -163,13 +178,13 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     }
     
     // Check compression: warn if not UNCOMPRESSED but continue
-    if (compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
+    if (CHECK_COMPRESSION_ENUM && compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
         std::cerr << "WARNING: Non-UNCOMPRESSED compression requested: " << compression_ 
                   << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
     }
     
     // Check encrypted_compression: warn if not UNCOMPRESSED but continue
-    if (encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
+    if (CHECK_COMPRESSION_ENUM && encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
         std::cerr << "WARNING: Non-UNCOMPRESSED encrypted_compression requested: " << encrypted_compression_ 
                   << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
     }
