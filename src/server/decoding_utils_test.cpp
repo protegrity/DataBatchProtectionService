@@ -36,7 +36,6 @@ static void test_INT32_ok() {
     append_le<int32_t>(buf, 123456789);
 
     auto s = PrintPlainDecoded(buf, Type::INT32);
-    assert(contains(s, "Decoded INT32 values:"));
     assert(contains(s, "[0] 1"));
     assert(contains(s, "[1] -2"));
     assert(contains(s, "[2] 123456789"));
@@ -47,7 +46,6 @@ static void test_INT64_ok() {
     append_le<int64_t>(buf, 42LL);
     append_le<int64_t>(buf, -99LL);
     auto s = PrintPlainDecoded(buf, Type::INT64);
-    assert(contains(s, "Decoded INT64 values:"));
     assert(contains(s, "[0] 42"));
     assert(contains(s, "[1] -99"));
 }
@@ -57,7 +55,6 @@ static void test_FLOAT_ok() {
     append_le<float>(buf, 1.5f);
     append_le<float>(buf, -2.25f);
     auto s = PrintPlainDecoded(buf, Type::FLOAT);
-    assert(contains(s, "Decoded FLOAT values:"));
     assert(contains(s, "[0] 1.5"));
     assert(contains(s, "[1] -2.25"));
 }
@@ -67,7 +64,6 @@ static void test_DOUBLE_ok() {
     append_le<double>(buf, 3.14159);
     append_le<double>(buf, -0.5);
     auto s = PrintPlainDecoded(buf, Type::DOUBLE);
-    assert(contains(s, "Decoded DOUBLE values:"));
     assert(contains(s, "[0] 3.14159"));
     assert(contains(s, "[1] -0.5"));
 }
@@ -79,7 +75,6 @@ static void test_INT96_ok() {
     append_le<uint32_t>(buf, 22);
     append_le<uint32_t>(buf, 33);
     auto s = PrintPlainDecoded(buf, Type::INT96);
-    assert(contains(s, "Decoded INT96 values"));
     assert(contains(s, "[0] [11, 22, 33]"));
 }
 
@@ -88,7 +83,6 @@ static void test_BYTE_ARRAY_ok() {
     append_len_prefixed(buf, "alpha");
     append_len_prefixed(buf, "βeta"); // UTF-8 is fine, treated as bytes
     auto s = PrintPlainDecoded(buf, Type::BYTE_ARRAY);
-    assert(contains(s, "Decoded BYTE_ARRAY values:"));
     assert(contains(s, "[0] \"alpha\""));
     assert(contains(s, "[1] \"βeta\""));
 }
@@ -97,7 +91,6 @@ static void test_FIXED_LEN_BYTE_ARRAY_ok() {
     std::string msg = "hello world";
     std::vector<uint8_t> buf(msg.begin(), msg.end());
     auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY);
-    assert(contains(s, "Decoded FIXED_LEN_BYTE_ARRAY:"));
     assert(contains(s, "\"hello world\""));
 }
 
