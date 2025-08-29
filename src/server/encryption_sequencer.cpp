@@ -46,6 +46,9 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     if (compression_enum_ == dbps::external::CompressionCodec::UNCOMPRESSED) {
         std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_);
         std::cout << "Debug - Decoded plaintext data:\n" << debug_decoded << std::endl;
+    } else {
+        std::cout << "Debug - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
+                  << decoded_data.size() << " bytes" << std::endl;
     }
     
     // Simple XOR encryption
