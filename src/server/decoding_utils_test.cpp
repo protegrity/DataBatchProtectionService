@@ -1,0 +1,130 @@
+#include "decoding_utils.h"
+#include <vector>
+#include <string>
+#include <cstring>
+#include <cstdint>
+#include <iostream>
+#include <cassert>
+
+using namespace dbps::external;
+
+template <typename T>
+static void append_le(std::vector<uint8_t>& dst, T v) {
+    static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+    size_t off = dst.size();
+    dst.resize(off + sizeof(T));
+    std::memcpy(dst.data() + off, &v, sizeof(T)); // little-endian assumed
+}
+
+static void append_len_prefixed(std::vector<uint8_t>& dst, const std::string& s) {
+    uint32_t len = static_cast<uint32_t>(s.size());
+    append_le<uint32_t>(dst, len);
+    size_t off = dst.size();
+    dst.resize(off + s.size());
+    std::memcpy(dst.data() + off, s.data(), s.size());
+}
+
+static bool contains(const std::string& haystack, const std::string& needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
+// ----------------- Tests -----------------
+static void test_INT32_ok() {
+    std::vector<uint8_t> buf;
+    append_le<int32_t>(buf, 1);
+    append_le<int32_t>(buf, -2);
+    append_le<int32_t>(buf, 123456789);
+
+    auto s = PrintPlainDecoded(buf, Type::INT32);
+    assert(contains(s, "Decoded INT32 values:"));
+    assert(contains(s, "[0] 1"));
+    assert(contains(s, "[1] -2"));
+    assert(contains(s, "[2] 123456789"));
+}
+
+static void test_INT64_ok() {
+    std::vector<uint8_t> buf;
+    append_le<int64_t>(buf, 42LL);
+    append_le<int64_t>(buf, -99LL);
+    auto s = PrintPlainDecoded(buf, Type::INT64);
+    assert(contains(s, "Decoded INT64 values:"));
+    assert(contains(s, "[0] 42"));
+    assert(contains(s, "[1] -99"));
+}
+
+static void test_FLOAT_ok() {
+    std::vector<uint8_t> buf;
+    append_le<float>(buf, 1.5f);
+    append_le<float>(buf, -2.25f);
+    auto s = PrintPlainDecoded(buf, Type::FLOAT);
+    assert(contains(s, "Decoded FLOAT values:"));
+    assert(contains(s, "[0] 1.5"));
+    assert(contains(s, "[1] -2.25"));
+}
+
+static void test_DOUBLE_ok() {
+    std::vector<uint8_t> buf;
+    append_le<double>(buf, 3.14159);
+    append_le<double>(buf, -0.5);
+    auto s = PrintPlainDecoded(buf, Type::DOUBLE);
+    assert(contains(s, "Decoded DOUBLE values:"));
+    assert(contains(s, "[0] 3.14159"));
+    assert(contains(s, "[1] -0.5"));
+}
+
+static void test_INT96_ok() {
+    std::vector<uint8_t> buf;
+    // one 12-byte value: lo=11, mid=22, hi=33
+    append_le<uint32_t>(buf, 11);
+    append_le<uint32_t>(buf, 22);
+    append_le<uint32_t>(buf, 33);
+    auto s = PrintPlainDecoded(buf, Type::INT96);
+    assert(contains(s, "Decoded INT96 values"));
+    assert(contains(s, "[0] [11, 22, 33]"));
+}
+
+static void test_BYTE_ARRAY_ok() {
+    std::vector<uint8_t> buf;
+    append_len_prefixed(buf, "alpha");
+    append_len_prefixed(buf, "βeta"); // UTF-8 is fine, treated as bytes
+    auto s = PrintPlainDecoded(buf, Type::BYTE_ARRAY);
+    assert(contains(s, "Decoded BYTE_ARRAY values:"));
+    assert(contains(s, "[0] \"alpha\""));
+    assert(contains(s, "[1] \"βeta\""));
+}
+
+static void test_FIXED_LEN_BYTE_ARRAY_ok() {
+    std::string msg = "hello world";
+    std::vector<uint8_t> buf(msg.begin(), msg.end());
+    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY);
+    assert(contains(s, "Decoded FIXED_LEN_BYTE_ARRAY:"));
+    assert(contains(s, "\"hello world\""));
+}
+
+static void test_decode_error_misaligned() {
+    std::vector<uint8_t> buf = {0x01, 0x02, 0x03}; // 3 bytes, not multiple of 4
+    auto s = PrintPlainDecoded(buf, Type::INT32);
+    assert(s == std::string("decode error"));
+}
+
+static void test_unsupported_type() {
+    std::vector<uint8_t> buf; // empty is fine; we just want the type check
+    auto s = PrintPlainDecoded(buf, Type::BOOLEAN);
+    assert(s == std::string("unsupported type"));
+}
+
+// ----------------- main -----------------
+int main() {
+    test_INT32_ok();
+    test_INT64_ok();
+    test_FLOAT_ok();
+    test_DOUBLE_ok();
+    test_INT96_ok();
+    test_BYTE_ARRAY_ok();
+    test_FIXED_LEN_BYTE_ARRAY_ok();
+    test_decode_error_misaligned();
+    test_unsupported_type();
+
+    std::cout << "All tests passed.\n";
+    return 0;
+}

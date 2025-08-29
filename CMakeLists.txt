@@ -91,6 +91,18 @@ target_include_directories(encryption_sequencer_test PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   src/common
   src/common/tcb
+  src/server
+)
+
+# Add decoding utils test executable
+add_executable(decoding_utils_test
+  src/server/decoding_utils_test.cpp
+)
+
+target_include_directories(decoding_utils_test PRIVATE
+  src/common
+  src/common/tcb
+  src/server
 )
 
 # Add dbpa interface test executable

@@ -60,6 +60,7 @@ public:
 
 public:
     static const bool USE_SIMPLE_XOR_ENCRYPTION = true;
+    static const bool CHECK_COMPRESSION_ENUM = false;
 
 private:
     // Corresponding enum values for the string parameters
