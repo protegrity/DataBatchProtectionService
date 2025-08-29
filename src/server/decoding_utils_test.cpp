@@ -8,6 +8,7 @@
 
 using namespace dbps::external;
 
+// Helper function to append a value in little-endian format to a byte vector
 template <typename T>
 static void append_le(std::vector<uint8_t>& dst, T v) {
     static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
@@ -16,6 +17,7 @@ static void append_le(std::vector<uint8_t>& dst, T v) {
     std::memcpy(dst.data() + off, &v, sizeof(T)); // little-endian assumed
 }
 
+// Helper function to append a length-prefixed string to a byte vector
 static void append_len_prefixed(std::vector<uint8_t>& dst, const std::string& s) {
     uint32_t len = static_cast<uint32_t>(s.size());
     append_le<uint32_t>(dst, len);
@@ -24,6 +26,7 @@ static void append_len_prefixed(std::vector<uint8_t>& dst, const std::string& s)
     std::memcpy(dst.data() + off, s.data(), s.size());
 }
 
+// Helper function to check if a string contains a substring
 static bool contains(const std::string& haystack, const std::string& needle) {
     return haystack.find(needle) != std::string::npos;
 }
