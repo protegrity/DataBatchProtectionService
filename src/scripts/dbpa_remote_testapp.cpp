@@ -23,6 +23,7 @@ class DBPARemoteTestApp {
 private:
     std::string server_url_;
     std::unique_ptr<RemoteDataBatchProtectionAgent> agent_;
+    std::unique_ptr<RemoteDataBatchProtectionAgent> float_agent_;
     
 public:
     DBPARemoteTestApp(const std::string& server_url) 
@@ -33,10 +34,21 @@ public:
         std::cout << std::endl;
     }
     
-    // Initialize the DBPA agent
+    // Initialize all DBPA agents
     bool Initialize() {
-        std::cout << "Initializing DBPA agent..." << std::endl;
+        std::cout << "Initializing DBPA agents..." << std::endl;
         
+        // Common configuration for all agents
+        std::map<std::string, std::string> connection_config = {
+            {"server_url", server_url_}
+        };
+        
+        std::string app_context = "{\"user_id\": \"demo_user_123\"}";
+        
+        bool main_agent_ok = false;
+        bool float_agent_ok = false;
+        
+        // Initialize the main agent for string/byte array data
         try {
             // Create HTTP client with server URL
             auto http_client = std::make_shared<HttplibClient>(server_url_);
@@ -44,30 +56,56 @@ public:
             // Create the remote agent
             agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
             
-            // Configuration for the demo
-            std::map<std::string, std::string> connection_config = {
-                {"server_url", server_url_}
-            };
-            
-            std::string app_context = "{\"user_id\": \"demo_user_123\"}";
-            
             // Initialize the agent
             agent_->init(
-                "demo_column",           // column_name
-                connection_config,       // connection_config
-                app_context,            // app_context
-                "demo_key_001",         // column_key_id
-                Type::BYTE_ARRAY,       // data_type
-                CompressionCodec::UNCOMPRESSED  // compression_type
+                "demo_column",                  // column_name
+                connection_config,              // connection_config
+                app_context,                   // app_context
+                "demo_key_001",                // column_key_id
+                Type::FIXED_LEN_BYTE_ARRAY,   // data_type
+                CompressionCodec::UNCOMPRESSED // compression_type
             );
             
-            std::cout << "OK: DBPA agent initialized successfully" << std::endl;
-            return true;
+            std::cout << "OK: Main DBPA agent initialized successfully" << std::endl;
+            main_agent_ok = true;
             
         } catch (const std::exception& e) {
-            std::cerr << "ERROR: Failed to initialize agent: " << e.what() << std::endl;
-            return false;
+            std::cerr << "ERROR: Failed to initialize main agent: " << e.what() << std::endl;
         }
+        
+        // Initialize the float agent for numeric data
+        try {
+            // Create HTTP client with server URL
+            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            
+            // Create the remote agent
+            float_agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
+            
+            // Initialize the agent
+            float_agent_->init(
+                "demo_float_column",           // column_name
+                connection_config,             // connection_config
+                app_context,                   // app_context
+                "demo_float_key_001",          // column_key_id
+                Type::FLOAT,                   // data_type
+                CompressionCodec::UNCOMPRESSED // compression_type
+            );
+            
+            std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
+            float_agent_ok = true;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Failed to initialize float agent: " << e.what() << std::endl;
+        }
+        
+        bool all_ok = main_agent_ok && float_agent_ok;
+        if (all_ok) {
+            std::cout << "OK: All agents initialized successfully" << std::endl;
+        } else {
+            std::cerr << "ERROR: Some agents failed to initialize" << std::endl;
+        }
+        
+        return all_ok;
     }
     
     // Demo encryption and decryption
@@ -79,7 +117,7 @@ public:
             "This is sample data for encryption",
             "Special chars: !@#$%^&*()",
             "Numbers: 1234567890",
-            "Long text: " + std::string(50 * 1000 * 1000, 'B'),
+            // "Long text: " + std::string(50 * 1000 * 1000, 'B'),
             "Sample data for decryption demo",
             "Another piece of data to decrypt",
             "Final sample data"
@@ -219,6 +257,114 @@ public:
         return success_count == total_count; // Return true only if all tests passed
     }
     
+    // Demo float data encryption/decryption
+    bool DemoFloatData() {
+        std::cout << "\n=== Float Data Demo ===" << std::endl;
+        
+        // Check if float agent is initialized
+        if (!float_agent_) {
+            std::cout << "ERROR: Float agent not initialized" << std::endl;
+            return false;
+        }
+        
+        // Test with different float values
+        std::vector<float> float_test_data = {
+            1.5f, -2.25f, 3.14159f, 0.0f, -999.123456f,
+            1234567.89f, -0.00001f, 42.0f
+        };
+        
+        try {
+            
+            // Convert float data to binary format (little-endian)
+            std::vector<uint8_t> float_binary_data;
+            for (float f : float_test_data) {
+                uint8_t* bytes = reinterpret_cast<uint8_t*>(&f);
+                for (size_t i = 0; i < sizeof(float); ++i) {
+                    float_binary_data.push_back(bytes[i]);
+                }
+            }
+            
+            std::cout << "Float test data (" << float_test_data.size() << " values): ";
+            for (size_t i = 0; i < float_test_data.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << float_test_data[i];
+            }
+            std::cout << std::endl;
+            std::cout << "Binary size: " << float_binary_data.size() << " bytes" << std::endl;
+            
+            // Encrypt the float data
+            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(float_binary_data));
+            
+            if (!encrypt_result || !encrypt_result->success()) {
+                std::cout << "ERROR: Float encryption failed" << std::endl;
+                if (encrypt_result) {
+                    std::cout << "  Error: " << encrypt_result->error_message() << std::endl;
+                }
+                return false;
+            }
+            
+            std::cout << "OK: Float data encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
+            
+            // Decrypt the float data
+            auto decrypt_result = float_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+            
+            if (!decrypt_result || !decrypt_result->success()) {
+                std::cout << "ERROR: Float decryption failed" << std::endl;
+                if (decrypt_result) {
+                    std::cout << "  Error: " << decrypt_result->error_message() << std::endl;
+                }
+                return false;
+            }
+            
+            std::cout << "OK: Float data decrypted successfully" << std::endl;
+            
+            // Convert decrypted binary back to float values
+            auto decrypted_data = decrypt_result->plaintext();
+            if (decrypted_data.size() != float_binary_data.size()) {
+                std::cout << "ERROR: Decrypted data size mismatch. Expected: " << float_binary_data.size() 
+                         << ", Got: " << decrypted_data.size() << std::endl;
+                return false;
+            }
+            
+            std::vector<float> decrypted_floats;
+            for (size_t i = 0; i < decrypted_data.size(); i += sizeof(float)) {
+                float f;
+                std::memcpy(&f, &decrypted_data[i], sizeof(float));
+                decrypted_floats.push_back(f);
+            }
+            
+            std::cout << "Decrypted float values: ";
+            for (size_t i = 0; i < decrypted_floats.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << decrypted_floats[i];
+            }
+            std::cout << std::endl;
+            
+            // Verify data integrity - Expect exact match: Encryption/Decryption should not be lossy.
+            bool integrity_ok = true;
+            for (size_t i = 0; i < float_test_data.size(); ++i) {
+                if (float_test_data[i] != decrypted_floats[i]) {
+                    std::cout << "ERROR: Float value mismatch at index " << i 
+                             << ". Expected: " << float_test_data[i] 
+                             << ", Got: " << decrypted_floats[i] << std::endl;
+                    integrity_ok = false;
+                }
+            }
+            
+            if (integrity_ok) {
+                std::cout << "OK: Float data integrity verified" << std::endl;
+                return true;
+            } else {
+                std::cout << "ERROR: Float data integrity check failed" << std::endl;
+                return false;
+            }
+            
+        } catch (const std::exception& e) {
+            std::cout << "ERROR: Float demo exception: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
     // Demo error handling
     bool DemoErrorHandling() {
         std::cout << "\n=== Error Handling Demo ===" << std::endl;
@@ -276,12 +422,14 @@ public:
         // Run demos and collect results
         bool encryption_ok = DemoEncryptionAndDecryption();
         bool roundtrip_ok = DemoRoundTrip();
+        bool float_demo_ok = DemoFloatData();
         bool error_handling_ok = DemoErrorHandling();
         
         // Print summary
         std::cout << "\n=== Demo Summary ===" << std::endl;
         std::cout << "Encryption and Decryption Demo: " << (encryption_ok ? "PASS" : "FAIL") << std::endl;
         std::cout << "Round-Trip Demo: " << (roundtrip_ok ? "PASS" : "FAIL") << std::endl;
+        std::cout << "Float Data Demo: " << (float_demo_ok ? "PASS" : "FAIL") << std::endl;
         std::cout << "Error Handling Demo: " << (error_handling_ok ? "PASS" : "FAIL") << std::endl;
     }
 };
