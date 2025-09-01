@@ -1,30 +1,9 @@
 #include <crow/app.h>
 #include <string>
-#include <algorithm>
 #include "json_request.h"
 #include "encryption_sequencer.h"
 
-// Helper function to overwrite datatype based on column name
-std::string GetOverwrittenDatatype(const std::string& column_name, const std::string& original_datatype) {
-    // Convert to lowercase for case-insensitive comparison
-    std::string lower_column_name = column_name;
-    std::transform(lower_column_name.begin(), lower_column_name.end(), lower_column_name.begin(), ::tolower);
-    
-    if (lower_column_name == "orderid") {
-        return "INT32";
-    } else if (lower_column_name == "productid") {
-        return "INT32";
-    } else if (lower_column_name == "price") {
-        return "FLOAT";
-    } else if (lower_column_name == "vat") {
-        return "FLOAT";
-    } else if (lower_column_name == "customer_name") {
-        return "BYTE_ARRAY";
-    }
-    
-    // Return original datatype if no overwrite is needed
-    return original_datatype;
-}
+
 
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
@@ -71,12 +50,9 @@ int main() {
         response.reference_id_ = request.reference_id_;
         response.encrypted_compression_ = request.encrypted_compression_;
 
-        // Get overwritten datatype based on column name
-        std::string effective_datatype = GetOverwrittenDatatype(request.column_name_, request.datatype_);
-        
         // Use DataBatchEncryptionSequencer for actual encryption
         DataBatchEncryptionSequencer sequencer(
-            effective_datatype,
+            request.datatype_,
             request.compression_,
             request.format_,
             request.encoding_,
@@ -119,18 +95,15 @@ int main() {
         response.access_control_ = "granted";
         response.reference_id_ = request.reference_id_;
         
-        // Get overwritten datatype based on column name
-        std::string effective_datatype = GetOverwrittenDatatype(request.column_name_, request.datatype_);
-        
         // Set decrypt-specific fields
-        response.datatype_ = effective_datatype;  // Use the effective (overwritten) datatype
+        response.datatype_ = request.datatype_;
         response.compression_ = request.compression_;
         response.format_ = request.format_;
         response.encoding_ = request.encoding_;
         
         // Use DataBatchEncryptionSequencer for actual decryption
         DataBatchEncryptionSequencer sequencer(
-            effective_datatype,
+            request.datatype_,
             request.compression_,
             request.format_,
             request.encoding_,
