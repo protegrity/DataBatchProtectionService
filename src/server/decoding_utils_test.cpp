@@ -100,13 +100,13 @@ static void test_FIXED_LEN_BYTE_ARRAY_ok() {
 static void test_decode_error_misaligned() {
     std::vector<uint8_t> buf = {0x01, 0x02, 0x03}; // 3 bytes, not multiple of 4
     auto s = PrintPlainDecoded(buf, Type::INT32);
-    assert(s == std::string("decode error"));
+    assert(s == std::string("Unknown encoding"));
 }
 
 static void test_unsupported_type() {
     std::vector<uint8_t> buf; // empty is fine; we just want the type check
     auto s = PrintPlainDecoded(buf, Type::BOOLEAN);
-    assert(s == std::string("unsupported type"));
+    assert(s == std::string("Unsupported type"));
 }
 
 // ----------------- main -----------------

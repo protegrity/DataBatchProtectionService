@@ -58,11 +58,11 @@ public:
             
             // Initialize the agent
             agent_->init(
-                "demo_column",                  // column_name
-                connection_config,              // connection_config
+                "demo_column",                 // column_name
+                connection_config,             // connection_config
                 app_context,                   // app_context
                 "demo_key_001",                // column_key_id
-                Type::FIXED_LEN_BYTE_ARRAY,   // data_type
+                Type::FIXED_LEN_BYTE_ARRAY,    // data_type
                 CompressionCodec::UNCOMPRESSED // compression_type
             );
             
