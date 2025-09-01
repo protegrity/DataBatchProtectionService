@@ -11,8 +11,8 @@
  * Returns "decode error" on failure or "unsupported type" for unimplemented types.
  */
 std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, dbps::external::Type::type physical_type) {
-    static constexpr const char* DECODE_ERROR_STR = "decode error";
-    static constexpr const char* UNSUPPORTED_TYPE_STR = "unsupported type";
+    static constexpr const char* DECODE_ERROR_STR = "Unknown encoding";
+    static constexpr const char* UNSUPPORTED_TYPE_STR = "Unsupported type";
 
     using Type = dbps::external::Type;
 
