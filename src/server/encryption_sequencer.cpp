@@ -233,23 +233,17 @@ std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector
     
     std::vector<uint8_t> encrypted_data(data.size());
 
-    if (USE_SIMPLE_XOR_ENCRYPTION) {
-        for (size_t i = 0; i < data.size(); ++i) {
-            encrypted_data[i] = data[i] ^ 0xAA;
-        }
+    // Generate a simple key from key_id by hashing it
+    std::hash<std::string> hasher;
+    size_t key_hash = hasher(key_id_);
+    
+    // XOR each byte with the key hash
+    for (size_t i = 0; i < data.size(); ++i) {
+        encrypted_data[i] = data[i] ^ (key_hash & 0xFF);
+        // Rotate the key hash for next byte
+        key_hash = (key_hash << 1) | (key_hash >> 31);
     }
-    else {
-        // Generate a simple key from key_id by hashing it
-        std::hash<std::string> hasher;
-        size_t key_hash = hasher(key_id_);
-        
-        // XOR each byte with the key hash
-        for (size_t i = 0; i < data.size(); ++i) {
-            encrypted_data[i] = data[i] ^ (key_hash & 0xFF);
-            // Rotate the key hash for next byte
-            key_hash = (key_hash << 1) | (key_hash >> 31);
-        }
-    }    
+
     return encrypted_data;
 }
 
