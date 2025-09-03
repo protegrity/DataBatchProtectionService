@@ -1,9 +1,16 @@
 cmake_minimum_required(VERSION 3.14)
-project(dbps_server_prj)
+project(dbps_server_prj VERSION 1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Build options
+option(BUILD_TESTS "Build test executables" ON)
+option(BUILD_CLIENT_LIB "Build client shared library" ON)
+
+# =============================================================================
+# Dependencies
+# =============================================================================
 include(FetchContent)
 
 # Crow is a lightweight framework for running web APIs
@@ -43,169 +50,230 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json cxxopts)
 
-add_executable(dbps_api_server 
-  src/server/dbps_api_server.cpp
-  src/server/encryption_sequencer.cpp
+# =============================================================================
+# Library Definitions
+# =============================================================================
+
+# Common utilities library (depends on crow for JSON parsing)
+add_library(dbps_common_lib STATIC 
   src/common/json_request.cpp
   src/common/enum_utils.cpp
 )
+target_include_directories(dbps_common_lib PUBLIC
+  src/common
+  src/common/tcb
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+)
 
+# Server components library
+add_library(dbps_server_lib STATIC 
+  src/server/encryption_sequencer.cpp
+)
+target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib)
+target_include_directories(dbps_server_lib PUBLIC
+  src/server
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+)
+
+# Client components library (depends on httplib, nlohmann/json, and cppcodec)
+add_library(dbps_client_lib STATIC 
+  src/client/dbps_api_client.cpp
+  src/client/httplib_client.cpp
+)
+target_link_libraries(dbps_client_lib PUBLIC dbps_common_lib)
+target_include_directories(dbps_client_lib PUBLIC
+  src/client
+  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+)
+
+# Remote DBPA library
+add_library(dbps_remote_lib STATIC 
+  src/common/dbpa_remote.cpp
+)
+target_link_libraries(dbps_remote_lib PUBLIC 
+  dbps_client_lib
+  dbps_common_lib
+)
+target_include_directories(dbps_remote_lib PUBLIC
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+)
+
+# =============================================================================
+# Main Executables
+# =============================================================================
+
+# Main API server
+add_executable(dbps_api_server src/server/dbps_api_server.cpp)
+target_link_libraries(dbps_api_server 
+  dbps_server_lib
+  dbps_common_lib
+)
 target_include_directories(dbps_api_server PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  src/common
-  src/common/tcb
-)
-
-# Add test executable
-add_executable(json_request_test
-  src/common/json_request_test.cpp
-  src/common/json_request.cpp
-)
-
-target_include_directories(json_request_test PRIVATE
-  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  src/common
-  src/common/tcb
-)
-
-# Add enum utils test executable
-add_executable(enum_utils_test
-  src/common/enum_utils_test.cpp
-  src/common/enum_utils.cpp
-)
-
-target_include_directories(enum_utils_test PRIVATE
-  src/common
-  src/common/tcb
-)
-
-# Add encryption sequencer test executable
-add_executable(encryption_sequencer_test
-  src/server/encryption_sequencer_test.cpp
-  src/server/encryption_sequencer.cpp
-  src/common/enum_utils.cpp
-)
-
-target_include_directories(encryption_sequencer_test PRIVATE
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  src/common
-  src/common/tcb
-  src/server
-)
-
-# Add decoding utils test executable
-add_executable(decoding_utils_test
-  src/server/decoding_utils_test.cpp
-)
-
-target_include_directories(decoding_utils_test PRIVATE
-  src/common
-  src/common/tcb
-  src/server
-)
-
-# Add dbpa interface test executable
-add_executable(dbpa_interface_test
-  src/common/dbpa_interface_test.cpp
-)
-
-target_include_directories(dbpa_interface_test PRIVATE
-  src/common
-  src/common/tcb
-)
-
-# Client test executable
-add_executable(dbps_api_client_test
-  src/client/dbps_api_client_test.cpp
-  src/client/dbps_api_client.cpp
-  src/client/httplib_client.cpp
-  src/common/json_request.cpp
-  src/common/enum_utils.cpp
-)
-
-target_include_directories(dbps_api_client_test PRIVATE
-  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  ${CMAKE_BINARY_DIR}/_deps/httplib-src
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
-  src/client
-  src/common
-  src/common/tcb
-)
-
-# Remote DBPA test executable
-add_executable(dbpa_remote_test
-  src/common/dbpa_remote_test.cpp
-  src/common/dbpa_remote.cpp
-  src/client/dbps_api_client.cpp
-  src/client/httplib_client.cpp
-  src/common/json_request.cpp
-  src/common/enum_utils.cpp
-)
-
-target_include_directories(dbpa_remote_test PRIVATE
-  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  ${CMAKE_BINARY_DIR}/_deps/httplib-src
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
-  src/client
-  src/common
-  src/common/tcb
 )
 
 # DBPA Remote Test Script executable
-add_executable(dbpa_remote_testapp
-  src/scripts/dbpa_remote_testapp.cpp
-  src/common/dbpa_remote.cpp
-  src/client/dbps_api_client.cpp
-  src/client/httplib_client.cpp
-  src/common/json_request.cpp
-  src/common/enum_utils.cpp
+add_executable(dbpa_remote_testapp src/scripts/dbpa_remote_testapp.cpp)
+target_link_libraries(dbpa_remote_testapp 
+  dbps_remote_lib
+  dbps_client_lib
+  dbps_common_lib
 )
-
 target_include_directories(dbpa_remote_testapp PRIVATE
-  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  ${CMAKE_BINARY_DIR}/_deps/httplib-src
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
   ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
-  src/client
-  src/common
-  src/common/tcb
 )
 
-# #########################################################
-# Create the shared library (*.so) for the dbps client.
-# #########################################################
+# =============================================================================
+# Test Executables
+# =============================================================================
 
-# Create dynamic library with core components
-add_library(dbps_client_lib SHARED
-  src/common/dbps_remote_shared_lib_wrapper.cpp
-  src/common/dbpa_remote.cpp
-  src/client/dbps_api_client.cpp
-  src/client/httplib_client.cpp
-  src/common/json_request.cpp
-  src/common/enum_utils.cpp
+if(BUILD_TESTS)
+  # JSON request tests
+  add_executable(json_request_test src/common/json_request_test.cpp)
+  target_link_libraries(json_request_test dbps_common_lib)
+  target_include_directories(json_request_test PRIVATE
+    ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  )
+
+  # Enum utils tests
+  add_executable(enum_utils_test src/common/enum_utils_test.cpp)
+  target_link_libraries(enum_utils_test dbps_common_lib)
+
+  # Encryption sequencer tests
+  add_executable(encryption_sequencer_test src/server/encryption_sequencer_test.cpp)
+  target_link_libraries(encryption_sequencer_test 
+    dbps_server_lib
+    dbps_common_lib
+  )
+
+  # Decoding utils tests
+  add_executable(decoding_utils_test src/server/decoding_utils_test.cpp)
+  target_link_libraries(decoding_utils_test dbps_common_lib)
+  target_include_directories(decoding_utils_test PRIVATE src/server)
+
+  # DBPA interface tests
+  add_executable(dbpa_interface_test src/common/dbpa_interface_test.cpp)
+  target_link_libraries(dbpa_interface_test dbps_common_lib)
+
+  # Client API tests
+  add_executable(dbps_api_client_test src/client/dbps_api_client_test.cpp)
+  target_link_libraries(dbps_api_client_test 
+    dbps_client_lib
+    dbps_common_lib
+  )
+  target_include_directories(dbps_api_client_test PRIVATE
+    ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  )
+
+  # Remote DBPA tests
+  add_executable(dbpa_remote_test src/common/dbpa_remote_test.cpp)
+  target_link_libraries(dbpa_remote_test 
+    dbps_remote_lib
+    dbps_client_lib
+    dbps_common_lib
+  )
+endif()
+
+# =============================================================================
+# Shared Library (Client Library)
+# =============================================================================
+
+if(BUILD_CLIENT_LIB)
+  # Create dynamic library with core components
+  add_library(dbps_client_shared SHARED
+    src/common/dbps_remote_shared_lib_wrapper.cpp
+    src/common/dbpa_remote.cpp
+    src/client/dbps_api_client.cpp
+    src/client/httplib_client.cpp
+    src/common/json_request.cpp
+  )
+
+  # Set library properties
+  set_target_properties(dbps_client_shared PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION 1
+    OUTPUT_NAME "dbpsClient"
+  )
+
+  # Link dependencies
+  target_link_libraries(dbps_client_shared 
+    dbps_remote_lib
+    dbps_client_lib
+    dbps_common_lib
+  )
+
+  # Include directories for the library
+  target_include_directories(dbps_client_shared PUBLIC
+    ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+    ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+    ${CMAKE_BINARY_DIR}/_deps/httplib-src
+    src/common
+    src/common/tcb
+  )
+endif()
+
+# =============================================================================
+# Custom Targets
+# =============================================================================
+
+# Libraries target
+add_custom_target(libraries
+  DEPENDS 
+    dbps_common_lib
+    dbps_server_lib
+    dbps_client_lib
+    dbps_remote_lib
+  COMMENT "Building all libraries"
 )
 
-# Set library properties
-set_target_properties(dbps_client_lib PROPERTIES
-  VERSION 1.0.0
-  SOVERSION 1
-  OUTPUT_NAME "dbpsClient"
+# Main executables target
+add_custom_target(executables
+  DEPENDS 
+    dbps_api_server
+    dbpa_remote_testapp
+  COMMENT "Building main executables"
 )
 
-# Include directories for the library
-# TODO: are these needed?
-target_include_directories(dbps_client_lib PUBLIC
-  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
-  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
-  ${CMAKE_BINARY_DIR}/_deps/httplib-src
+# Tests target
+if(BUILD_TESTS)
+  add_custom_target(tests
+    DEPENDS 
+      json_request_test
+      enum_utils_test
+      encryption_sequencer_test
+      decoding_utils_test
+      dbpa_interface_test
+      dbps_api_client_test
+      dbpa_remote_test
+    COMMENT "Building all tests"
+  )
+endif()
 
-  src/common
-  src/common/tcb
+# Client shared library target
+if(BUILD_CLIENT_LIB)
+  add_custom_target(client_shared
+    DEPENDS dbps_client_shared
+    COMMENT "Building client shared library"
+  )
+endif()
+
+# All target (everything)
+add_custom_target(all_targets
+  DEPENDS 
+    libraries
+    executables
+  COMMENT "Building all targets"
 )
 
-# Export symbols for the library
-#target_compile_definitions(dbps_client_lib PRIVATE DBPS_EXPORTS)
+# Add tests to all_targets if enabled
+if(BUILD_TESTS)
+  add_dependencies(all_targets tests)
+endif()
+
+# Add client shared library to all_targets if enabled
+if(BUILD_CLIENT_LIB)
+  add_dependencies(all_targets client_shared)
+endif()
