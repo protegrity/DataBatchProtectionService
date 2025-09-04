@@ -123,7 +123,7 @@ void RemoteDataBatchProtectionAgent::init(
         if (!server_url_opt || server_url_opt->empty()) {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
             initialized_ = "Agent not properly initialized - server_url missing";
-            return;
+            throw DBPSException("No server_url provided in connection_config");
         }
         server_url_ = *server_url_opt;
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
@@ -132,7 +132,7 @@ void RemoteDataBatchProtectionAgent::init(
         if (app_context_.empty()) { 
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - app_context is empty" << std::endl;
             initialized_ = "Agent not properly initialized - app_context is empty";
-            return;
+            throw DBPSException("app_context is empty");
         }
 
         // Extract user_id from app_context
@@ -140,7 +140,7 @@ void RemoteDataBatchProtectionAgent::init(
         if (!user_id_opt || user_id_opt->empty()) {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No user_id provided in app_context." << std::endl;
             initialized_ = "Agent not properly initialized - user_id missing";
-            return;
+            throw DBPSException("No user_id provided in app_context");
         }
         user_id_ = *user_id_opt;
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - user_id extracted: [" << user_id_ << "]" << std::endl;
@@ -161,14 +161,17 @@ void RemoteDataBatchProtectionAgent::init(
         if (health_response != "OK") {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Health check returned unexpected response: " << health_response << std::endl;
             initialized_ = "Agent not properly initialized - healthz check failed";
-            return;
+            throw DBPSException("Health check failed: " + health_response);
         }
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Health check successful: " << health_response << std::endl;
 
+    } catch (const DBPSException& e) {
+        // Re-throw DBPSException as-is.
+        throw;
     } catch (const std::exception& e) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - Unexpected exception: " << e.what() << std::endl;
         initialized_ = "Agent not properly initialized - Unexpected exception: " + std::string(e.what());
-        return;
+        throw DBPSException("Unexpected exception during initialization: " + std::string(e.what()));
     }
 
     initialized_ = ""; // Empty string indicates successful initialization

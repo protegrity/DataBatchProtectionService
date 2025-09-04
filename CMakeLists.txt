@@ -48,7 +48,14 @@ FetchContent_Declare(
   GIT_TAG v3.1.0
 )
 
-FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json cxxopts)
+# Google Test for unit testing
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.14.0
+)
+
+FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json cxxopts googletest)
 
 # =============================================================================
 # Library Definitions
@@ -174,6 +181,7 @@ if(BUILD_TESTS)
     dbps_remote_lib
     dbps_client_lib
     dbps_common_lib
+    gtest_main
   )
 endif()
 
