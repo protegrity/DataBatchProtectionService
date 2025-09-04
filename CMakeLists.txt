@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(dbps_server_prj VERSION 1.0)
+project(dbps_server_prj)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -201,10 +201,11 @@ if(BUILD_CLIENT_LIB)
 
   # Set library properties
   set_target_properties(dbps_client_shared PROPERTIES
-    VERSION ${PROJECT_VERSION}
+    VERSION 1.0.0
     SOVERSION 1
     OUTPUT_NAME "dbpsClient"
   )
+
 
   # Link dependencies
   target_link_libraries(dbps_client_shared 
