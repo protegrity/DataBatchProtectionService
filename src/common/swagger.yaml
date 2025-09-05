@@ -54,7 +54,6 @@ paths:
                     value_format:
                       compression: UNCOMPRESSED
                       format: RAW_C_DATA
-                      encoding: BASE64
                     value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                   data_batch_encrypted:
                     value_format:
@@ -78,20 +77,20 @@ paths:
                     pretty_printed_value: "user1@example.com\nuser2@example.com"
                     reference_id: 550e8400-e29b-41d4-a716-446655440000
               ints_csv_utf8:
-                summary: Encrypt CSV of INT32 IDs (UTF-8, uncompressed)
+                summary: Encrypt CSV of INT32 IDs (BASE64 encoded)
                 description: |
-                  Three INT32 values provided as a CSV string. The plaintext is UTF-8 (not base64).
+                  Three INT32 values provided as a CSV string, BASE64 encoded.
+                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                   Encrypted output will be returned in `data_batch_encrypted.value`.
                 value:
                   column_reference:
                     name: CustomerID
                   data_batch:
-                    value: "3344,5566,7788"
+                    value: "MzM0NCw1NTY2LDc3ODg="
                     datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
                       format: CSV
-                      encoding: UTF8
                   data_batch_encrypted:
                     value_format:
                       compression: ZSTD
@@ -230,7 +229,6 @@ paths:
                     value_format:
                       compression: UNCOMPRESSED
                       format: RAW_C_DATA
-                      encoding: BASE64
                   encryption:
                     key_id: EMAIL_KEY_001
                   access:
@@ -249,10 +247,10 @@ paths:
                   debug:
                     reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
               ints_csv_utf8:
-                summary: Decrypt CSV of INT32 IDs (UTF-8, uncompressed)
+                summary: Decrypt CSV of INT32 IDs (BASE64 encoded)
                 description: |
-                  Takes an encrypted Base64 blob and decrypts it back into the plaintext CSV
-                  "3344,5566,7788" as UTF-8 text.
+                  Takes an encrypted Base64 blob and decrypts it back into the BASE64 encoded CSV.
+                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                 value:
                   column_reference:
                     name: CustomerID
@@ -265,7 +263,6 @@ paths:
                     value_format:
                       compression: UNCOMPRESSED
                       format: CSV
-                      encoding: UTF8
                   encryption:
                     key_id: NumericID001
                   access:
@@ -303,7 +300,6 @@ paths:
                       value_format:
                         compression: UNCOMPRESSED
                         format: RAW_C_DATA
-                        encoding: BASE64
                       value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                     access:
                       user_id: user123
@@ -315,15 +311,15 @@ paths:
                 ints_csv_utf8_success:
                   summary: Decrypted INT32 CSV IDs
                   description: |
-                    Decrypted back into the original UTF-8 CSV string "3344,5566,7788".
+                    Decrypted back into the BASE64 encoded CSV string.
+                    Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                   value:
                     data_batch:
                       datatype: INT32
                       value_format:
                         compression: UNCOMPRESSED
                         format: CSV
-                        encoding: UTF8
-                      value: "3344,5566,7788"
+                      value: "MzM0NCw1NTY2LDc3ODg="
                     access:
                       user_id: GRM_009
                       role: IDReader
@@ -449,27 +445,17 @@ components:
         - RAW_C_DATA
       description: Format used for serializing the data
 
-    encoding:
-      type: string
-      enum:
-        - UTF8
-        - BASE64
-      description: Encoding applied to the data
-
     value_format:
       type: object
       description: Details on how the data was serialized for plaintext values.
       required:
         - compression
         - format
-        - encoding
       properties:
         compression:
           $ref: '#/components/schemas/compression'
         format:
           $ref: '#/components/schemas/serialization_format'
-        encoding:
-          $ref: '#/components/schemas/encoding'
 
     value_format_encrypted:
       type: object

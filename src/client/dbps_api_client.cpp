@@ -215,10 +215,6 @@ EncryptApiResponse DBPSApiClient::Encrypt(
     json_request.user_id_ = user_id;
     json_request.reference_id_ = GenerateReferenceId();
 
-    // TODO: Add support for other formats and encodings.
-    // Encode the plaintext as base64 and set the encoding param to BASE64.
-    json_request.encoding_ = std::string(to_string(Encoding::BASE64));
-    
     EncryptApiResponse api_response;
     try {
         // Encode the plaintext as base64 and set the value_ param.
@@ -302,10 +298,6 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     json_request.user_id_ = user_id;
     json_request.reference_id_ = GenerateReferenceId();
 
-    // TODO: Add support for other formats and encodings.
-    // Encode the ciphertext as base64 and set the encoding param to BASE64.
-    json_request.encoding_ = std::string(to_string(Encoding::BASE64));
-    
     DecryptApiResponse api_response;
     try {
         // Encode the ciphertext as base64 and set the encrypted_value_ param and 

@@ -268,7 +268,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
         "\"debug\":{\"reference_id\":\"123\"},"
         "\"data_batch\":{"
         "\"datatype\":\"BYTE_ARRAY\","
-        "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"RAW_C_DATA\",\"encoding\":\"BASE64\"},"
+        "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"RAW_C_DATA\"},"
         "\"value\":\"dGVzdF9kYXRh\""
         "}}", 
         ""

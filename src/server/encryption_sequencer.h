@@ -16,7 +16,6 @@
  * 
  * Currently supports only:
  * - Compression: UNCOMPRESSED
- * - Encoding: BASE64  
  * - Format: RAW_C_DATA
  * 
  * The class takes constructor parameters that were previously public attributes in JsonRequest.
@@ -26,7 +25,6 @@ public:
     std::string datatype_;
     std::string compression_;
     std::string format_;
-    std::string encoding_;
     std::string encrypted_compression_;
     std::string key_id_;
     
@@ -43,7 +41,6 @@ public:
         const std::string& datatype,
         const std::string& compression,
         const std::string& format,
-        const std::string& encoding,
         const std::string& encrypted_compression,
         const std::string& key_id
     );
@@ -67,7 +64,6 @@ private:
     dbps::external::CompressionCodec::type compression_enum_;
     dbps::external::CompressionCodec::type encrypted_compression_enum_;
     dbps::external::Format::type format_enum_;
-    dbps::external::Encoding::type encoding_enum_;
     
     /**
      * Converts string values to corresponding enum values using enum_utils.
@@ -79,7 +75,7 @@ private:
     /**
      * Performs comprehensive validation of all parameters and key_id.
      * Converts string parameters to enums, validates key_id, and checks supported combinations.
-     * Currently only supports: uncompressed, encoding=base64, format=raw_c_data
+     * Currently only supports: uncompressed, format=raw_c_data
      * Returns true if all validation passes, false otherwise.
      */
     bool ValidateParameters();

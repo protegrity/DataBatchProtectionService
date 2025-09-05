@@ -213,7 +213,6 @@ TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     json_response.datatype_ = "BYTE_ARRAY";
     json_response.compression_ = "UNCOMPRESSED";
     json_response.format_ = "RAW_C_DATA";
-    json_response.encoding_ = "BASE64";
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -255,8 +254,7 @@ TEST(EncryptWithValidData) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {
@@ -337,8 +335,7 @@ TEST(DecryptWithValidData) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {
@@ -356,8 +353,7 @@ TEST(DecryptWithValidData) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "access": {
@@ -510,8 +506,7 @@ TEST(EncryptWithInvalidBase64Response) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {
@@ -577,8 +572,7 @@ TEST(DecryptWithInvalidBase64Response) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {
@@ -597,8 +591,7 @@ TEST(DecryptWithInvalidBase64Response) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "access": {
@@ -649,8 +642,7 @@ TEST(EncryptWithInvalidJsonResponse) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {
@@ -709,8 +701,7 @@ TEST(DecryptWithInvalidJsonResponse) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA",
-                "encoding": "BASE64"
+                "format": "RAW_C_DATA"
             }
         },
         "data_batch_encrypted": {

@@ -55,7 +55,6 @@ int main() {
             request.datatype_,
             request.compression_,
             request.format_,
-            request.encoding_,
             request.encrypted_compression_,
             request.key_id_
         );
@@ -99,14 +98,12 @@ int main() {
         response.datatype_ = request.datatype_;
         response.compression_ = request.compression_;
         response.format_ = request.format_;
-        response.encoding_ = request.encoding_;
         
         // Use DataBatchEncryptionSequencer for actual decryption
         DataBatchEncryptionSequencer sequencer(
             request.datatype_,
             request.compression_,
             request.format_,
-            request.encoding_,
             request.encrypted_compression_,
             request.key_id_
         );
