@@ -548,23 +548,23 @@ int main() {
     all_tests_passed &= TestParameterValidation();
     PrintTestResult("Parameter Validation", all_tests_passed);
     
-    // all_tests_passed &= TestInputValidation();
-    // PrintTestResult("Input Validation", all_tests_passed);
+    all_tests_passed &= TestInputValidation();
+    PrintTestResult("Input Validation", all_tests_passed);
     
-    // all_tests_passed &= TestEnumConversion();
-    // PrintTestResult("Enum Conversion", all_tests_passed);
+    all_tests_passed &= TestEnumConversion();
+    PrintTestResult("Enum Conversion", all_tests_passed);
     
-    // all_tests_passed &= TestBase64Decoding();
-    // PrintTestResult("Base64 Decoding", all_tests_passed);
+    all_tests_passed &= TestBase64Decoding();
+    PrintTestResult("Base64 Decoding", all_tests_passed);
     
-    // all_tests_passed &= TestEncryptionDecryption();
-    // PrintTestResult("Encryption/Decryption", all_tests_passed);
+    all_tests_passed &= TestEncryptionDecryption();
+    PrintTestResult("Encryption/Decryption", all_tests_passed);
     
-    // all_tests_passed &= TestRoundTripEncryption();
-    // PrintTestResult("Round-Trip Encryption", all_tests_passed);
+    all_tests_passed &= TestRoundTripEncryption();
+    PrintTestResult("Round-Trip Encryption", all_tests_passed);
     
-    // all_tests_passed &= TestResultStorage();
-    // PrintTestResult("Result Storage", all_tests_passed);
+    all_tests_passed &= TestResultStorage();
+    PrintTestResult("Result Storage", all_tests_passed);
     
     std::cout << "=============================================" << std::endl;
     if (all_tests_passed) {
