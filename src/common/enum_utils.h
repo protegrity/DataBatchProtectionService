@@ -19,8 +19,4 @@ std::optional<::dbps::external::CompressionCodec::type> to_compression_enum(std:
 std::string_view to_string(::dbps::external::Format::type v);
 std::optional<::dbps::external::Format::type> to_format_enum(std::string_view s);
 
-// For dbps::external::Encoding
-std::string_view to_string(::dbps::external::Encoding::type v);
-std::optional<::dbps::external::Encoding::type> to_encoding_enum(std::string_view s);
-
 }

@@ -40,12 +40,4 @@ struct Format {
     };
 };
 
-// Encoding applied to the data when serialized to send over the wire
-struct Encoding {
-    enum type {
-        UTF8 = 0,
-        BASE64 = 1
-    };
-};
-
 }
