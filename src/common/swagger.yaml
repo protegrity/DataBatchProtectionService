@@ -53,7 +53,7 @@ paths:
                     datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
-                      format: RAW_C_DATA
+                      format: PLAIN
                     value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                   data_batch_encrypted:
                     value_format:
@@ -228,7 +228,7 @@ paths:
                     datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
-                      format: RAW_C_DATA
+                      format: PLAIN
                   encryption:
                     key_id: EMAIL_KEY_001
                   access:
@@ -299,7 +299,7 @@ paths:
                       datatype: BYTE_ARRAY
                       value_format:
                         compression: UNCOMPRESSED
-                        format: RAW_C_DATA
+                        format: PLAIN
                       value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
                     access:
                       user_id: user123
@@ -440,9 +440,8 @@ components:
     serialization_format:
       type: string
       enum:
-        - JSON
         - CSV
-        - RAW_C_DATA
+        - PLAIN
       description: Format used for serializing the data
 
     value_format:

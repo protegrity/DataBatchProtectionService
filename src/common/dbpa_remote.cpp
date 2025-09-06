@@ -199,7 +199,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         column_name_,
         data_type_,
         compression_type_,
-        Format::RAW_C_DATA,  // Currently only RAW_C_DATA is supported
+        Format::PLAIN,  // Currently only PLAIN is supported
         compression_type_,
         column_key_id_,
         user_id_
@@ -230,7 +230,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         column_name_,
         data_type_,
         compression_type_,
-        Format::RAW_C_DATA,  // Currently only RAW_C_DATA is supported
+        Format::PLAIN,  // Currently only PLAIN is supported
         compression_type_,
         column_key_id_,
         user_id_

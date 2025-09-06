@@ -178,10 +178,10 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
                   << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
     }
     
-    // Check format: must be RAW_C_DATA
-    if (format_enum_ != dbps::external::Format::RAW_C_DATA) {
+    // Check format: must be PLAIN
+    if (format_enum_ != dbps::external::Format::PLAIN) {
         error_stage_ = "parameter_validation";
-        error_message_ = "Only RAW_C_DATA format is supported";
+        error_message_ = "Only PLAIN format is supported";
         return false;
     }
     

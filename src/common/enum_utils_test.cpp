@@ -154,31 +154,24 @@ TEST(CompressionCodecInvalidFromString) {
 
 // Test Format enum conversions
 TEST(FormatToStringConversion) {
-    ASSERT_EQ("JSON", std::string(to_string(Format::JSON)));
     ASSERT_EQ("CSV", std::string(to_string(Format::CSV)));
-    ASSERT_EQ("RAW_C_DATA", std::string(to_string(Format::RAW_C_DATA)));
+    ASSERT_EQ("PLAIN", std::string(to_string(Format::PLAIN)));
 }
 
 TEST(FormatFromStringConversion) {
-    auto result = to_format_enum("JSON");
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::JSON, result.value());
-    
-    result = to_format_enum("CSV");
+    auto result = to_format_enum("CSV");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Format::CSV, result.value());
     
-    result = to_format_enum("RAW_C_DATA");
+    result = to_format_enum("PLAIN");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::RAW_C_DATA, result.value());
+    ASSERT_EQ(Format::PLAIN, result.value());
 }
 
 TEST(FormatInvalidFromString) {
     auto result = to_format_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    result = to_format_enum("json");  // lowercase
-    ASSERT_FALSE(result.has_value());
     
     result = to_format_enum("RAWC_DATA");  // missing underscore
     ASSERT_FALSE(result.has_value());
@@ -226,7 +219,7 @@ TEST(RoundTripCompressionCodecConversion) {
 TEST(RoundTripFormatConversion) {
     // Test all Format enum values
     Format::type formats[] = {
-        Format::JSON, Format::CSV, Format::RAW_C_DATA
+        Format::CSV, Format::PLAIN
     };
     
     for (auto format : formats) {
@@ -332,7 +325,7 @@ TEST(CompressionCodecEnumCompleteness) {
 TEST(FormatEnumCompleteness) {
     // Define all known Format enum values
     Format::type all_formats[] = {
-        Format::JSON, Format::CSV, Format::RAW_C_DATA
+        Format::CSV, Format::PLAIN
     };
     
     // Test that every enum value can be converted to string and back
@@ -375,12 +368,12 @@ TEST(StringUniqueness) {
     
     // Collect all Format strings
     Format::type all_formats[] = {
-        Format::JSON, Format::CSV, Format::RAW_C_DATA
+        Format::CSV, Format::PLAIN
     };
     for (auto format : all_formats) {
         format_strings.insert(std::string(to_string(format)));
     }
-    ASSERT_EQ(3, format_strings.size());  // All strings should be unique
+    ASSERT_EQ(2, format_strings.size());  // All strings should be unique
     
 }
 
@@ -407,14 +400,14 @@ TEST(CrossEnumStringCollision) {
     }
     
     Format::type all_formats[] = {
-        Format::JSON, Format::CSV, Format::RAW_C_DATA
+        Format::CSV, Format::PLAIN
     };
     for (auto format : all_formats) {
         all_strings.insert(std::string(to_string(format)));
     }
     
-    // Total should be 8 + 8 + 3 = 19 unique strings
-    ASSERT_EQ(19, all_strings.size());
+    // Total should be 8 + 8 + 2 = 18 unique strings
+    ASSERT_EQ(18, all_strings.size());
 }
 
 int main() {

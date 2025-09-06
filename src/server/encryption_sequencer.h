@@ -16,7 +16,7 @@
  * 
  * Currently supports only:
  * - Compression: UNCOMPRESSED
- * - Format: RAW_C_DATA
+ * - Format: PLAIN
  * 
  * The class takes constructor parameters that were previously public attributes in JsonRequest.
  */
