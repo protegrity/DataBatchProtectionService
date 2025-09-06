@@ -53,11 +53,10 @@ const std::string VALID_ENCRYPT_JSON = R"({
     },
     "data_batch": {
         "datatype": "BYTE_ARRAY",
-        "value": "test@example.com",
+        "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV",
-            "encoding": "UTF8"
+            "format": "CSV"
         }
     },
     "data_batch_encrypted": {
@@ -72,7 +71,8 @@ const std::string VALID_ENCRYPT_JSON = R"({
         "user_id": "user456"
     },
     "debug": {
-        "reference_id": "ref789"
+        "reference_id": "ref789",
+        "pretty_printed_value": "test@example.com"
     }
 })";
 
@@ -84,12 +84,11 @@ const std::string VALID_DECRYPT_JSON = R"({
         "datatype": "BYTE_ARRAY",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV",
-            "encoding": "UTF8"
+            "format": "CSV"
         }
     },
     "data_batch_encrypted": {
-        "value": "ENCRYPTED_test@example.com",
+        "value": "RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=",
         "value_format": {
             "compression": "GZIP"
         }
@@ -101,7 +100,8 @@ const std::string VALID_DECRYPT_JSON = R"({
         "user_id": "user456"
     },
     "debug": {
-        "reference_id": "ref789"
+        "reference_id": "ref789",
+        "pretty_printed_value": "ENCRYPTED_test@example.com"
     }
 })";
 
@@ -114,14 +114,13 @@ TEST(JsonRequestValidParse) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific field
-    ASSERT_EQ("test@example.com", request.value_);
+    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_); // "test@example.com"
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -141,7 +140,6 @@ TEST(JsonRequestMissingRequiredFields) {
     ASSERT_EQ("", request.datatype_);
     ASSERT_EQ("", request.compression_);
     ASSERT_EQ("", request.format_);
-    ASSERT_EQ("", request.encoding_);
     ASSERT_EQ("", request.encrypted_compression_);
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
@@ -165,7 +163,6 @@ TEST(JsonRequestInvalidJson) {
     ASSERT_EQ("", request.datatype_);
     ASSERT_EQ("", request.compression_);
     ASSERT_EQ("", request.format_);
-    ASSERT_EQ("", request.encoding_);
     ASSERT_EQ("", request.encrypted_compression_);
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
@@ -183,8 +180,7 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV",
-                "encoding": "UTF8"
+                "format": "CSV"
             }
         },
         "data_batch_encrypted": {
@@ -207,7 +203,6 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -231,14 +226,13 @@ TEST(EncryptJsonRequestValidParse) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific fields
-    ASSERT_EQ("test@example.com", request.value_);
+    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_); // "test@example.com"
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -253,8 +247,7 @@ TEST(EncryptJsonRequestMissingValue) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV",
-                "encoding": "UTF8"
+                "format": "CSV"
             }
         },
         "data_batch_encrypted": {
@@ -269,7 +262,8 @@ TEST(EncryptJsonRequestMissingValue) {
             "user_id": "user456"
         },
         "debug": {
-            "reference_id": "ref789"
+            "reference_id": "ref789",
+            "encrypted_value_plaintext": "ENCRYPTED_test@example.com"
         }
     })";
     
@@ -281,7 +275,6 @@ TEST(EncryptJsonRequestMissingValue) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -305,14 +298,13 @@ TEST(DecryptJsonRequestValidParse) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check decrypt-specific fields
-    ASSERT_EQ("ENCRYPTED_test@example.com", request.encrypted_value_);
+    ASSERT_EQ("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=", request.encrypted_value_); // "ENCRYPTED_test@example.com"
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -327,8 +319,7 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV",
-                "encoding": "UTF8"
+                "format": "CSV"
             }
         },
         "data_batch_encrypted": {
@@ -343,7 +334,8 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
             "user_id": "user456"
         },
         "debug": {
-            "reference_id": "ref789"
+            "reference_id": "ref789",
+            "encrypted_value_plaintext": "ENCRYPTED_test@example.com"
         }
     })";
     
@@ -355,7 +347,6 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
     ASSERT_EQ("CSV", request.format_);
-    ASSERT_EQ("UTF8", request.encoding_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -380,7 +371,7 @@ TEST(SafeGetFromJsonPathValid) {
     
     result = SafeGetFromJsonPath(json_body, {"data_batch", "value"});
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ("test@example.com", *result);
+    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", *result); // "test@example.com"
 }
 
 TEST(SafeGetFromJsonPathInvalidPath) {
@@ -406,7 +397,7 @@ TEST(EncryptJsonRequestToJson) {
     
     // Verify the generated JSON contains expected fields
     ASSERT_TRUE(json_string.find("email") != std::string::npos);
-    ASSERT_TRUE(json_string.find("test@example.com") != std::string::npos);
+    ASSERT_TRUE(json_string.find("dGVzdEBleGFtcGxlLmNvbQ==") != std::string::npos); // "test@example.com"
     ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
     ASSERT_TRUE(json_string.find("key123") != std::string::npos);
     ASSERT_TRUE(json_string.find("user456") != std::string::npos);
@@ -423,7 +414,7 @@ TEST(DecryptJsonRequestToJson) {
     
     // Verify the generated JSON contains expected fields
     ASSERT_TRUE(json_string.find("email") != std::string::npos);
-    ASSERT_TRUE(json_string.find("ENCRYPTED_test@example.com") != std::string::npos);
+    ASSERT_TRUE(json_string.find("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=") != std::string::npos); // "ENCRYPTED_test@example.com"
     ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
     ASSERT_TRUE(json_string.find("key123") != std::string::npos);
     ASSERT_TRUE(json_string.find("user456") != std::string::npos);
@@ -435,7 +426,7 @@ const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
         "value_format": {
             "compression": "GZIP"
         },
-        "value": "ENCRYPTED_test@example.com"
+        "value": "RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20="
     },
     "access": {
         "user_id": "user456",
@@ -443,18 +434,18 @@ const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
         "access_control": "read_write"
     },
     "debug": {
-        "reference_id": "ref789"
+        "reference_id": "ref789",
+        "pretty_printed_value": "ENCRYPTED_test@example.com"
     }
 })";
 
 const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
     "data_batch": {
         "datatype": "BYTE_ARRAY",
-        "value": "test@example.com",
+        "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV",
-            "encoding": "UTF8"
+            "format": "CSV"
         }
     },
     "access": {
@@ -463,7 +454,8 @@ const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
         "access_control": "read_write"
     },
     "debug": {
-        "reference_id": "ref789"
+        "reference_id": "ref789",
+        "pretty_printed_value": "test@example.com"
     }
 })";
 
@@ -477,7 +469,7 @@ TEST(EncryptJsonResponseValidParse) {
     ASSERT_EQ("read_write", response.access_control_);
     ASSERT_EQ("ref789", response.reference_id_);
     ASSERT_EQ("GZIP", response.encrypted_compression_);
-    ASSERT_EQ("ENCRYPTED_test@example.com", response.encrypted_value_);
+    ASSERT_EQ("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=", response.encrypted_value_); // "ENCRYPTED_test@example.com"
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -494,8 +486,7 @@ TEST(DecryptJsonResponseValidParse) {
     ASSERT_EQ("BYTE_ARRAY", response.datatype_);
     ASSERT_EQ("UNCOMPRESSED", response.compression_);
     ASSERT_EQ("CSV", response.format_);
-    ASSERT_EQ("UTF8", response.encoding_);
-    ASSERT_EQ("test@example.com", response.decrypted_value_);
+    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", response.decrypted_value_); // "test@example.com"
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -541,7 +532,7 @@ TEST(DecryptJsonResponseMissingDecryptedValue) {
         "debug": {"reference_id": "ref456"},
         "data_batch": {
             "datatype": "BYTE_ARRAY",
-            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV", "encoding": "UTF8"}
+            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV"}
         }
     })");
     
@@ -554,7 +545,7 @@ TEST(EncryptJsonResponseMissingEncryptedCompression) {
     response.Parse(R"({
         "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
         "debug": {"reference_id": "ref456"},
-        "data_batch_encrypted": {"value": "ENCRYPTED_data"}
+        "data_batch_encrypted": {"value": "RU5DUllQVEVEX2RhdGE="} // "ENCRYPTED_data"
     })");
     
     ASSERT_FALSE(response.IsValid());
@@ -563,12 +554,13 @@ TEST(EncryptJsonResponseMissingEncryptedCompression) {
 
 TEST(DecryptJsonResponseMissingDatatype) {
     DecryptJsonResponse response;
+    // value is "decrypted_data"
     response.Parse(R"({
         "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
         "debug": {"reference_id": "ref456"},
         "data_batch": {
-            "value": "decrypted_data",
-            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV", "encoding": "UTF8"}
+            "value": "ZGVjcnlwdGVkX2RhdGE=",
+            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV"}
         }
     })");
     
@@ -583,7 +575,7 @@ TEST(EncryptJsonResponseToJson) {
     response.access_control_ = "read_write";
     response.reference_id_ = "ref456";
     response.encrypted_compression_ = "GZIP";
-    response.encrypted_value_ = "ENCRYPTED_data";
+    response.encrypted_value_ = "RU5DUllQVEVEX2RhdGE="; // "ENCRYPTED_data"
     
     ASSERT_TRUE(response.IsValid());
     
@@ -592,7 +584,7 @@ TEST(EncryptJsonResponseToJson) {
     ASSERT_TRUE(json_string.find("admin") != std::string::npos);
     ASSERT_TRUE(json_string.find("read_write") != std::string::npos);
     ASSERT_TRUE(json_string.find("ref456") != std::string::npos);
-    ASSERT_TRUE(json_string.find("ENCRYPTED_data") != std::string::npos);
+    ASSERT_TRUE(json_string.find("RU5DUllQVEVEX2RhdGE=") != std::string::npos); // "ENCRYPTED_data"
     ASSERT_TRUE(json_string.find("GZIP") != std::string::npos);
 }
 
@@ -605,8 +597,7 @@ TEST(DecryptJsonResponseToJson) {
     response.datatype_ = "BYTE_ARRAY";
     response.compression_ = "UNCOMPRESSED";
     response.format_ = "CSV";
-    response.encoding_ = "UTF8";
-    response.decrypted_value_ = "decrypted_data";
+    response.decrypted_value_ = "ZGVjcnlwdGVkX2RhdGE="; // "decrypted_data"
     
     ASSERT_TRUE(response.IsValid());
     
@@ -615,23 +606,23 @@ TEST(DecryptJsonResponseToJson) {
     ASSERT_TRUE(json_string.find("admin") != std::string::npos);
     ASSERT_TRUE(json_string.find("read_write") != std::string::npos);
     ASSERT_TRUE(json_string.find("ref456") != std::string::npos);
-    ASSERT_TRUE(json_string.find("decrypted_data") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ZGVjcnlwdGVkX2RhdGE=") != std::string::npos); // "decrypted_data"
     ASSERT_TRUE(json_string.find("BYTE_ARRAY") != std::string::npos);
     ASSERT_TRUE(json_string.find("UNCOMPRESSED") != std::string::npos);
     ASSERT_TRUE(json_string.find("CSV") != std::string::npos);
-    ASSERT_TRUE(json_string.find("UTF8") != std::string::npos);
 }
 
 TEST(JsonResponsePartialParsing) {
     EncryptJsonResponse response;
+    // value is "ENCRYPTED_data"
     response.Parse(R"({
         "access": {"user_id": "user123"},
-        "data_batch_encrypted": {"value": "ENCRYPTED_data"}
+        "data_batch_encrypted": {"value": "RU5DUllQVEVEX2RhdGE="}
     })");
     
     // Should parse what it can, but validation should fail
     ASSERT_EQ("user123", response.user_id_);
-    ASSERT_EQ("ENCRYPTED_data", response.encrypted_value_);
+    ASSERT_EQ("RU5DUllQVEVEX2RhdGE=", response.encrypted_value_); // "ENCRYPTED_data"
     ASSERT_FALSE(response.IsValid()); // Missing other required fields
 }
 

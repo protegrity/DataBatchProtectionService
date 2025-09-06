@@ -93,20 +93,4 @@ std::optional<F> to_format_enum(std::string_view s) {
     return lookup::from_string_impl<F>(s, kFormatPairs);
 }
 
-// For dbps::external::Encoding
-namespace {
-using E = ::dbps::external::Encoding::type;
-inline constexpr std::array<std::pair<E, std::string_view>, 2> kEncodingPairs{{
-    {E::UTF8, "UTF8"},
-    {E::BASE64, "BASE64"},
-}};
-} // anon
-
-std::string_view to_string(E v) {
-    return lookup::to_string_impl(v, kEncodingPairs);
-}
-std::optional<E> to_encoding_enum(std::string_view s) {
-    return lookup::from_string_impl<E>(s, kEncodingPairs);
-}
-
 }

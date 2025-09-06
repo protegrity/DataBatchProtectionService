@@ -10,13 +10,11 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     const std::string& datatype,
     const std::string& compression,
     const std::string& format,
-    const std::string& encoding,
     const std::string& encrypted_compression,
     const std::string& key_id
 ) : datatype_(datatype),
     compression_(compression),
     format_(format),
-    encoding_(encoding),
     encrypted_compression_(encrypted_compression),
     key_id_(key_id) {}
 
@@ -152,15 +150,6 @@ bool DataBatchEncryptionSequencer::ConvertStringsToEnums() {
     }
     format_enum_ = *format_result;
     
-    // Convert encoding string to enum
-    auto encoding_result = dbps::enum_utils::to_encoding_enum(encoding_);
-    if (!encoding_result) {
-        error_stage_ = "encoding_conversion";
-        error_message_ = "Invalid encoding: " + encoding_;
-        return false;
-    }
-    encoding_enum_ = *encoding_result;
-    
     return true;
 }
 
@@ -187,13 +176,6 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     if (CHECK_COMPRESSION_ENUM && encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
         std::cerr << "WARNING: Non-UNCOMPRESSED encrypted_compression requested: " << encrypted_compression_ 
                   << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
-    }
-    
-    // Check encoding: must be BASE64
-    if (encoding_enum_ != dbps::external::Encoding::BASE64) {
-        error_stage_ = "parameter_validation";
-        error_message_ = "Only BASE64 encoding is supported";
-        return false;
     }
     
     // Check format: must be RAW_C_DATA

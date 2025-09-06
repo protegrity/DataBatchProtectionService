@@ -16,7 +16,6 @@ public:
     std::string datatype_;
     std::string compression_;
     std::string format_;
-    std::string encoding_;
     std::string encrypted_compression_;
     std::string key_id_;
     std::string user_id_;
@@ -259,7 +258,6 @@ public:
     std::string datatype_;
     std::string compression_;
     std::string format_;
-    std::string encoding_;
     std::string decrypted_value_;
     
     /**

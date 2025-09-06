@@ -190,38 +190,6 @@ TEST(FormatInvalidFromString) {
     ASSERT_FALSE(result.has_value());
 }
 
-// Test Encoding enum conversions
-TEST(EncodingToStringConversion) {
-    ASSERT_EQ("UTF8", std::string(to_string(Encoding::UTF8)));
-    ASSERT_EQ("BASE64", std::string(to_string(Encoding::BASE64)));
-}
-
-TEST(EncodingFromStringConversion) {
-    auto result = to_encoding_enum("UTF8");
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Encoding::UTF8, result.value());
-    
-    result = to_encoding_enum("BASE64");
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Encoding::BASE64, result.value());
-}
-
-TEST(EncodingInvalidFromString) {
-    auto result = to_encoding_enum("INVALID");
-    ASSERT_FALSE(result.has_value());
-    
-    result = to_encoding_enum("utf8");  // lowercase
-    ASSERT_FALSE(result.has_value());
-    
-    result = to_encoding_enum("UTF-8");  // with hyphen
-    ASSERT_FALSE(result.has_value());
-    
-    result = to_encoding_enum("");
-    ASSERT_FALSE(result.has_value());
-    
-    result = to_encoding_enum("ASCII");  // common encoding
-    ASSERT_FALSE(result.has_value());
-}
 
 // Test round-trip conversions
 TEST(RoundTripTypeConversion) {
@@ -269,26 +237,12 @@ TEST(RoundTripFormatConversion) {
     }
 }
 
-TEST(RoundTripEncodingConversion) {
-    // Test all Encoding enum values
-    Encoding::type encodings[] = {
-        Encoding::UTF8, Encoding::BASE64
-    };
-    
-    for (auto encoding : encodings) {
-        auto str = to_string(encoding);
-        auto converted = to_encoding_enum(str);
-        ASSERT_TRUE(converted.has_value());
-        ASSERT_EQ(encoding, converted.value());
-    }
-}
 
 // Test edge cases
 TEST(EmptyStringHandling) {
     ASSERT_FALSE(to_datatype_enum("").has_value());
     ASSERT_FALSE(to_compression_enum("").has_value());
     ASSERT_FALSE(to_format_enum("").has_value());
-    ASSERT_FALSE(to_encoding_enum("").has_value());
 }
 
 TEST(WhitespaceHandling) {
@@ -331,13 +285,10 @@ TEST(RuntimeEvaluation) {
     auto type_str = to_string(Type::BYTE_ARRAY);
     auto codec_str = to_string(CompressionCodec::GZIP);
     auto format_str = to_string(Format::CSV);
-    auto encoding_str = to_string(Encoding::UTF8);
-    
     // Verify the results
     ASSERT_EQ("BYTE_ARRAY", std::string(type_str));
     ASSERT_EQ("GZIP", std::string(codec_str));
     ASSERT_EQ("CSV", std::string(format_str));
-    ASSERT_EQ("UTF8", std::string(encoding_str));
 }
 
 // Protection tests: ensure enum_utils stays in sync with enum definitions
@@ -395,30 +346,12 @@ TEST(FormatEnumCompleteness) {
     }
 }
 
-TEST(EncodingEnumCompleteness) {
-    // Define all known Encoding enum values
-    Encoding::type all_encodings[] = {
-        Encoding::UTF8, Encoding::BASE64
-    };
-    
-    // Test that every enum value can be converted to string and back
-    for (auto encoding : all_encodings) {
-        auto str = to_string(encoding);
-        ASSERT_TRUE(str != "UNKNOWN");  // Should not return UNKNOWN for valid enum
-        
-        auto converted = to_encoding_enum(str);
-        ASSERT_TRUE(converted.has_value());
-        ASSERT_EQ(encoding, converted.value());
-    }
-}
 
 TEST(StringUniqueness) {
     // Test that all string representations are unique
     std::set<std::string> type_strings;
     std::set<std::string> codec_strings;
     std::set<std::string> format_strings;
-    std::set<std::string> encoding_strings;
-    
     // Collect all Type strings
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
@@ -449,14 +382,6 @@ TEST(StringUniqueness) {
     }
     ASSERT_EQ(3, format_strings.size());  // All strings should be unique
     
-    // Collect all Encoding strings
-    Encoding::type all_encodings[] = {
-        Encoding::UTF8, Encoding::BASE64
-    };
-    for (auto encoding : all_encodings) {
-        encoding_strings.insert(std::string(to_string(encoding)));
-    }
-    ASSERT_EQ(2, encoding_strings.size());  // All strings should be unique
 }
 
 TEST(CrossEnumStringCollision) {
@@ -488,15 +413,8 @@ TEST(CrossEnumStringCollision) {
         all_strings.insert(std::string(to_string(format)));
     }
     
-    Encoding::type all_encodings[] = {
-        Encoding::UTF8, Encoding::BASE64
-    };
-    for (auto encoding : all_encodings) {
-        all_strings.insert(std::string(to_string(encoding)));
-    }
-    
-    // Total should be 8 + 8 + 3 + 2 = 21 unique strings
-    ASSERT_EQ(21, all_strings.size());
+    // Total should be 8 + 8 + 3 = 19 unique strings
+    ASSERT_EQ(19, all_strings.size());
 }
 
 int main() {
@@ -517,16 +435,11 @@ int main() {
     test_FormatFromStringConversion();
     test_FormatInvalidFromString();
     
-    // Encoding enum tests
-    test_EncodingToStringConversion();
-    test_EncodingFromStringConversion();
-    test_EncodingInvalidFromString();
     
     // Round-trip tests
     test_RoundTripTypeConversion();
     test_RoundTripCompressionCodecConversion();
     test_RoundTripFormatConversion();
-    test_RoundTripEncodingConversion();
     
     // Edge case tests
     test_EmptyStringHandling();
@@ -539,7 +452,6 @@ int main() {
     test_TypeEnumCompleteness();
     test_CompressionCodecEnumCompleteness();
     test_FormatEnumCompleteness();
-    test_EncodingEnumCompleteness();
     test_StringUniqueness();
     test_CrossEnumStringCollision();
     
