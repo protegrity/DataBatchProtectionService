@@ -11,7 +11,7 @@
  * - Validates and converts string parameters to enum values
  * - Supports base64 decoding of input data
  * - Implements simple XOR-based encryption/decryption using key_id
- * - Validates supported parameter combinations (uncompressed, base64, raw_c_data)
+ * - Validates supported parameter combinations (uncompressed, base64, plain)
  * - Provides comprehensive error reporting with stage and message tracking
  * 
  * Currently supports only:
@@ -75,7 +75,7 @@ private:
     /**
      * Performs comprehensive validation of all parameters and key_id.
      * Converts string parameters to enums, validates key_id, and checks supported combinations.
-     * Currently only supports: uncompressed, format=raw_c_data
+     * Currently only supports: uncompressed, format=plain
      * Returns true if all validation passes, false otherwise.
      */
     bool ValidateParameters();
