@@ -212,7 +212,7 @@ TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     json_response.decrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     json_response.datatype_ = "BYTE_ARRAY";
     json_response.compression_ = "UNCOMPRESSED";
-    json_response.format_ = "RAW_C_DATA";
+    json_response.format_ = "PLAIN";
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -254,7 +254,7 @@ TEST(EncryptWithValidData) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -298,7 +298,7 @@ TEST(EncryptWithValidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -335,7 +335,7 @@ TEST(DecryptWithValidData) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -353,7 +353,7 @@ TEST(DecryptWithValidData) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "access": {
@@ -382,7 +382,7 @@ TEST(DecryptWithValidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -419,13 +419,13 @@ TEST(EncryptWithInvalidData) {
     std::string test_plaintext = "test@example.com";
     std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
     
-    // Test 1: Unsupported format (not RAW_C_DATA)
+    // Test 1: Unsupported format (not PLAIN)
     auto response1 = client.Encrypt(
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::CSV,                // format - NOT RAW_C_DATA
+        Format::RAW_BYTES,          // format - NOT PLAIN
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -441,7 +441,7 @@ TEST(EncryptWithInvalidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -462,13 +462,13 @@ TEST(DecryptWithInvalidData) {
     std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
     
-    // Test 1: Unsupported format (not RAW_C_DATA)
+    // Test 1: Unsupported format (not PLAIN)
     auto response1 = client.Decrypt(
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::CSV,                // format - NOT RAW_C_DATA
+        Format::RAW_BYTES,          // format - NOT PLAIN
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -484,7 +484,7 @@ TEST(DecryptWithInvalidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -506,7 +506,7 @@ TEST(EncryptWithInvalidBase64Response) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -551,7 +551,7 @@ TEST(EncryptWithInvalidBase64Response) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -572,7 +572,7 @@ TEST(DecryptWithInvalidBase64Response) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -591,7 +591,7 @@ TEST(DecryptWithInvalidBase64Response) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "access": {
@@ -620,7 +620,7 @@ TEST(DecryptWithInvalidBase64Response) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -642,7 +642,7 @@ TEST(EncryptWithInvalidJsonResponse) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -680,7 +680,7 @@ TEST(EncryptWithInvalidJsonResponse) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -701,7 +701,7 @@ TEST(DecryptWithInvalidJsonResponse) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "RAW_C_DATA"
+                "format": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -740,7 +740,7 @@ TEST(DecryptWithInvalidJsonResponse) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::RAW_C_DATA,         // format
+        Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id

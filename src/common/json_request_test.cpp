@@ -56,7 +56,7 @@ const std::string VALID_ENCRYPT_JSON = R"({
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV"
+            "format": "RAW_BYTES"
         }
     },
     "data_batch_encrypted": {
@@ -84,7 +84,7 @@ const std::string VALID_DECRYPT_JSON = R"({
         "datatype": "BYTE_ARRAY",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV"
+            "format": "RAW_BYTES"
         }
     },
     "data_batch_encrypted": {
@@ -113,7 +113,7 @@ TEST(JsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -180,7 +180,7 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV"
+                "format": "RAW_BYTES"
             }
         },
         "data_batch_encrypted": {
@@ -202,7 +202,7 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -225,7 +225,7 @@ TEST(EncryptJsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -247,7 +247,7 @@ TEST(EncryptJsonRequestMissingValue) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV"
+                "format": "RAW_BYTES"
             }
         },
         "data_batch_encrypted": {
@@ -274,7 +274,7 @@ TEST(EncryptJsonRequestMissingValue) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -297,7 +297,7 @@ TEST(DecryptJsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -319,7 +319,7 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
             "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "CSV"
+                "format": "RAW_BYTES"
             }
         },
         "data_batch_encrypted": {
@@ -346,7 +346,7 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ("BYTE_ARRAY", request.datatype_);
     ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("CSV", request.format_);
+    ASSERT_EQ("RAW_BYTES", request.format_);
     ASSERT_EQ("GZIP", request.encrypted_compression_);
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -445,7 +445,7 @@ const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "CSV"
+            "format": "RAW_BYTES"
         }
     },
     "access": {
@@ -485,7 +485,7 @@ TEST(DecryptJsonResponseValidParse) {
     ASSERT_EQ("ref789", response.reference_id_);
     ASSERT_EQ("BYTE_ARRAY", response.datatype_);
     ASSERT_EQ("UNCOMPRESSED", response.compression_);
-    ASSERT_EQ("CSV", response.format_);
+    ASSERT_EQ("RAW_BYTES", response.format_);
     ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", response.decrypted_value_); // "test@example.com"
     
     ASSERT_TRUE(response.IsValid());
@@ -532,7 +532,7 @@ TEST(DecryptJsonResponseMissingDecryptedValue) {
         "debug": {"reference_id": "ref456"},
         "data_batch": {
             "datatype": "BYTE_ARRAY",
-            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV"}
+            "value_format": {"compression": "UNCOMPRESSED", "format": "RAW_BYTES"}
         }
     })");
     
@@ -560,7 +560,7 @@ TEST(DecryptJsonResponseMissingDatatype) {
         "debug": {"reference_id": "ref456"},
         "data_batch": {
             "value": "ZGVjcnlwdGVkX2RhdGE=",
-            "value_format": {"compression": "UNCOMPRESSED", "format": "CSV"}
+            "value_format": {"compression": "UNCOMPRESSED", "format": "RAW_BYTES"}
         }
     })");
     
@@ -596,7 +596,7 @@ TEST(DecryptJsonResponseToJson) {
     response.reference_id_ = "ref456";
     response.datatype_ = "BYTE_ARRAY";
     response.compression_ = "UNCOMPRESSED";
-    response.format_ = "CSV";
+    response.format_ = "RAW_BYTES";
     response.decrypted_value_ = "ZGVjcnlwdGVkX2RhdGE="; // "decrypted_data"
     
     ASSERT_TRUE(response.IsValid());
@@ -609,7 +609,7 @@ TEST(DecryptJsonResponseToJson) {
     ASSERT_TRUE(json_string.find("ZGVjcnlwdGVkX2RhdGE=") != std::string::npos); // "decrypted_data"
     ASSERT_TRUE(json_string.find("BYTE_ARRAY") != std::string::npos);
     ASSERT_TRUE(json_string.find("UNCOMPRESSED") != std::string::npos);
-    ASSERT_TRUE(json_string.find("CSV") != std::string::npos);
+    ASSERT_TRUE(json_string.find("RAW_BYTES") != std::string::npos);
 }
 
 TEST(JsonResponsePartialParsing) {

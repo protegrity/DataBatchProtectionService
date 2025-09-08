@@ -79,10 +79,9 @@ std::optional<C> to_compression_enum(std::string_view s) {
 // For dbps::external::Format
 namespace {
 using F = ::dbps::external::Format::type;
-inline constexpr std::array<std::pair<F, std::string_view>, 3> kFormatPairs{{
-    {F::JSON, "JSON"},
-    {F::CSV, "CSV"},
-    {F::RAW_C_DATA, "RAW_C_DATA"},
+inline constexpr std::array<std::pair<F, std::string_view>, 2> kFormatPairs{{
+    {F::RAW_BYTES, "RAW_BYTES"},
+    {F::PLAIN, "PLAIN"},
 }};
 } // anon
 

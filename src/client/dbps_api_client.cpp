@@ -228,9 +228,9 @@ EncryptApiResponse DBPSApiClient::Encrypt(
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
 
-        // Check if only RAW_C_DATA format is implemented
-        if (format != Format::RAW_C_DATA) {
-            api_response.SetApiClientError("On request, only RAW_C_DATA format is currently implemented");
+        // Check if only PLAIN format is implemented
+        if (format != Format::PLAIN) {
+            api_response.SetApiClientError("On request, only PLAIN format is currently implemented");
             return api_response;
         }
 
@@ -312,9 +312,9 @@ DecryptApiResponse DBPSApiClient::Decrypt(
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
 
-        // Check if only RAW_C_DATA format is implemented
-        if (format != Format::RAW_C_DATA) {
-            api_response.SetApiClientError("On request, only RAW_C_DATA format is currently implemented");
+        // Check if only PLAIN format is implemented
+        if (format != Format::PLAIN) {
+            api_response.SetApiClientError("On request, only PLAIN format is currently implemented");
             return api_response;
         }
 
