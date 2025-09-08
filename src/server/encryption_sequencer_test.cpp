@@ -140,7 +140,7 @@ bool TestParameterValidation() {
     // Test 3: Invalid format
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "CSV", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", "UNCOMPRESSED", "RAW_BYTES", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (result) {

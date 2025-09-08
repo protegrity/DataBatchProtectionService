@@ -154,14 +154,14 @@ TEST(CompressionCodecInvalidFromString) {
 
 // Test Format enum conversions
 TEST(FormatToStringConversion) {
-    ASSERT_EQ("CSV", std::string(to_string(Format::CSV)));
+    ASSERT_EQ("RAW_BYTES", std::string(to_string(Format::RAW_BYTES)));
     ASSERT_EQ("PLAIN", std::string(to_string(Format::PLAIN)));
 }
 
 TEST(FormatFromStringConversion) {
-    auto result = to_format_enum("CSV");
+    auto result = to_format_enum("RAW_BYTES");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::CSV, result.value());
+    ASSERT_EQ(Format::RAW_BYTES, result.value());
     
     result = to_format_enum("PLAIN");
     ASSERT_TRUE(result.has_value());
@@ -219,7 +219,7 @@ TEST(RoundTripCompressionCodecConversion) {
 TEST(RoundTripFormatConversion) {
     // Test all Format enum values
     Format::type formats[] = {
-        Format::CSV, Format::PLAIN
+        Format::RAW_BYTES, Format::PLAIN
     };
     
     for (auto format : formats) {
@@ -277,11 +277,11 @@ TEST(RuntimeEvaluation) {
     // Test runtime evaluation of the functions
     auto type_str = to_string(Type::BYTE_ARRAY);
     auto codec_str = to_string(CompressionCodec::GZIP);
-    auto format_str = to_string(Format::CSV);
+    auto format_str = to_string(Format::RAW_BYTES);
     // Verify the results
     ASSERT_EQ("BYTE_ARRAY", std::string(type_str));
     ASSERT_EQ("GZIP", std::string(codec_str));
-    ASSERT_EQ("CSV", std::string(format_str));
+    ASSERT_EQ("RAW_BYTES", std::string(format_str));
 }
 
 // Protection tests: ensure enum_utils stays in sync with enum definitions
@@ -325,7 +325,7 @@ TEST(CompressionCodecEnumCompleteness) {
 TEST(FormatEnumCompleteness) {
     // Define all known Format enum values
     Format::type all_formats[] = {
-        Format::CSV, Format::PLAIN
+        Format::RAW_BYTES, Format::PLAIN
     };
     
     // Test that every enum value can be converted to string and back
@@ -368,7 +368,7 @@ TEST(StringUniqueness) {
     
     // Collect all Format strings
     Format::type all_formats[] = {
-        Format::CSV, Format::PLAIN
+        Format::RAW_BYTES, Format::PLAIN
     };
     for (auto format : all_formats) {
         format_strings.insert(std::string(to_string(format)));
@@ -400,7 +400,7 @@ TEST(CrossEnumStringCollision) {
     }
     
     Format::type all_formats[] = {
-        Format::CSV, Format::PLAIN
+        Format::RAW_BYTES, Format::PLAIN
     };
     for (auto format : all_formats) {
         all_strings.insert(std::string(to_string(format)));

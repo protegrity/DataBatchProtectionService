@@ -35,7 +35,7 @@ struct CompressionCodec {
 struct Format {
     enum type {
         PLAIN = 0,
-        CSV = 1
+        RAW_BYTES = 1
     };
 };
 

@@ -80,7 +80,7 @@ std::optional<C> to_compression_enum(std::string_view s) {
 namespace {
 using F = ::dbps::external::Format::type;
 inline constexpr std::array<std::pair<F, std::string_view>, 2> kFormatPairs{{
-    {F::CSV, "CSV"},
+    {F::RAW_BYTES, "RAW_BYTES"},
     {F::PLAIN, "PLAIN"},
 }};
 } // anon

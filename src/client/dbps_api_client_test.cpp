@@ -425,7 +425,7 @@ TEST(EncryptWithInvalidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::CSV,                // format - NOT PLAIN
+        Format::RAW_BYTES,          // format - NOT PLAIN
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -468,7 +468,7 @@ TEST(DecryptWithInvalidData) {
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::CSV,                // format - NOT PLAIN
+        Format::RAW_BYTES,          // format - NOT PLAIN
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
