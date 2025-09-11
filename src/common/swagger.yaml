@@ -77,9 +77,9 @@ paths:
                     pretty_printed_value: "user1@example.com\nuser2@example.com"
                     reference_id: 550e8400-e29b-41d4-a716-446655440000
               ints_csv_utf8:
-                summary: Encrypt RAW_BYTES of INT32 IDs (BASE64 encoded)
+                summary: Encrypt UNDEFINED of INT32 IDs (BASE64 encoded)
                 description: |
-                  Three INT32 values provided as a RAW_BYTES string, BASE64 encoded.
+                  Three INT32 values provided as a UNDEFINED string, BASE64 encoded.
                   Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                   Encrypted output will be returned in `data_batch_encrypted.value`.
                 value:
@@ -90,7 +90,7 @@ paths:
                     datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
-                      format: RAW_BYTES
+                      format: UNDEFINED
                   data_batch_encrypted:
                     value_format:
                       compression: ZSTD
@@ -140,9 +140,9 @@ paths:
                     debug:
                       reference_id: 550e8400-e29b-41d4-a716-446655440000
                 ints_csv_utf8_success:
-                  summary: Encrypted INT32 RAW_BYTES IDs
+                  summary: Encrypted INT32 UNDEFINED IDs
                   description: |
-                    Encrypted output for the INT32 RAW_BYTES "3344,5566,7788".
+                    Encrypted output for the INT32 UNDEFINED "3344,5566,7788".
                     `data_batch_encrypted.value` contains the Base64-encoded ciphertext.
                   value:
                     data_batch_encrypted:
@@ -247,9 +247,9 @@ paths:
                   debug:
                     reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
               ints_csv_utf8:
-                summary: Decrypt RAW_BYTES of INT32 IDs (BASE64 encoded)
+                summary: Decrypt UNDEFINED of INT32 IDs (BASE64 encoded)
                 description: |
-                  Takes an encrypted Base64 blob and decrypts it back into the BASE64 encoded RAW_BYTES.
+                  Takes an encrypted Base64 blob and decrypts it back into the BASE64 encoded UNDEFINED.
                   Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                 value:
                   column_reference:
@@ -262,7 +262,7 @@ paths:
                     datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
-                      format: RAW_BYTES
+                      format: UNDEFINED
                   encryption:
                     key_id: NumericID001
                   access:
@@ -309,16 +309,16 @@ paths:
                       pretty_printed_value: "user1@example.com\nuser2@example.com"
                       reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
                 ints_csv_utf8_success:
-                  summary: Decrypted INT32 RAW_BYTES IDs
+                  summary: Decrypted INT32 UNDEFINED IDs
                   description: |
-                    Decrypted back into the BASE64 encoded RAW_BYTES string.
+                    Decrypted back into the BASE64 encoded UNDEFINED string.
                     Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                   value:
                     data_batch:
                       datatype: INT32
                       value_format:
                         compression: UNCOMPRESSED
-                        format: RAW_BYTES
+                        format: UNDEFINED
                       value: "MzM0NCw1NTY2LDc3ODg="
                     access:
                       user_id: GRM_009
@@ -440,7 +440,7 @@ components:
     serialization_format:
       type: string
       enum:
-        - RAW_BYTES
+        - UNDEFINED
         - PLAIN
       description: Format used for serializing the data
 
