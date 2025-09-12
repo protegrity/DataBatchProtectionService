@@ -430,18 +430,29 @@ components:
         - UNCOMPRESSED
         - SNAPPY
         - GZIP
-        - LZO
         - BROTLI
-        - LZ4
         - ZSTD
-        - LZ4_RAW
+        - LZ4
+        - LZ4_FRAME
+        - LZO
+        - BZ2
+        - LZ4_HADOOP
       description: Compression format
 
     serialization_format:
       type: string
       enum:
-        - UNDEFINED
         - PLAIN
+        - PLAIN_DICTIONARY
+        - RLE
+        - BIT_PACKED
+        - DELTA_BINARY_PACKED
+        - DELTA_LENGTH_BYTE_ARRAY
+        - DELTA_BYTE_ARRAY
+        - RLE_DICTIONARY
+        - BYTE_STREAM_SPLIT
+        - UNDEFINED
+        - UNKNOWN
       description: Format used for serializing the data
 
     value_format:
@@ -534,6 +545,7 @@ components:
             - DOUBLE
             - BYTE_ARRAY
             - FIXED_LEN_BYTE_ARRAY
+            - UNDEFINED
         value_format:
           $ref: '#/components/schemas/value_format'
 

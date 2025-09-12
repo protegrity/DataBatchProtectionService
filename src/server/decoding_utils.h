@@ -114,6 +114,13 @@ std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, dbps::external::T
             break;
         }
 
+        case Type::UNDEFINED: {
+            out << "Decoded UNDEFINED type (raw bytes):\n";
+            const char* s = reinterpret_cast<const char*>(data);
+            out << "  \"" << std::string(s, s + raw.size()) << "\"\n";
+            break;
+        }
+
         default:
             return UNSUPPORTED_TYPE_STR;
     }

@@ -137,7 +137,7 @@ bool TestParameterValidation() {
         }
     }
     
-    // Test 3: Invalid format
+    // Test 3: Invalid format (UNDEFINED)
     {
         DataBatchEncryptionSequencer sequencer(
             "BYTE_ARRAY", "UNCOMPRESSED", "UNDEFINED", "UNCOMPRESSED", "test_key"
@@ -149,6 +149,22 @@ bool TestParameterValidation() {
         }
         if (sequencer.error_stage_ != "parameter_validation") {
             std::cout << "Wrong error stage for invalid format: " << sequencer.error_stage_ << std::endl;
+            return false;
+        }
+    }
+    
+    // Test 4: Invalid format (RLE - format not yet implemented)
+    {
+        DataBatchEncryptionSequencer sequencer(
+            "BYTE_ARRAY", "UNCOMPRESSED", "RLE", "UNCOMPRESSED", "test_key"
+        );
+        bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
+        if (result) {
+            std::cout << "Invalid format test (RLE) should have failed" << std::endl;
+            return false;
+        }
+        if (sequencer.error_stage_ != "parameter_validation") {
+            std::cout << "Wrong error stage for invalid format (RLE): " << sequencer.error_stage_ << std::endl;
             return false;
         }
     }
