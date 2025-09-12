@@ -4,6 +4,8 @@
 #include <vector>
 #include "enums.h"
 
+using namespace dbps::external;
+
 /**
  * Encryption sequencer class that handles data conversion and encryption/decryption operations.
  * 
@@ -14,9 +16,7 @@
  * - Validates supported parameter combinations (uncompressed, base64, plain)
  * - Provides comprehensive error reporting with stage and message tracking
  * 
- * Currently supports only:
- * - Compression: UNCOMPRESSED
- * - Format: PLAIN
+ * Supports all data types, compression types, and formats.
  * 
  * The class takes constructor parameters that were previously public attributes in JsonRequest.
  */
@@ -55,15 +55,12 @@ public:
     bool ConvertAndEncrypt(const std::string& plaintext);
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
-public:
-    static const bool CHECK_COMPRESSION_ENUM = false;
-
 private:
     // Corresponding enum values for the string parameters
-    dbps::external::Type::type datatype_enum_;
-    dbps::external::CompressionCodec::type compression_enum_;
-    dbps::external::CompressionCodec::type encrypted_compression_enum_;
-    dbps::external::Format::type format_enum_;
+    Type::type datatype_enum_;
+    CompressionCodec::type compression_enum_;
+    CompressionCodec::type encrypted_compression_enum_;
+    Format::type format_enum_;
     
     /**
      * Converts string values to corresponding enum values using enum_utils.
@@ -75,7 +72,7 @@ private:
     /**
      * Performs comprehensive validation of all parameters and key_id.
      * Converts string parameters to enums, validates key_id, and checks supported combinations.
-     * Currently only supports: uncompressed, format=plain
+     * Supports all data types, compression types, and formats.
      * Returns true if all validation passes, false otherwise.
      */
     bool ValidateParameters();

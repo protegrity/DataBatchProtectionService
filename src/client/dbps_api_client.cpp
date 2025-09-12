@@ -228,12 +228,6 @@ EncryptApiResponse DBPSApiClient::Encrypt(
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
 
-        // Check if only PLAIN format is implemented
-        if (format != Format::PLAIN) {
-            api_response.SetApiClientError("On request, only PLAIN format is currently implemented");
-            return api_response;
-        }
-
         // Check if the request is valid
         if (!json_request.IsValid()) {
             api_response.SetApiClientError("Invalid encrypt request");
@@ -311,12 +305,6 @@ DecryptApiResponse DBPSApiClient::Decrypt(
         
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
-
-        // Check if only PLAIN format is implemented
-        if (format != Format::PLAIN) {
-            api_response.SetApiClientError("On request, only PLAIN format is currently implemented");
-            return api_response;
-        }
 
         // Check if the request is valid
         if (!json_request.IsValid()) {

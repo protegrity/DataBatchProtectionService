@@ -120,51 +120,51 @@ bool TestParameterValidation() {
         }
     }
     
-    // Test 2: Invalid compression (should now succeed with warning)
+    // Test 2: Invalid compression (should succeed with warning)
     {
         DataBatchEncryptionSequencer sequencer(
             "BYTE_ARRAY", "GZIP", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
-            // TODO: When compression validation is enforced, this should fail
             return false;
         }
         // Should not have error stage since it succeeded
         if (!sequencer.error_stage_.empty()) {
-            // TODO: When compression validation is enforced, this should have error stage
             return false;
         }
     }
     
-    // Test 3: Invalid format (UNDEFINED)
+    // Test 3: Undefined format is supported
     {
         DataBatchEncryptionSequencer sequencer(
             "BYTE_ARRAY", "UNCOMPRESSED", "UNDEFINED", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
-        if (result) {
-            std::cout << "Invalid format test should have failed" << std::endl;
+        if (!result) {
+            std::cout << "Format UNDEFINED should be supported: " << sequencer.error_message_ << std::endl;
             return false;
         }
-        if (sequencer.error_stage_ != "parameter_validation") {
-            std::cout << "Wrong error stage for invalid format: " << sequencer.error_stage_ << std::endl;
+        // Should succeed with no error stage
+        if (!sequencer.error_stage_.empty()) {
+            std::cout << "Unexpected error stage for supported format: " << sequencer.error_stage_ << std::endl;
             return false;
         }
     }
     
-    // Test 4: Invalid format (RLE - format not yet implemented)
+    // Test 4: All formats now supported (including RLE)
     {
         DataBatchEncryptionSequencer sequencer(
             "BYTE_ARRAY", "UNCOMPRESSED", "RLE", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
-        if (result) {
-            std::cout << "Invalid format test (RLE) should have failed" << std::endl;
+        if (!result) {
+            std::cout << "Format RLE should now be supported: " << sequencer.error_message_ << std::endl;
             return false;
         }
-        if (sequencer.error_stage_ != "parameter_validation") {
-            std::cout << "Wrong error stage for invalid format (RLE): " << sequencer.error_stage_ << std::endl;
+        // Should succeed with no error stage
+        if (!sequencer.error_stage_.empty()) {
+            std::cout << "Unexpected error stage for supported format (RLE): " << sequencer.error_stage_ << std::endl;
             return false;
         }
     }

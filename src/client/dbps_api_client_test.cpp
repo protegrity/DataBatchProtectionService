@@ -419,24 +419,9 @@ TEST(EncryptWithInvalidData) {
     std::string test_plaintext = "test@example.com";
     std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
     
-    // Test 1: Unsupported format (not PLAIN)
-    auto response1 = client.Encrypt(
-        span<const uint8_t>(plaintext_data),
-        "email",                    // column_name
-        Type::BYTE_ARRAY,           // datatype
-        CompressionCodec::UNCOMPRESSED, // compression
-        Format::UNDEFINED,          // format - NOT PLAIN
-        CompressionCodec::UNCOMPRESSED, // encrypted_compression
-        "test_key_123",             // key_id
-        "test_user_456"             // user_id
-    );
-    
-    // Verify the response indicates failure
-    ASSERT_FALSE(response1.Success());
-    
-    // Test 2: Empty plaintext
+    // Test empty plaintext
     std::vector<uint8_t> empty_data;
-    auto response2 = client.Encrypt(
+    auto response1 = client.Encrypt(
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
@@ -448,7 +433,7 @@ TEST(EncryptWithInvalidData) {
     );
     
     // Verify the response indicates failure
-    ASSERT_FALSE(response2.Success());
+    ASSERT_FALSE(response1.Success());
 }
 
 TEST(DecryptWithInvalidData) {
@@ -462,24 +447,9 @@ TEST(DecryptWithInvalidData) {
     std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
     std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
     
-    // Test 1: Unsupported format (not PLAIN)
-    auto response1 = client.Decrypt(
-        span<const uint8_t>(ciphertext_data),
-        "email",                    // column_name
-        Type::BYTE_ARRAY,           // datatype
-        CompressionCodec::UNCOMPRESSED, // compression
-        Format::UNDEFINED,          // format - NOT PLAIN
-        CompressionCodec::UNCOMPRESSED, // encrypted_compression
-        "test_key_123",             // key_id
-        "test_user_456"             // user_id
-    );
-    
-    // Verify the response indicates failure
-    ASSERT_FALSE(response1.Success());
-    
-    // Test 2: Empty ciphertext
+    // Test empty ciphertext
     std::vector<uint8_t> empty_data;
-    auto response2 = client.Decrypt(
+    auto response1 = client.Decrypt(
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
@@ -491,7 +461,7 @@ TEST(DecryptWithInvalidData) {
     );
     
     // Verify the response indicates failure
-    ASSERT_FALSE(response2.Success());
+    ASSERT_FALSE(response1.Success());
 }
 
 TEST(EncryptWithInvalidBase64Response) {
