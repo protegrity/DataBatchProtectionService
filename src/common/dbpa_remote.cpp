@@ -101,7 +101,8 @@ void RemoteDataBatchProtectionAgent::init(
     std::map<std::string, std::string> connection_config,
     std::string app_context,
     std::string column_key_id,
-    Type::type data_type,
+    Type::type datatype,
+    std::optional<int> datatype_length,
     CompressionCodec::type compression_type) {
 
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Starting initialization for column: " << column_name << std::endl;
@@ -114,7 +115,8 @@ void RemoteDataBatchProtectionAgent::init(
             std::move(connection_config),
             std::move(app_context),
             std::move(column_key_id),
-            data_type,
+            datatype,
+            datatype_length,
             compression_type
         );
 
@@ -197,7 +199,8 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     auto response = api_client_->Encrypt(
         plaintext,
         column_name_,
-        data_type_,
+        datatype_,
+        datatype_length_,
         compression_type_,
         Format::PLAIN,  // Currently only PLAIN is supported
         compression_type_,
@@ -228,7 +231,8 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     auto response = api_client_->Decrypt(
         ciphertext,
         column_name_,
-        data_type_,
+        datatype_,
+        datatype_length_,
         compression_type_,
         Format::PLAIN,  // Currently only PLAIN is supported
         compression_type_,

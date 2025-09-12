@@ -10,11 +10,13 @@ using namespace dbps::external;
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     const std::string& datatype,
+    const std::optional<int>& datatype_length,
     const std::string& compression,
     const std::string& format,
     const std::string& encrypted_compression,
     const std::string& key_id
 ) : datatype_(datatype),
+    datatype_length_(datatype_length),
     compression_(compression),
     format_(format),
     encrypted_compression_(encrypted_compression),
@@ -58,7 +60,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     }    
     if (is_uncompressed && is_plain) {
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_);
+        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_, datatype_length_);
         if (debug_decoded.length() > 1000) {
             std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
@@ -177,6 +179,20 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
         error_stage_ = "validation";
         error_message_ = "key_id cannot be null or empty";
         return false;
+    }
+
+    // Check FIXED_LEN_BYTE_ARRAY datatype_length requirement
+    if (datatype_enum_ == Type::FIXED_LEN_BYTE_ARRAY) {
+        if (!datatype_length_.has_value()) {
+            error_stage_ = "parameter_validation";
+            error_message_ = "FIXED_LEN_BYTE_ARRAY datatype requires datatype_length parameter";
+            return false;
+        }
+        if (datatype_length_.value() <= 0) {
+            error_stage_ = "parameter_validation";
+            error_message_ = "FIXED_LEN_BYTE_ARRAY datatype_length must be positive";
+            return false;
+        }
     }
     
     return true;

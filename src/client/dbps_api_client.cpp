@@ -199,6 +199,7 @@ EncryptApiResponse DBPSApiClient::Encrypt(
     span<const uint8_t> plaintext,
     const std::string& column_name,
     Type::type datatype,
+    const std::optional<int>& datatype_length,
     CompressionCodec::type compression,
     Format::type format,
     CompressionCodec::type encrypted_compression,
@@ -208,6 +209,7 @@ EncryptApiResponse DBPSApiClient::Encrypt(
     EncryptJsonRequest json_request;
     json_request.column_name_ = column_name;
     json_request.datatype_ = std::string(to_string(datatype));
+    json_request.datatype_length_ = datatype_length;
     json_request.compression_ = std::string(to_string(compression));
     json_request.format_ = std::string(to_string(format));
     json_request.encrypted_compression_ = std::string(to_string(encrypted_compression));
@@ -276,6 +278,7 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     span<const uint8_t> ciphertext,
     const std::string& column_name,
     Type::type datatype,
+    const std::optional<int>& datatype_length,
     CompressionCodec::type compression,
     Format::type format,
     CompressionCodec::type encrypted_compression,
@@ -285,6 +288,7 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     DecryptJsonRequest json_request;
     json_request.column_name_ = column_name;
     json_request.datatype_ = std::string(to_string(datatype));
+    json_request.datatype_length_ = datatype_length;
     json_request.compression_ = std::string(to_string(compression));
     json_request.format_ = std::string(to_string(format));
     json_request.encrypted_compression_ = std::string(to_string(encrypted_compression));

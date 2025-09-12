@@ -89,7 +89,8 @@ public:
         std::map<std::string, std::string> connection_config,
         std::string app_context,
         std::string column_key_id,
-        Type::type data_type,
+        Type::type datatype,
+        std::optional<int> datatype_length,
         CompressionCodec::type compression_type) override;
     
     std::unique_ptr<EncryptionResult> Encrypt(

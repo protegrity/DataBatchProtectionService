@@ -14,6 +14,7 @@ public:
     // Common required fields
     std::string column_name_;
     std::string datatype_;
+    std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
     std::string encrypted_compression_;
@@ -256,6 +257,7 @@ class DecryptJsonResponse : public JsonResponse {
 public:
     // Decrypt-specific required fields
     std::string datatype_;
+    std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
     std::string decrypted_value_;

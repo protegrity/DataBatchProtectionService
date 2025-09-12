@@ -57,6 +57,15 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"})) {
         datatype_ = *parsed_value;
     }
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_length"})) {
+        // Parse as integer since datatype_length is optional
+        try {
+            datatype_length_ = std::stoi(*parsed_value);
+        } catch (const std::exception&) {
+            // If parsing fails, leave datatype_length_ as std::nullopt
+            datatype_length_ = std::nullopt;
+        }
+    }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"})) {
         compression_ = *parsed_value;
     }
@@ -79,13 +88,13 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
 
 bool JsonRequest::IsValid() const {
     return !column_name_.empty() && 
-           !datatype_.empty() && 
-           !compression_.empty() && 
-           !format_.empty() && 
-           !encrypted_compression_.empty() && 
-           !key_id_.empty() && 
-           !user_id_.empty() && 
-           !reference_id_.empty();
+                                !datatype_.empty() && 
+                                !compression_.empty() && 
+                                !format_.empty() && 
+                                !encrypted_compression_.empty() && 
+                                !key_id_.empty() && 
+                                !user_id_.empty() && 
+                                !reference_id_.empty();
 }
 
 std::string JsonRequest::GetValidationError() const {
@@ -157,6 +166,9 @@ std::string EncryptJsonRequest::ToJsonString() const {
     // Build data_batch
     crow::json::wvalue data_batch;
     data_batch["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        data_batch["datatype_length"] = datatype_length_.value();
+    }
     data_batch["value"] = value_;
     
     crow::json::wvalue value_format;
@@ -235,6 +247,9 @@ std::string DecryptJsonRequest::ToJsonString() const {
     // Build data_batch
     crow::json::wvalue data_batch;
     data_batch["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        data_batch["datatype_length"] = datatype_length_.value();
+    }
     
     crow::json::wvalue value_format;
     value_format["compression"] = compression_;
@@ -321,6 +336,15 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
     // Extract decrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"})) {
         datatype_ = *parsed_value;
+    }
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_length"})) {
+        // Parse as integer since datatype_length is optional
+        try {
+            datatype_length_ = std::stoi(*parsed_value);
+        } catch (const std::exception&) {
+            // If parsing fails, leave datatype_length_ as std::nullopt
+            datatype_length_ = std::nullopt;
+        }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"})) {
         compression_ = *parsed_value;
@@ -443,6 +467,9 @@ std::string DecryptJsonResponse::ToJsonString() const {
     // Build data_batch
     crow::json::wvalue data_batch;
     data_batch["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        data_batch["datatype_length"] = datatype_length_.value();
+    }
     data_batch["value"] = decrypted_value_;
     
     crow::json::wvalue value_format;

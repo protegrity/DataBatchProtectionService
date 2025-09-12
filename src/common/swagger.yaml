@@ -546,6 +546,10 @@ components:
             - BYTE_ARRAY
             - FIXED_LEN_BYTE_ARRAY
             - UNDEFINED
+        datatype_length:
+          type: integer
+          description: Optional length specification for fixed-length data types (e.g., FIXED_LEN_BYTE_ARRAY)
+          minimum: 0
         value_format:
           $ref: '#/components/schemas/value_format'
 

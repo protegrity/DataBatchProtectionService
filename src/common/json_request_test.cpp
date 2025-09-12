@@ -642,6 +642,74 @@ TEST(JsonResponseNullJsonHandling) {
     // Should handle gracefully without crashing
 }
 
+// Test datatype_length functionality - simplified
+static void test_DatatypeLengthParsing() {
+    // Test parsing with datatype_length
+    const std::string json_with_datatype_length = R"({
+        "column_reference": {
+            "name": "email"
+        },
+        "data_batch": {
+            "datatype": "FIXED_LEN_BYTE_ARRAY",
+            "datatype_length": 16,
+            "value": "SGVsbG8sIFdvcmxkIQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "PLAIN"
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {
+                "compression": "UNCOMPRESSED"
+            }
+        },
+        "encryption": {
+            "key_id": "test_key_123"
+        },
+        "access": {
+            "user_id": "test_user"
+        },
+        "debug": {
+            "reference_id": "test_ref_123"
+        }
+    })";
+    
+    EncryptJsonRequest request;
+    request.Parse(json_with_datatype_length);
+    
+    ASSERT_TRUE(request.IsValid());
+    ASSERT_TRUE(request.datatype_length_.has_value());
+    ASSERT_EQ(request.datatype_length_.value(), 16);
+}
+
+// Test-specific derived class for EncryptJsonRequest testing
+class TestableEncryptJsonRequest : public EncryptJsonRequest {
+public:
+    // Make ToJsonString public for testing
+    std::string ToJsonString() const override {
+        return EncryptJsonRequest::ToJsonString();
+    }
+};
+
+static void test_DatatypeLengthSerialization() {
+    // Test serialization with and without datatype_length
+    TestableEncryptJsonRequest request;
+    request.user_id_ = "test_user";
+    request.reference_id_ = "test_ref_123";
+    request.datatype_ = "FIXED_LEN_BYTE_ARRAY";
+    request.datatype_length_ = 16;
+    request.compression_ = "UNCOMPRESSED";
+    request.format_ = "PLAIN";
+    request.encrypted_compression_ = "UNCOMPRESSED";
+    request.key_id_ = "test_key_123";
+    request.value_ = "SGVsbG8sIFdvcmxkIQ==";
+    
+    std::string json_output = request.ToJsonString();
+    auto json_obj = crow::json::load(json_output);
+    ASSERT_TRUE(json_obj["data_batch"].has("datatype_length"));
+    ASSERT_EQ(json_obj["data_batch"]["datatype_length"], 16);
+}
+
 // Main test runner
 int main() {
     std::cout << "Running JSON Request Tests..." << std::endl;
@@ -850,7 +918,22 @@ int main() {
         all_tests_passed = false;
     }
     
-
+    // datatype_length functionality tests - simplified
+    try {
+        test_DatatypeLengthParsing();
+        PrintTestResult("Datatype length parsing", true);
+    } catch (...) {
+        PrintTestResult("Datatype length parsing", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DatatypeLengthSerialization();
+        PrintTestResult("Datatype length serialization", true);
+    } catch (...) {
+        PrintTestResult("Datatype length serialization", false);
+        all_tests_passed = false;
+    }
     
     std::cout << "==================================" << std::endl;
     if (all_tests_passed) {

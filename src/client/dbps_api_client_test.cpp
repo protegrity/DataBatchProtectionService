@@ -297,6 +297,7 @@ TEST(EncryptWithValidData) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -381,6 +382,7 @@ TEST(DecryptWithValidData) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -425,6 +427,7 @@ TEST(EncryptWithInvalidData) {
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -453,6 +456,7 @@ TEST(DecryptWithInvalidData) {
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -520,6 +524,7 @@ TEST(EncryptWithInvalidBase64Response) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -589,6 +594,7 @@ TEST(DecryptWithInvalidBase64Response) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -649,6 +655,7 @@ TEST(EncryptWithInvalidJsonResponse) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -709,6 +716,7 @@ TEST(DecryptWithInvalidJsonResponse) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression

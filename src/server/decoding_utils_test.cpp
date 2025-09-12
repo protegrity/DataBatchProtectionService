@@ -93,8 +93,24 @@ static void test_BYTE_ARRAY_ok() {
 static void test_FIXED_LEN_BYTE_ARRAY_ok() {
     std::string msg = "hello world";
     std::vector<uint8_t> buf(msg.begin(), msg.end());
-    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY);
+    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 11); // length = 11
     assert(contains(s, "\"hello world\""));
+}
+
+static void test_FIXED_LEN_BYTE_ARRAY_multiple_elements() {
+    // Test multiple fixed-length elements
+    std::vector<uint8_t> buf;
+    std::string elem1 = "abc";  // 3 chars
+    std::string elem2 = "def";  // 3 chars
+    std::string elem3 = "ghi";  // 3 chars
+    buf.insert(buf.end(), elem1.begin(), elem1.end());
+    buf.insert(buf.end(), elem2.begin(), elem2.end());
+    buf.insert(buf.end(), elem3.begin(), elem3.end());
+    
+    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 3); // length = 3
+    assert(contains(s, "[0] \"abc\""));
+    assert(contains(s, "[1] \"def\""));
+    assert(contains(s, "[2] \"ghi\""));
 }
 
 static void test_decode_error_misaligned() {
@@ -118,6 +134,7 @@ int main() {
     test_INT96_ok();
     test_BYTE_ARRAY_ok();
     test_FIXED_LEN_BYTE_ARRAY_ok();
+    test_FIXED_LEN_BYTE_ARRAY_multiple_elements();
     test_decode_error_misaligned();
     test_unsupported_type();
 

@@ -14,8 +14,9 @@ bool TestEncryptionDecryption() {
     {
         DataBatchEncryptionSequencer sequencer(
             "BYTE_ARRAY",      // datatype
+            std::nullopt,      // datatype_length
             "UNCOMPRESSED",    // compression
-            "PLAIN",      // format
+            "PLAIN",           // format
             "UNCOMPRESSED",    // encrypted_compression
             "test_key_123"     // key_id
         );
@@ -34,11 +35,11 @@ bool TestEncryptionDecryption() {
     // Test 2: Different key_id produces different encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
         );
         
         std::string test_data = "SGVsbG8sIFdvcmxkIQ==";
@@ -55,11 +56,11 @@ bool TestEncryptionDecryption() {
     // Test 3: Same key_id produces consistent encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
         );
         
         std::string test_data = "SGVsbG8sIFdvcmxkIQ==";
@@ -76,7 +77,7 @@ bool TestEncryptionDecryption() {
     // Test 4: Empty data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         
         // This should fail because empty input is rejected
@@ -90,7 +91,7 @@ bool TestEncryptionDecryption() {
     // Test 5: Binary data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         
         // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
@@ -111,7 +112,7 @@ bool TestParameterValidation() {
     // Test 1: Valid parameters, should succeed
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -123,7 +124,7 @@ bool TestParameterValidation() {
     // Test 2: Invalid compression (should succeed with warning)
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "GZIP", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "GZIP", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -138,7 +139,7 @@ bool TestParameterValidation() {
     // Test 3: Undefined format is supported
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "UNDEFINED", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "UNDEFINED", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -155,7 +156,7 @@ bool TestParameterValidation() {
     // Test 4: All formats now supported (including RLE)
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "RLE", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "RLE", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -177,7 +178,7 @@ bool TestInputValidation() {
     // Test 1: Empty plaintext
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("");
         if (result) {
@@ -193,7 +194,7 @@ bool TestInputValidation() {
     // Test 2: Empty ciphertext
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndDecrypt("");
         if (result) {
@@ -209,7 +210,7 @@ bool TestInputValidation() {
     // Test 3: Empty key_id
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", ""
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", ""
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (result) {
@@ -230,7 +231,7 @@ bool TestEnumConversion() {
     // Test 1: Valid enum conversion
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -242,7 +243,7 @@ bool TestEnumConversion() {
     // Test 2: Invalid datatype
     {
         DataBatchEncryptionSequencer sequencer(
-            "INVALID_TYPE", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "INVALID_TYPE", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (result) {
@@ -263,7 +264,7 @@ bool TestBase64Decoding() {
     // Test 1: Valid base64 - "Hello, World!"
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -275,7 +276,7 @@ bool TestBase64Decoding() {
     // Test 2: Valid base64 - empty string
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("");
         if (result) {
@@ -287,7 +288,7 @@ bool TestBase64Decoding() {
     // Test 3: Valid base64 - single character
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("QQ=="); // "A"
         if (!result) {
@@ -299,7 +300,7 @@ bool TestBase64Decoding() {
     // Test 4: Valid base64 - binary data
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("AAECAwQF"); // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
         if (!result) {
@@ -311,7 +312,7 @@ bool TestBase64Decoding() {
     // Test 5: Invalid base64 - garbage characters
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("InvalidBase64!@#");
         if (result) {
@@ -327,7 +328,7 @@ bool TestBase64Decoding() {
     // Test 6: Invalid base64 - incomplete padding
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ"); // Missing padding
         if (result) {
@@ -348,7 +349,7 @@ bool TestRoundTripEncryption() {
     // Test 1: Basic round trip - "Hello, World!"
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ=="; // "Hello, World!"
@@ -379,7 +380,7 @@ bool TestRoundTripEncryption() {
     // Test 2: Binary data round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "binary_test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "binary_test_key"
         );
         
         std::string original_base64 = "AAECAwQF"; // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
@@ -410,7 +411,7 @@ bool TestRoundTripEncryption() {
     // Test 3: Single character round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "single_char_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "single_char_key"
         );
         
         std::string original_base64 = "QQ=="; // "A"
@@ -441,11 +442,11 @@ bool TestRoundTripEncryption() {
     // Test 4: Different keys produce different encrypted results
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ==";
@@ -487,7 +488,7 @@ bool TestResultStorage() {
     // Test 1: Verify encrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ==";
@@ -519,7 +520,7 @@ bool TestResultStorage() {
     // Test 2: Verify decrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
         );
         
         // First encrypt something
@@ -554,6 +555,48 @@ bool TestResultStorage() {
     return true;
 }
 
+// Test FIXED_LEN_BYTE_ARRAY validation
+bool TestFixedLenByteArrayValidation() {
+    const std::string test_data = "SGVsbG8sIFdvcmxkIQ==";
+    
+    // Helper function to test validation failure
+    auto testValidationFailure = [&](const std::optional<int>& datatype_length, const std::string& expected_msg) -> bool {
+        DataBatchEncryptionSequencer sequencer(
+            "FIXED_LEN_BYTE_ARRAY", datatype_length, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123"
+        );
+        
+        bool result = sequencer.ConvertAndEncrypt(test_data);
+        if (result) {
+            std::cout << "ERROR: Should have failed validation" << std::endl;
+            return false;
+        }
+        
+        if (sequencer.error_stage_ != "parameter_validation" || 
+            sequencer.error_message_.find(expected_msg) == std::string::npos) {
+            std::cout << "ERROR: Expected: " << expected_msg << std::endl;
+            std::cout << "Got: " << sequencer.error_stage_ << " - " << sequencer.error_message_ << std::endl;
+            return false;
+        }
+        return true;
+    };
+    
+    // Test invalid cases
+    if (!testValidationFailure(std::nullopt, "FIXED_LEN_BYTE_ARRAY datatype requires datatype_length parameter")) return false;
+    if (!testValidationFailure(-1, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive")) return false;
+    if (!testValidationFailure(0, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive")) return false;
+    
+    // Test valid case (should pass parameter validation)
+    DataBatchEncryptionSequencer sequencer("FIXED_LEN_BYTE_ARRAY", 16, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123");
+    bool result = sequencer.ConvertAndEncrypt(test_data);
+    
+    if (!result && sequencer.error_stage_ == "parameter_validation") {
+        std::cout << "ERROR: Valid datatype_length should pass parameter validation" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
 int main() {
     std::cout << "Running DataBatchEncryptionSequencer tests..." << std::endl;
     std::cout << "=============================================" << std::endl;
@@ -578,6 +621,9 @@ int main() {
     
     all_tests_passed &= TestRoundTripEncryption();
     PrintTestResult("Round-Trip Encryption", all_tests_passed);
+    
+    all_tests_passed &= TestFixedLenByteArrayValidation();
+    PrintTestResult("FIXED_LEN_BYTE_ARRAY Validation", all_tests_passed);
     
     all_tests_passed &= TestResultStorage();
     PrintTestResult("Result Storage", all_tests_passed);
