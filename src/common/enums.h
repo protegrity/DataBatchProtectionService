@@ -4,6 +4,7 @@ namespace dbps::external {
 
 // Captures the data type of the data batch elements.
 // Intentionally similar to parquet::Type to ease mapping and for compatibility with a known enum.
+// Originally defined in Arrow codebase: arrow/blob/main/cpp/src/parquet/types.h
 struct Type {
     enum type {
         BOOLEAN = 0,
@@ -19,6 +20,7 @@ struct Type {
 };
 
 // Intentionally similar to arrow::CompressionCodec
+// Originally defined in Arrow codebase: //arrow/blob/main/cpp/src/arrow/util/type_fwd.h
 struct CompressionCodec {
     enum type {
         UNCOMPRESSED = 0,
@@ -36,6 +38,7 @@ struct CompressionCodec {
 
 // Format for data values
 // Intentionally similar to parquet::Encoding to ease mapping and for compatibility with a known enum.
+// Originally defined in Arrow codebase: arrow/blob/main/cpp/src/parquet/types.h
 // TODO: Rename to Encoding to match parquet::Encoding (as a further cleanup)
 struct Format {
     enum type {

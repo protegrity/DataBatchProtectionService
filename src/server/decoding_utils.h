@@ -114,6 +114,7 @@ std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, dbps::external::T
             break;
         }
 
+        // This is a known type, but passed as "undefined" by the API caller intentionally.
         case Type::UNDEFINED: {
             out << "Decoded UNDEFINED type (raw bytes):\n";
             const char* s = reinterpret_cast<const char*>(data);
