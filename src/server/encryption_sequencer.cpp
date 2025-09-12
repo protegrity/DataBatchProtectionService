@@ -46,13 +46,17 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
     // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
     //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
-    if (compression_enum_ != CompressionCodec::UNCOMPRESSED) {
+    bool is_uncompressed = compression_enum_ == CompressionCodec::UNCOMPRESSED;
+    bool is_plain = format_enum_ == Format::PLAIN;
+    if (!is_uncompressed) {
         std::cout << "Encrypt value - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
-    } else if (format_enum_ != Format::PLAIN) {
+    }
+    if (!is_plain) {
         std::cout << "Encrypt value - Data format is not PLAIN (" << format_ << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
-    } else {
+    }    
+    if (is_uncompressed && is_plain) {
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
         std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_);
         if (debug_decoded.length() > 1000) {

@@ -154,7 +154,7 @@ public:
      * 
      * @return The encryption API response object containing comprehensive information about the call
      * 
-     * @note All data types, compression types, and formats are supported
+     * @note Data types, compression types, and formats as defined in the enums.h file are supported
      */
     EncryptApiResponse Encrypt(
         span<const uint8_t> plaintext,
@@ -181,7 +181,7 @@ public:
      * 
      * @return The decryption API response object containing comprehensive information about the call
      * 
-     * @note All data types, compression types, and formats are supported
+     * @note Data types, compression types, and formats as defined in the enums.h file are supported
      */
     DecryptApiResponse Decrypt(
         span<const uint8_t> ciphertext,
