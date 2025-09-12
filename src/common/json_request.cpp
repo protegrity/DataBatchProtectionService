@@ -15,6 +15,11 @@
 */
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path) {
     try {
+        // Check if json_body is empty or null
+        if (!json_body || json_body.t() == crow::json::type::Null) {
+            return std::nullopt;
+        }
+        
         const crow::json::rvalue* current = &json_body;
         for (const auto& field : path) {
             if (!current->has(field)) {
