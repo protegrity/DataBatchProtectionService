@@ -13,7 +13,8 @@ struct Type {
         FLOAT = 4,
         DOUBLE = 5,
         BYTE_ARRAY = 6,
-        FIXED_LEN_BYTE_ARRAY = 7
+        FIXED_LEN_BYTE_ARRAY = 7,
+        UNDEFINED = 8
     };
 };
 
@@ -23,19 +24,32 @@ struct CompressionCodec {
         UNCOMPRESSED = 0,
         SNAPPY = 1,
         GZIP = 2,
-        LZO = 3,
-        BROTLI = 4,
+        BROTLI = 3,
+        ZSTD = 4,
         LZ4 = 5,
-        ZSTD = 6,
-        LZ4_RAW = 7
+        LZ4_FRAME = 6,
+        LZO = 7,
+        BZ2 = 8,
+        LZ4_HADOOP = 9
     };
 };
 
 // Format for data values
+// Intentionally similar to parquet::Encoding to ease mapping and for compatibility with a known enum.
+// TODO: Rename to Encoding to match parquet::Encoding (as a further cleanup)
 struct Format {
     enum type {
         PLAIN = 0,
-        UNDEFINED = 1
+        PLAIN_DICTIONARY = 2,
+        RLE = 3,
+        BIT_PACKED = 4,
+        DELTA_BINARY_PACKED = 5,
+        DELTA_LENGTH_BYTE_ARRAY = 6,
+        DELTA_BYTE_ARRAY = 7,
+        RLE_DICTIONARY = 8,
+        BYTE_STREAM_SPLIT = 9,
+        UNDEFINED = 10,
+        UNKNOWN = 11
     };
 };
 

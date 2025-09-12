@@ -17,7 +17,7 @@ constexpr std::string_view to_string_impl(
     for (auto&& [k, s] : pairs) {
         if (k == v) return s;
     }
-    return "UNKNOWN";
+    return "UNKNOWN_ENUM";
 }
 
 template <typename E, std::size_t N>
@@ -35,7 +35,7 @@ constexpr std::optional<E> from_string_impl(
 // For dbps::external::Type
 namespace {
 using T = ::dbps::external::Type::type;
-inline constexpr std::array<std::pair<T, std::string_view>, 8> kTypePairs{{
+inline constexpr std::array<std::pair<T, std::string_view>, 9> kTypePairs{{
     {T::BOOLEAN, "BOOLEAN"},
     {T::INT32, "INT32"},
     {T::INT64, "INT64"},
@@ -44,6 +44,7 @@ inline constexpr std::array<std::pair<T, std::string_view>, 8> kTypePairs{{
     {T::DOUBLE, "DOUBLE"},
     {T::BYTE_ARRAY, "BYTE_ARRAY"},
     {T::FIXED_LEN_BYTE_ARRAY, "FIXED_LEN_BYTE_ARRAY"},
+    {T::UNDEFINED, "UNDEFINED"},
 }};
 } // anon
 
@@ -57,15 +58,17 @@ std::optional<T> to_datatype_enum(std::string_view s) {
 // For dbps::external::CompressionCodec
 namespace {
 using C = ::dbps::external::CompressionCodec::type;
-inline constexpr std::array<std::pair<C, std::string_view>, 8> kCodecPairs{{
+inline constexpr std::array<std::pair<C, std::string_view>, 10> kCodecPairs{{
     {C::UNCOMPRESSED, "UNCOMPRESSED"},
     {C::SNAPPY, "SNAPPY"},
     {C::GZIP, "GZIP"},
-    {C::LZO, "LZO"},
     {C::BROTLI, "BROTLI"},
-    {C::LZ4, "LZ4"},
     {C::ZSTD, "ZSTD"},
-    {C::LZ4_RAW, "LZ4_RAW"},
+    {C::LZ4, "LZ4"},
+    {C::LZ4_FRAME, "LZ4_FRAME"},
+    {C::LZO, "LZO"},
+    {C::BZ2, "BZ2"},
+    {C::LZ4_HADOOP, "LZ4_HADOOP"},
 }};
 } // anon
 
@@ -79,9 +82,18 @@ std::optional<C> to_compression_enum(std::string_view s) {
 // For dbps::external::Format
 namespace {
 using F = ::dbps::external::Format::type;
-inline constexpr std::array<std::pair<F, std::string_view>, 2> kFormatPairs{{
-    {F::UNDEFINED, "UNDEFINED"},
+inline constexpr std::array<std::pair<F, std::string_view>, 11> kFormatPairs{{
     {F::PLAIN, "PLAIN"},
+    {F::PLAIN_DICTIONARY, "PLAIN_DICTIONARY"},
+    {F::RLE, "RLE"},
+    {F::BIT_PACKED, "BIT_PACKED"},
+    {F::DELTA_BINARY_PACKED, "DELTA_BINARY_PACKED"},
+    {F::DELTA_LENGTH_BYTE_ARRAY, "DELTA_LENGTH_BYTE_ARRAY"},
+    {F::DELTA_BYTE_ARRAY, "DELTA_BYTE_ARRAY"},
+    {F::RLE_DICTIONARY, "RLE_DICTIONARY"},
+    {F::BYTE_STREAM_SPLIT, "BYTE_STREAM_SPLIT"},
+    {F::UNDEFINED, "UNDEFINED"},
+    {F::UNKNOWN, "UNKNOWN"},
 }};
 } // anon
 
