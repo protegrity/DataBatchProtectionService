@@ -5,6 +5,8 @@
 #include <functional>
 #include <iostream>
 
+using namespace dbps::external;
+
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     const std::string& datatype,
@@ -40,18 +42,29 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         return false;
     }
     
-    // Debug: Print the decoded plaintext data (only for uncompressed data)
-    if (compression_enum_ == dbps::external::CompressionCodec::UNCOMPRESSED) {
+    // Integration point for data element based encryptors.
+    // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
+    // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
+    //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
+    bool is_uncompressed = compression_enum_ == CompressionCodec::UNCOMPRESSED;
+    bool is_plain = format_enum_ == Format::PLAIN;
+    if (!is_uncompressed) {
+        std::cout << "Encrypt value - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
+                  << decoded_data.size() << " bytes" << std::endl;
+    }
+    if (!is_plain) {
+        std::cout << "Encrypt value - Data format is not PLAIN (" << format_ << "), skipping detailed decode output. Raw size: " 
+                  << decoded_data.size() << " bytes" << std::endl;
+    }    
+    if (is_uncompressed && is_plain) {
+        // Only show detailed decode output if both UNCOMPRESSED and PLAIN
         std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_);
         if (debug_decoded.length() > 1000) {
-            std::cout << "Debug - Decoded plaintext data (first 1000 chars):\n" 
+            std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
         } else {
-            std::cout << "Debug - Decoded plaintext data:\n" << debug_decoded << std::endl;
+            std::cout << "Encrypt value - Decoded plaintext data:\n" << debug_decoded << std::endl;
         }
-    } else {
-        std::cout << "Debug - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
-                  << decoded_data.size() << " bytes" << std::endl;
     }
     
     // Simple XOR encryption
@@ -163,25 +176,6 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     if (key_id_.empty()) {
         error_stage_ = "validation";
         error_message_ = "key_id cannot be null or empty";
-        return false;
-    }
-    
-    // Check compression: warn if not UNCOMPRESSED but continue
-    if (CHECK_COMPRESSION_ENUM && compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
-        std::cerr << "WARNING: Non-UNCOMPRESSED compression requested: " << compression_ 
-                  << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
-    }
-    
-    // Check encrypted_compression: warn if not UNCOMPRESSED but continue
-    if (CHECK_COMPRESSION_ENUM && encrypted_compression_enum_ != dbps::external::CompressionCodec::UNCOMPRESSED) {
-        std::cerr << "WARNING: Non-UNCOMPRESSED encrypted_compression requested: " << encrypted_compression_ 
-                  << ". Only UNCOMPRESSED is currently implemented, proceeding anyway." << std::endl;
-    }
-    
-    // Check format: must be PLAIN
-    if (format_enum_ != dbps::external::Format::PLAIN) {
-        error_stage_ = "parameter_validation";
-        error_message_ = "Only PLAIN format is supported";
         return false;
     }
     
