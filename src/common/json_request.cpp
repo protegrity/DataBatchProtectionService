@@ -88,13 +88,13 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
 
 bool JsonRequest::IsValid() const {
     return !column_name_.empty() && 
-                                !datatype_.empty() && 
-                                !compression_.empty() && 
-                                !format_.empty() && 
-                                !encrypted_compression_.empty() && 
-                                !key_id_.empty() && 
-                                !user_id_.empty() && 
-                                !reference_id_.empty();
+           !datatype_.empty() && 
+           !compression_.empty() && 
+           !format_.empty() && 
+           !encrypted_compression_.empty() && 
+           !key_id_.empty() && 
+           !user_id_.empty() && 
+           !reference_id_.empty();
 }
 
 std::string JsonRequest::GetValidationError() const {
