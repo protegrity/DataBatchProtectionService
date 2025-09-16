@@ -24,6 +24,7 @@ private:
     std::string server_url_;
     std::unique_ptr<RemoteDataBatchProtectionAgent> agent_;
     std::unique_ptr<RemoteDataBatchProtectionAgent> float_agent_;
+    std::unique_ptr<RemoteDataBatchProtectionAgent> fixed_len_agent_;
     
 public:
     DBPARemoteTestApp(const std::string& server_url) 
@@ -47,6 +48,7 @@ public:
         
         bool main_agent_ok = false;
         bool float_agent_ok = false;
+        bool fixed_len_agent_ok = false;
         
         // Initialize the main agent for string/byte array data
         try {
@@ -62,7 +64,8 @@ public:
                 connection_config,             // connection_config
                 app_context,                   // app_context
                 "demo_key_001",                // column_key_id
-                Type::UNDEFINED,               // data_type
+                Type::UNDEFINED,               // datatype
+                std::nullopt,                  // datatype_length (not needed for UNDEFINED)
                 CompressionCodec::UNCOMPRESSED // compression_type
             );
             
@@ -87,7 +90,8 @@ public:
                 connection_config,             // connection_config
                 app_context,                   // app_context
                 "demo_float_key_001",          // column_key_id
-                Type::FLOAT,                   // data_type
+                Type::FLOAT,                   // datatype
+                std::nullopt,                  // datatype_length (not needed for FLOAT)
                 CompressionCodec::UNCOMPRESSED // compression_type
             );
             
@@ -98,7 +102,33 @@ public:
             std::cerr << "ERROR: Failed to initialize float agent: " << e.what() << std::endl;
         }
         
-        bool all_ok = main_agent_ok && float_agent_ok;
+        // Initialize the fixed-length agent for FIXED_LEN_BYTE_ARRAY data
+        try {
+            // Create HTTP client with server URL
+            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            
+            // Create the remote agent
+            fixed_len_agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
+            
+            // Initialize the agent
+            fixed_len_agent_->init(
+                "demo_fixed_len_column",       // column_name
+                connection_config,             // connection_config
+                app_context,                   // app_context
+                "demo_fixed_len_key_001",      // column_key_id
+                Type::FIXED_LEN_BYTE_ARRAY,   // datatype
+                8,                            // datatype_length (8 bytes per element)
+                CompressionCodec::UNCOMPRESSED // compression_type
+            );
+            
+            std::cout << "OK: Fixed-length DBPA agent initialized successfully" << std::endl;
+            fixed_len_agent_ok = true;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Failed to initialize fixed-length agent: " << e.what() << std::endl;
+        }
+        
+        bool all_ok = main_agent_ok && float_agent_ok && fixed_len_agent_ok;
         if (all_ok) {
             std::cout << "OK: All agents initialized successfully" << std::endl;
         } else {
@@ -365,6 +395,76 @@ public:
         }
     }
 
+    // Demo datatype_length functionality
+    bool DemoDatatypeLength() {
+        std::cout << "\n=== Datatype Length Demo ===" << std::endl;
+        
+        // Check if fixed-length agent is initialized
+        if (!fixed_len_agent_) {
+            std::cout << "ERROR: Fixed-length agent not initialized" << std::endl;
+            return false;
+        }
+        
+        try {
+            // Test FIXED_LEN_BYTE_ARRAY with datatype_length
+            std::cout << "Testing FIXED_LEN_BYTE_ARRAY with datatype_length..." << std::endl;
+            
+            // Create test data: 3 fixed-length strings of 8 bytes each
+            std::string test_strings[] = {"Hello123", "World456", "Test7890"};
+            std::vector<uint8_t> fixed_length_data;
+            
+            for (const auto& str : test_strings) {
+                fixed_length_data.insert(fixed_length_data.end(), str.begin(), str.end());
+            }
+            
+            std::cout << "Test data: 3 fixed-length strings (8 bytes each)" << std::endl;
+            std::cout << "Total size: " << fixed_length_data.size() << " bytes" << std::endl;
+            
+            // Test encryption with FIXED_LEN_BYTE_ARRAY and datatype_length
+            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data));
+            
+            if (!encrypt_result || !encrypt_result->success()) {
+                std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY encryption failed" << std::endl;
+                if (encrypt_result) {
+                    std::cout << "  Error: " << encrypt_result->error_message() << std::endl;
+                }
+                return false;
+            }
+            
+            std::cout << "OK: FIXED_LEN_BYTE_ARRAY encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
+            
+            // Test decryption
+            auto decrypt_result = fixed_len_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+            
+            if (!decrypt_result || !decrypt_result->success()) {
+                std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY decryption failed" << std::endl;
+                if (decrypt_result) {
+                    std::cout << "  Error: " << decrypt_result->error_message() << std::endl;
+                }
+                return false;
+            }
+            
+            std::cout << "OK: FIXED_LEN_BYTE_ARRAY decrypted successfully" << std::endl;
+            
+            // Verify data integrity
+            auto decrypted_data = decrypt_result->plaintext();
+            if (decrypted_data.size() == fixed_length_data.size() && 
+                std::equal(decrypted_data.begin(), decrypted_data.end(), fixed_length_data.begin())) {
+                std::cout << "OK: FIXED_LEN_BYTE_ARRAY data integrity verified" << std::endl;
+            } else {
+                std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY data integrity check failed" << std::endl;
+                return false;
+            }
+            
+            std::cout << "OK: Datatype length demo completed successfully" << std::endl;
+            return true;
+            
+        } catch (const std::exception& e) {
+            std::cout << "ERROR: Datatype length demo exception: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
     // Demo error handling
     bool DemoErrorHandling() {
         std::cout << "\n=== Error Handling Demo ===" << std::endl;
@@ -423,6 +523,7 @@ public:
         bool encryption_ok = DemoEncryptionAndDecryption();
         bool roundtrip_ok = DemoRoundTrip();
         bool float_demo_ok = DemoFloatData();
+        bool datatype_length_ok = DemoDatatypeLength();
         bool error_handling_ok = DemoErrorHandling();
         
         // Print summary
@@ -430,6 +531,7 @@ public:
         std::cout << "Encryption and Decryption Demo: " << (encryption_ok ? "PASS" : "FAIL") << std::endl;
         std::cout << "Round-Trip Demo: " << (roundtrip_ok ? "PASS" : "FAIL") << std::endl;
         std::cout << "Float Data Demo: " << (float_demo_ok ? "PASS" : "FAIL") << std::endl;
+        std::cout << "Datatype Length Demo: " << (datatype_length_ok ? "PASS" : "FAIL") << std::endl;
         std::cout << "Error Handling Demo: " << (error_handling_ok ? "PASS" : "FAIL") << std::endl;
     }
 };

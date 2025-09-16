@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 #include "enums.h"
 
 using namespace dbps::external;
@@ -23,6 +24,7 @@ using namespace dbps::external;
 class DataBatchEncryptionSequencer {
 public:
     std::string datatype_;
+    std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
     std::string encrypted_compression_;
@@ -39,6 +41,7 @@ public:
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
         const std::string& datatype,
+        const std::optional<int>& datatype_length,
         const std::string& compression,
         const std::string& format,
         const std::string& encrypted_compression,

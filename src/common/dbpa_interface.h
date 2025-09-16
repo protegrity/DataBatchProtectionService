@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <stdexcept>
@@ -81,14 +82,16 @@ public:
         std::map<std::string, std::string> connection_config,
         std::string app_context,
         std::string column_key_id,
-        Type::type data_type,
+        Type::type datatype,
+        std::optional<int> datatype_length,
         CompressionCodec::type compression_type)
     {
         column_name_ = std::move(column_name);
         connection_config_ = std::move(connection_config);
         app_context_ = std::move(app_context);
         column_key_id_ = std::move(column_key_id);
-        data_type_ = data_type;
+        datatype_ = datatype;
+        datatype_length_ = datatype_length;
         compression_type_ = compression_type;
     }
 
@@ -106,7 +109,8 @@ protected:
     std::string app_context_;  // includes user_id
 
     std::string column_key_id_;
-    Type::type data_type_;
+    Type::type datatype_;
+    std::optional<int> datatype_length_;
     CompressionCodec::type compression_type_;
 };
 }

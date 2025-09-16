@@ -250,7 +250,9 @@ TEST(EncryptWithValidData) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -297,6 +299,7 @@ TEST(EncryptWithValidData) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -332,7 +335,9 @@ TEST(DecryptWithValidData) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -349,8 +354,10 @@ TEST(DecryptWithValidData) {
     
     std::string mock_response = R"({
         "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
-            "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -381,6 +388,7 @@ TEST(DecryptWithValidData) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -425,6 +433,7 @@ TEST(EncryptWithInvalidData) {
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -453,6 +462,7 @@ TEST(DecryptWithInvalidData) {
         span<const uint8_t>(empty_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -472,7 +482,9 @@ TEST(EncryptWithInvalidBase64Response) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -520,6 +532,7 @@ TEST(EncryptWithInvalidBase64Response) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -539,7 +552,9 @@ TEST(DecryptWithInvalidBase64Response) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -557,8 +572,10 @@ TEST(DecryptWithInvalidBase64Response) {
     // Response with valid JSON structure but invalid base64 value
     std::string mock_response = R"({
         "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "INVALID_BASE64_VALUE!!!",
-            "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -589,6 +606,7 @@ TEST(DecryptWithInvalidBase64Response) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -608,7 +626,9 @@ TEST(EncryptWithInvalidJsonResponse) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -649,6 +669,7 @@ TEST(EncryptWithInvalidJsonResponse) {
         span<const uint8_t>(plaintext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
@@ -668,7 +689,9 @@ TEST(DecryptWithInvalidJsonResponse) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -709,6 +732,7 @@ TEST(DecryptWithInvalidJsonResponse) {
         span<const uint8_t>(ciphertext_data),
         "email",                    // column_name
         Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
         CompressionCodec::UNCOMPRESSED, // encrypted_compression

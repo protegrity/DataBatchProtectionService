@@ -14,6 +14,7 @@ public:
     // Common required fields
     std::string column_name_;
     std::string datatype_;
+    std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
     std::string encrypted_compression_;
@@ -36,7 +37,7 @@ public:
      * Derived classes should call this first, then parse their specific fields.
      * @param request_body The raw request body string
      */
-    void ParseCommon(const std::string& request_body);
+     void ParseCommon(const std::string& request_body);
     
     /**
      * Pure virtual method for parsing specific fields.
@@ -64,7 +65,10 @@ public:
     std::string ToJson() const;
 
 protected:
-    /**
+    // String parsed from datatype_length_ for validation checks
+    std::string datatype_length_str_;
+
+     /**
      * Generates a JSON string from the member variables representing the request.
      * @return String representation of the JSON
      */
@@ -256,6 +260,7 @@ class DecryptJsonResponse : public JsonResponse {
 public:
     // Decrypt-specific required fields
     std::string datatype_;
+    std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
     std::string decrypted_value_;
@@ -284,6 +289,9 @@ public:
     std::string GetValidationError() const override;
 
 protected:
+    // String parsed from datatype_length_ for validation checks
+    std::string datatype_length_str_;
+
     /**
      * Generates a JSON string from the member variables representing the response.
      * @return String representation of the JSON

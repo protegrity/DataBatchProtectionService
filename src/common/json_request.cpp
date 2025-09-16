@@ -15,6 +15,12 @@
 */
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path) {
     try {
+        // Check if json_body is empty or null.
+        // !json_body is an oveloaded operator that checks if the json_body parsing failed.
+        if (!json_body || json_body.t() == crow::json::type::Null) {
+            return std::nullopt;
+        }
+        
         const crow::json::rvalue* current = &json_body;
         for (const auto& field : path) {
             if (!current->has(field)) {
@@ -25,6 +31,15 @@ std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_bo
         return std::string(*current); // Converts any JSON type to string
     } catch (const std::exception& e) {
         CROW_LOG_ERROR << "Exception in SafeGetFromJsonPath: " << e.what();
+        return std::nullopt;
+    }
+}
+
+// Helper function to safely parse a string to integer
+std::optional<int> SafeParseToInt(const std::string& str) {
+    try {
+        return std::stoi(str);
+    } catch (const std::exception&) {
         return std::nullopt;
     }
 }
@@ -54,8 +69,17 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"column_reference", "name"})) {
         column_name_ = *parsed_value;
     }
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"})) {
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "datatype"})) {
         datatype_ = *parsed_value;
+    }
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "length"})) {
+        // Parse as integer when the parsed_value is not empty
+        if (auto int_value = SafeParseToInt(*parsed_value)) {
+            datatype_length_ = *int_value;
+        } else {
+            // If integer parsing fails, capture the parsed value for validation check
+            datatype_length_str_ = *parsed_value;
+        }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"})) {
         compression_ = *parsed_value;
@@ -78,6 +102,12 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
 }
 
 bool JsonRequest::IsValid() const {
+    // Check if datatype_length_str_ is not empty, then it must be parseable as integer
+    bool datatype_length_valid = true;
+    if (!datatype_length_str_.empty()) {
+        datatype_length_valid = SafeParseToInt(datatype_length_str_).has_value();
+    }
+    
     return !column_name_.empty() && 
            !datatype_.empty() && 
            !compression_.empty() && 
@@ -85,20 +115,26 @@ bool JsonRequest::IsValid() const {
            !encrypted_compression_.empty() && 
            !key_id_.empty() && 
            !user_id_.empty() && 
-           !reference_id_.empty();
+           !reference_id_.empty() &&
+           datatype_length_valid;
 }
 
 std::string JsonRequest::GetValidationError() const {
     std::vector<std::string> missing_fields;
     
     if (column_name_.empty()) missing_fields.push_back("column_reference.name");
-    if (datatype_.empty()) missing_fields.push_back("data_batch.datatype");
+    if (datatype_.empty()) missing_fields.push_back("data_batch.datatype_info.datatype");
     if (compression_.empty()) missing_fields.push_back("data_batch.value_format.compression");
     if (format_.empty()) missing_fields.push_back("data_batch.value_format.format");
     if (encrypted_compression_.empty()) missing_fields.push_back("data_batch_encrypted.value_format.compression");
     if (key_id_.empty()) missing_fields.push_back("encryption.key_id");
     if (user_id_.empty()) missing_fields.push_back("access.user_id");
     if (reference_id_.empty()) missing_fields.push_back("debug.reference_id");
+    
+    // Check for invalid datatype_length
+    if (!datatype_length_str_.empty() && !SafeParseToInt(datatype_length_str_).has_value()) {
+        missing_fields.push_back("data_batch.datatype_info.length (invalid integer value)");
+    }
     
     return BuildValidationError(missing_fields);
 }
@@ -156,7 +192,15 @@ std::string EncryptJsonRequest::ToJsonString() const {
     
     // Build data_batch
     crow::json::wvalue data_batch;
-    data_batch["datatype"] = datatype_;
+    
+    // Build datatype_info inside data_batch
+    crow::json::wvalue datatype_info;
+    datatype_info["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        datatype_info["length"] = datatype_length_.value();
+    }
+    data_batch["datatype_info"] = std::move(datatype_info);
+    
     data_batch["value"] = value_;
     
     crow::json::wvalue value_format;
@@ -234,7 +278,14 @@ std::string DecryptJsonRequest::ToJsonString() const {
     
     // Build data_batch
     crow::json::wvalue data_batch;
-    data_batch["datatype"] = datatype_;
+    
+    // Build datatype_info inside data_batch
+    crow::json::wvalue datatype_info;
+    datatype_info["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        datatype_info["length"] = datatype_length_.value();
+    }
+    data_batch["datatype_info"] = std::move(datatype_info);
     
     crow::json::wvalue value_format;
     value_format["compression"] = compression_;
@@ -319,8 +370,17 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
     if (!json_body) return;
     
     // Extract decrypt-specific fields
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype"})) {
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "datatype"})) {
         datatype_ = *parsed_value;
+    }
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "length"})) {
+        // Parse as integer when the parsed_value is not empty
+        if (auto int_value = SafeParseToInt(*parsed_value)) {
+            datatype_length_ = *int_value;
+        } else {
+            // If integer parsing fails, capture the parsed value for validation check
+            datatype_length_str_ = *parsed_value;
+        }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "compression"})) {
         compression_ = *parsed_value;
@@ -412,11 +472,18 @@ std::string EncryptJsonResponse::ToJsonString() const {
 }
 
 bool DecryptJsonResponse::IsValid() const {
+    // Check if datatype_length_str_ is not empty, then it must be parseable as integer
+    bool datatype_length_valid = true;
+    if (!datatype_length_str_.empty()) {
+        datatype_length_valid = SafeParseToInt(datatype_length_str_).has_value();
+    }
+    
     return JsonResponse::IsValid() && 
            !datatype_.empty() && 
            !compression_.empty() && 
            !format_.empty() && 
-           !decrypted_value_.empty();
+           !decrypted_value_.empty() &&
+           datatype_length_valid;
 }
 
 std::string DecryptJsonResponse::GetValidationError() const {
@@ -429,10 +496,15 @@ std::string DecryptJsonResponse::GetValidationError() const {
     if (reference_id_.empty()) missing_fields.push_back("debug.reference_id");
     
     // Check decrypt-specific fields
-    if (datatype_.empty()) missing_fields.push_back("data_batch.datatype");
+    if (datatype_.empty()) missing_fields.push_back("data_batch.datatype_info.datatype");
     if (compression_.empty()) missing_fields.push_back("data_batch.value_format.compression");
     if (format_.empty()) missing_fields.push_back("data_batch.value_format.format");
     if (decrypted_value_.empty()) missing_fields.push_back("data_batch.value");
+    
+    // Check for invalid datatype_length
+    if (!datatype_length_str_.empty() && !SafeParseToInt(datatype_length_str_).has_value()) {
+        missing_fields.push_back("data_batch.datatype_info.length (invalid integer value)");
+    }
     
     return BuildValidationError(missing_fields);
 }
@@ -442,7 +514,15 @@ std::string DecryptJsonResponse::ToJsonString() const {
     
     // Build data_batch
     crow::json::wvalue data_batch;
-    data_batch["datatype"] = datatype_;
+    
+    // Build datatype_info inside data_batch
+    crow::json::wvalue datatype_info;
+    datatype_info["datatype"] = datatype_;
+    if (datatype_length_.has_value()) {
+        datatype_info["length"] = datatype_length_.value();
+    }
+    data_batch["datatype_info"] = std::move(datatype_info);
+    
     data_batch["value"] = decrypted_value_;
     
     crow::json::wvalue value_format;

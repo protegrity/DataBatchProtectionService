@@ -4,17 +4,20 @@
 #include <string>
 #include <sstream>
 #include <cstring>
+#include <optional>
 #include "enums.h"
+
+using namespace dbps::external;
 
 /**
  * Decodes raw binary data into a human-readable string for debugging/logging.
  * Returns "decode error" on failure or "unsupported type" for unimplemented types.
+ * For FIXED_LEN_BYTE_ARRAY, datatype_length specifies the fixed length of each element.
  */
-std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, dbps::external::Type::type physical_type) {
+std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, Type::type physical_type,
+    std::optional<int> datatype_length = std::nullopt) {
     static constexpr const char* DECODE_ERROR_STR = "Unknown encoding";
     static constexpr const char* UNSUPPORTED_TYPE_STR = "Unsupported type";
-
-    using Type = dbps::external::Type;
 
     auto require = [&](bool cond) -> bool { return cond; };
 
@@ -106,11 +109,19 @@ std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, dbps::external::T
             break;
         }
 
-        // TODO: Implement FIXED_LEN_BYTE_ARRAY properly.  Currently, it just prints the raw data as a string.
         case Type::FIXED_LEN_BYTE_ARRAY: {
-            out << "Decoded FIXED_LEN_BYTE_ARRAY:\n";
-            const char* s = reinterpret_cast<const char*>(data);
-            out << "  \"" << std::string(s, s + raw.size()) << "\"\n";
+            if (!datatype_length.has_value() || datatype_length.value() <= 0 || (raw.size() % datatype_length.value()) != 0) {
+                return DECODE_ERROR_STR;
+            }
+            
+            int fixed_length = datatype_length.value();
+            
+            out << "Decoded FIXED_LEN_BYTE_ARRAY (length=" << fixed_length << "):\n";
+            size_t element_count = raw.size() / fixed_length;
+            for (size_t i = 0; i < element_count; ++i) {
+                const char* element_start = reinterpret_cast<const char*>(data + i * fixed_length);
+                out << "  [" << i << "] \"" << std::string(element_start, fixed_length) << "\"\n";
+            }
             break;
         }
 

@@ -53,6 +53,7 @@ int main() {
         // Use DataBatchEncryptionSequencer for actual encryption
         DataBatchEncryptionSequencer sequencer(
             request.datatype_,
+            request.datatype_length_,
             request.compression_,
             request.format_,
             request.encrypted_compression_,
@@ -96,12 +97,14 @@ int main() {
         
         // Set decrypt-specific fields
         response.datatype_ = request.datatype_;
+        response.datatype_length_ = request.datatype_length_;
         response.compression_ = request.compression_;
         response.format_ = request.format_;
         
         // Use DataBatchEncryptionSequencer for actual decryption
         DataBatchEncryptionSequencer sequencer(
             request.datatype_,
+            request.datatype_length_,
             request.compression_,
             request.format_,
             request.encrypted_compression_,
