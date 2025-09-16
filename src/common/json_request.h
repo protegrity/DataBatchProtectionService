@@ -37,7 +37,7 @@ public:
      * Derived classes should call this first, then parse their specific fields.
      * @param request_body The raw request body string
      */
-    void ParseCommon(const std::string& request_body);
+     void ParseCommon(const std::string& request_body);
     
     /**
      * Pure virtual method for parsing specific fields.
@@ -65,7 +65,10 @@ public:
     std::string ToJson() const;
 
 protected:
-    /**
+    // String parsed from datatype_length_ for validation checks
+    std::string datatype_length_str_;
+
+     /**
      * Generates a JSON string from the member variables representing the request.
      * @return String representation of the JSON
      */
@@ -286,6 +289,9 @@ public:
     std::string GetValidationError() const override;
 
 protected:
+    // String parsed from datatype_length_ for validation checks
+    std::string datatype_length_str_;
+
     /**
      * Generates a JSON string from the member variables representing the response.
      * @return String representation of the JSON

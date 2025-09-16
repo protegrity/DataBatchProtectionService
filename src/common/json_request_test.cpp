@@ -4,8 +4,9 @@
 #include <crow/app.h>
 #include "json_request.h"
 
-// Forward declaration for internal function from json_request.cpp
+// Forward declarations for internal functions from json_request.cpp
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
+std::optional<int> SafeParseToInt(const std::string& str);
 
 // Test-specific derived class to access protected methods
 class TestableJsonRequest : public JsonRequest {
@@ -52,7 +53,9 @@ const std::string VALID_ENCRYPT_JSON = R"({
         "name": "email"
     },
     "data_batch": {
-        "datatype": "BYTE_ARRAY",
+        "datatype_info": {
+            "datatype": "BYTE_ARRAY"
+        },
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
@@ -81,7 +84,9 @@ const std::string VALID_DECRYPT_JSON = R"({
         "name": "email"
     },
     "data_batch": {
-        "datatype": "BYTE_ARRAY",
+        "datatype_info": {
+            "datatype": "BYTE_ARRAY"
+        },
         "value_format": {
             "compression": "UNCOMPRESSED",
             "format": "UNDEFINED"
@@ -148,7 +153,7 @@ TEST(JsonRequestMissingRequiredFields) {
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
     ASSERT_TRUE(error.find("Missing required fields:") != std::string::npos);
-    ASSERT_TRUE(error.find("data_batch.datatype") != std::string::npos);
+    ASSERT_TRUE(error.find("data_batch.datatype_info.datatype") != std::string::npos);
     ASSERT_TRUE(error.find("encryption.key_id") != std::string::npos);
 }
 
@@ -177,7 +182,9 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
             "name": "email"
         },
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "UNDEFINED"
@@ -244,7 +251,9 @@ TEST(EncryptJsonRequestMissingValue) {
             "name": "email"
         },
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "UNDEFINED"
@@ -316,7 +325,9 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
             "name": "email"
         },
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "UNDEFINED"
@@ -441,7 +452,9 @@ const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
 
 const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
     "data_batch": {
-        "datatype": "BYTE_ARRAY",
+        "datatype_info": {
+            "datatype": "BYTE_ARRAY"
+        },
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
@@ -531,7 +544,9 @@ TEST(DecryptJsonResponseMissingDecryptedValue) {
         "access": {"user_id": "user123", "role": "admin", "access_control": "read"},
         "debug": {"reference_id": "ref456"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"}
         }
     })");
@@ -565,7 +580,7 @@ TEST(DecryptJsonResponseMissingDatatype) {
     })");
     
     ASSERT_FALSE(response.IsValid());
-    ASSERT_TRUE(response.GetValidationError().find("data_batch.datatype") != std::string::npos);
+    ASSERT_TRUE(response.GetValidationError().find("data_batch.datatype_info.datatype") != std::string::npos);
 }
 
 TEST(EncryptJsonResponseToJson) {
@@ -650,8 +665,10 @@ static void test_DatatypeLengthParsing() {
             "name": "email"
         },
         "data_batch": {
-            "datatype": "FIXED_LEN_BYTE_ARRAY",
-            "datatype_length": 16,
+            "datatype_info": {
+                "datatype": "FIXED_LEN_BYTE_ARRAY",
+                "length": 16
+            },
             "value": "SGVsbG8sIFdvcmxkIQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -706,8 +723,55 @@ static void test_DatatypeLengthSerialization() {
     
     std::string json_output = request.ToJsonString();
     auto json_obj = crow::json::load(json_output);
-    ASSERT_TRUE(json_obj["data_batch"].has("datatype_length"));
-    ASSERT_EQ(json_obj["data_batch"]["datatype_length"], 16);
+    ASSERT_TRUE(json_obj["data_batch"]["datatype_info"].has("length"));
+    ASSERT_EQ(json_obj["data_batch"]["datatype_info"]["length"], 16);
+}
+
+// Test invalid datatype_length values
+static void test_JsonRequestInvalidDatatypeLength() {
+    const std::string json_with_invalid_datatype_length = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype_info": {
+                "datatype": "FIXED_LEN_BYTE_ARRAY",
+                "length": "not_a_number"
+            },
+            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"}
+        },
+        "data_batch_encrypted": {"value_format": {"compression": "GZIP"}},
+        "encryption": {"key_id": "key123"},
+        "access": {"user_id": "user456"},
+        "debug": {"reference_id": "ref789"}
+    })";
+    
+    EncryptJsonRequest request;
+    request.Parse(json_with_invalid_datatype_length);
+    
+    ASSERT_FALSE(request.IsValid());
+    std::string error = request.GetValidationError();
+    ASSERT_TRUE(error.find("data_batch.datatype_info.length (invalid integer value)") != std::string::npos);
+}
+
+static void test_DecryptJsonResponseInvalidDatatypeLength() {
+    const std::string json_with_invalid_datatype_length = R"({
+        "access": {"user_id": "user123", "role": "admin", "access_control": "full"},
+        "debug": {"reference_id": "ref456"},
+        "data_batch": {
+            "datatype_info": {
+                "datatype": "FIXED_LEN_BYTE_ARRAY",
+                "length": "invalid_int"
+            },
+            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"},
+            "value": "decrypted_data"
+        }
+    })";
+    
+    DecryptJsonResponse response;
+    response.Parse(json_with_invalid_datatype_length);
+    
+    ASSERT_FALSE(response.IsValid());
+    std::string error = response.GetValidationError();
+    ASSERT_TRUE(error.find("data_batch.datatype_info.length (invalid integer value)") != std::string::npos);
 }
 
 // Main test runner
@@ -932,6 +996,22 @@ int main() {
         PrintTestResult("Datatype length serialization", true);
     } catch (...) {
         PrintTestResult("Datatype length serialization", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_JsonRequestInvalidDatatypeLength();
+        PrintTestResult("JsonRequest invalid datatype_length", true);
+    } catch (...) {
+        PrintTestResult("JsonRequest invalid datatype_length", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_DecryptJsonResponseInvalidDatatypeLength();
+        PrintTestResult("DecryptJsonResponse invalid datatype_length", true);
+    } catch (...) {
+        PrintTestResult("DecryptJsonResponse invalid datatype_length", false);
         all_tests_passed = false;
     }
     

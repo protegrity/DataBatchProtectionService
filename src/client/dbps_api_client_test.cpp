@@ -250,7 +250,9 @@ TEST(EncryptWithValidData) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -333,7 +335,9 @@ TEST(DecryptWithValidData) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -350,8 +354,10 @@ TEST(DecryptWithValidData) {
     
     std::string mock_response = R"({
         "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
-            "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -476,7 +482,9 @@ TEST(EncryptWithInvalidBase64Response) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -544,7 +552,9 @@ TEST(DecryptWithInvalidBase64Response) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -562,8 +572,10 @@ TEST(DecryptWithInvalidBase64Response) {
     // Response with valid JSON structure but invalid base64 value
     std::string mock_response = R"({
         "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "INVALID_BASE64_VALUE!!!",
-            "datatype": "BYTE_ARRAY",
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"
@@ -614,7 +626,9 @@ TEST(EncryptWithInvalidJsonResponse) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
@@ -675,7 +689,9 @@ TEST(DecryptWithInvalidJsonResponse) {
     std::string expected_request = R"({
         "column_reference": {"name": "email"},
         "data_batch": {
-            "datatype": "BYTE_ARRAY",
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
             "value_format": {
                 "compression": "UNCOMPRESSED",
                 "format": "PLAIN"

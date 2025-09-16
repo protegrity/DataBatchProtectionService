@@ -267,7 +267,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
         "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},"
         "\"debug\":{\"reference_id\":\"123\"},"
         "\"data_batch\":{"
-        "\"datatype\":\"BYTE_ARRAY\","
+        "\"datatype_info\":{\"datatype\":\"BYTE_ARRAY\"},"
         "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"PLAIN\"},"
         "\"value\":\"dGVzdF9kYXRh\""
         "}}", 

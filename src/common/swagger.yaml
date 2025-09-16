@@ -50,7 +50,8 @@ paths:
                   column_reference:
                     name: email
                   data_batch:
-                    datatype: BYTE_ARRAY
+                    datatype_info:
+                      datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
                       format: PLAIN
@@ -86,8 +87,9 @@ paths:
                   column_reference:
                     name: CustomerID
                   data_batch:
+                    datatype_info:
+                      datatype: INT32
                     value: "MzM0NCw1NTY2LDc3ODg="
-                    datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
                       format: UNDEFINED
@@ -225,7 +227,8 @@ paths:
                       compression: ZSTD
                     value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
                   data_batch:
-                    datatype: BYTE_ARRAY
+                    datatype_info:
+                      datatype: BYTE_ARRAY
                     value_format:
                       compression: UNCOMPRESSED
                       format: PLAIN
@@ -259,7 +262,8 @@ paths:
                       compression: ZSTD
                     value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
                   data_batch:
-                    datatype: INT32
+                    datatype_info:
+                      datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
                       format: UNDEFINED
@@ -296,7 +300,8 @@ paths:
                   summary: Decrypted back to base64 raw bytes (two lines of emails)
                   value:
                     data_batch:
-                      datatype: BYTE_ARRAY
+                      datatype_info:
+                        datatype: BYTE_ARRAY
                       value_format:
                         compression: UNCOMPRESSED
                         format: PLAIN
@@ -315,7 +320,8 @@ paths:
                     Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
                   value:
                     data_batch:
-                      datatype: INT32
+                      datatype_info:
+                        datatype: INT32
                       value_format:
                         compression: UNCOMPRESSED
                         format: UNDEFINED
@@ -526,12 +532,11 @@ components:
             An app calling the API may already have a reference_id from the calling stack
             and it can be used here, for example the session_id from a caller JWT.
 
-    data_batch_base:
+    datatype_info:
       type: object
-      description: Base shape for plain (unencrypted) data batch metadata.
+      description: Data type information for the values being encrypted or decrypted
       required:
         - datatype
-        - value_format
       properties:
         datatype:
           type: string
@@ -546,10 +551,20 @@ components:
             - BYTE_ARRAY
             - FIXED_LEN_BYTE_ARRAY
             - UNDEFINED
-        datatype_length:
+        length:
           type: integer
           description: Optional length specification for fixed-length data types (e.g., FIXED_LEN_BYTE_ARRAY)
           minimum: 0
+
+    data_batch_base:
+      type: object
+      description: Base shape for plain (unencrypted) data batch metadata.
+      required:
+        - datatype_info
+        - value_format
+      properties:
+        datatype_info:
+          $ref: '#/components/schemas/datatype_info'
         value_format:
           $ref: '#/components/schemas/value_format'
 
