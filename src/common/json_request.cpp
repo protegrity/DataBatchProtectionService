@@ -73,7 +73,7 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
         datatype_ = *parsed_value;
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "length"})) {
-        // Parse as integer since datatype_length is optional
+        // Parse as integer when the parsed_value is not empty
         if (auto int_value = SafeParseToInt(*parsed_value)) {
             datatype_length_ = *int_value;
         } else {
@@ -374,7 +374,7 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
         datatype_ = *parsed_value;
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "length"})) {
-        // Parse as integer since datatype_length is optional
+        // Parse as integer when the parsed_value is not empty
         if (auto int_value = SafeParseToInt(*parsed_value)) {
             datatype_length_ = *int_value;
         } else {
