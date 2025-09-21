@@ -38,7 +38,7 @@ static void test_INT32_ok() {
     append_le<int32_t>(buf, -2);
     append_le<int32_t>(buf, 123456789);
 
-    auto s = PrintPlainDecoded(buf, Type::INT32);
+    auto s = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 0);
     assert(contains(s, "[0] 1"));
     assert(contains(s, "[1] -2"));
     assert(contains(s, "[2] 123456789"));
@@ -48,7 +48,7 @@ static void test_INT64_ok() {
     std::vector<uint8_t> buf;
     append_le<int64_t>(buf, 42LL);
     append_le<int64_t>(buf, -99LL);
-    auto s = PrintPlainDecoded(buf, Type::INT64);
+    auto s = PrintPlainDecoded(buf, Type::INT64, std::nullopt, 0);
     assert(contains(s, "[0] 42"));
     assert(contains(s, "[1] -99"));
 }
@@ -57,7 +57,7 @@ static void test_FLOAT_ok() {
     std::vector<uint8_t> buf;
     append_le<float>(buf, 1.5f);
     append_le<float>(buf, -2.25f);
-    auto s = PrintPlainDecoded(buf, Type::FLOAT);
+    auto s = PrintPlainDecoded(buf, Type::FLOAT, std::nullopt, 0);
     assert(contains(s, "[0] 1.5"));
     assert(contains(s, "[1] -2.25"));
 }
@@ -66,7 +66,7 @@ static void test_DOUBLE_ok() {
     std::vector<uint8_t> buf;
     append_le<double>(buf, 3.14159);
     append_le<double>(buf, -0.5);
-    auto s = PrintPlainDecoded(buf, Type::DOUBLE);
+    auto s = PrintPlainDecoded(buf, Type::DOUBLE, std::nullopt, 0);
     assert(contains(s, "[0] 3.14159"));
     assert(contains(s, "[1] -0.5"));
 }
@@ -77,7 +77,7 @@ static void test_INT96_ok() {
     append_le<uint32_t>(buf, 11);
     append_le<uint32_t>(buf, 22);
     append_le<uint32_t>(buf, 33);
-    auto s = PrintPlainDecoded(buf, Type::INT96);
+    auto s = PrintPlainDecoded(buf, Type::INT96, std::nullopt, 0);
     assert(contains(s, "[0] [11, 22, 33]"));
 }
 
@@ -85,7 +85,7 @@ static void test_BYTE_ARRAY_ok() {
     std::vector<uint8_t> buf;
     append_len_prefixed(buf, "alpha");
     append_len_prefixed(buf, "βeta"); // UTF-8 is fine, treated as bytes
-    auto s = PrintPlainDecoded(buf, Type::BYTE_ARRAY);
+    auto s = PrintPlainDecoded(buf, Type::BYTE_ARRAY, std::nullopt, 0);
     assert(contains(s, "[0] \"alpha\""));
     assert(contains(s, "[1] \"βeta\""));
 }
@@ -93,7 +93,7 @@ static void test_BYTE_ARRAY_ok() {
 static void test_FIXED_LEN_BYTE_ARRAY_ok() {
     std::string msg = "hello world";
     std::vector<uint8_t> buf(msg.begin(), msg.end());
-    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 11); // length = 11
+    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 11, 0); // length = 11
     assert(contains(s, "\"hello world\""));
 }
 
@@ -107,7 +107,7 @@ static void test_FIXED_LEN_BYTE_ARRAY_multiple_elements() {
     buf.insert(buf.end(), elem2.begin(), elem2.end());
     buf.insert(buf.end(), elem3.begin(), elem3.end());
     
-    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 3); // length = 3
+    auto s = PrintPlainDecoded(buf, Type::FIXED_LEN_BYTE_ARRAY, 3, 0); // length = 3
     assert(contains(s, "[0] \"abc\""));
     assert(contains(s, "[1] \"def\""));
     assert(contains(s, "[2] \"ghi\""));
@@ -115,14 +115,47 @@ static void test_FIXED_LEN_BYTE_ARRAY_multiple_elements() {
 
 static void test_decode_error_misaligned() {
     std::vector<uint8_t> buf = {0x01, 0x02, 0x03}; // 3 bytes, not multiple of 4
-    auto s = PrintPlainDecoded(buf, Type::INT32);
+    auto s = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 0);
     assert(s == std::string("Unknown encoding"));
 }
 
 static void test_unsupported_type() {
     std::vector<uint8_t> buf; // empty is fine; we just want the type check
-    auto s = PrintPlainDecoded(buf, Type::BOOLEAN);
+    auto s = PrintPlainDecoded(buf, Type::BOOLEAN, std::nullopt, 0);
     assert(s == std::string("Unsupported type"));
+}
+
+static void test_leading_bytes_to_strip_error_cases() {
+    std::vector<uint8_t> buf;
+    append_le<int32_t>(buf, 1);
+    append_le<int32_t>(buf, 2);
+    append_le<int32_t>(buf, 3);
+    
+    // Test negative value
+    auto s1 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, -1);
+    assert(s1 == std::string("Invalid leading_bytes_to_strip: must be >= 0"));
+    
+    // Test value larger than data size
+    auto s2 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 20);
+    assert(s2 == std::string("Invalid leading_bytes_to_strip: must be < data size"));
+    
+    // Test value equal to data size (should also fail)
+    auto s3 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 12);
+    assert(s3 == std::string("Invalid leading_bytes_to_strip: must be < data size"));
+}
+
+static void test_leading_bytes_to_strip_valid_case() {
+    std::vector<uint8_t> buf;
+    // Add some prefix bytes (5 bytes of level bytes)
+    buf.insert(buf.end(), {0x01, 0x02, 0x03, 0x04, 0x05});
+    append_le<int32_t>(buf, 100);
+    append_le<int32_t>(buf, 200);
+    append_le<int32_t>(buf, 300);
+    
+    auto s = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 5);
+    assert(contains(s, "[0] 100"));
+    assert(contains(s, "[1] 200"));
+    assert(contains(s, "[2] 300"));
 }
 
 // ----------------- main -----------------
@@ -137,6 +170,8 @@ int main() {
     test_FIXED_LEN_BYTE_ARRAY_multiple_elements();
     test_decode_error_misaligned();
     test_unsupported_type();
+    test_leading_bytes_to_strip_error_cases();
+    test_leading_bytes_to_strip_valid_case();
 
     std::cout << "All tests passed.\n";
     return 0;

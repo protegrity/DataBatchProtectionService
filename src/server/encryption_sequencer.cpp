@@ -59,8 +59,11 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
                   << decoded_data.size() << " bytes" << std::endl;
     }    
     if (is_uncompressed && is_plain) {
+        // TODO: Pass calculation of level bytes count when passed on the Sequencer constructor.
+        int leading_bytes_to_strip = 0;
+
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_, datatype_length_);
+        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_, datatype_length_, leading_bytes_to_strip);
         if (debug_decoded.length() > 1000) {
             std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
