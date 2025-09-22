@@ -133,15 +133,15 @@ static void test_leading_bytes_to_strip_error_cases() {
     
     // Test negative value
     auto s1 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, -1);
-    assert(s1 == std::string("Invalid leading_bytes_to_strip: must be >= 0"));
+    assert(s1 == std::string("Number of leading bytes to strip must be >= 0"));
     
     // Test value larger than data size
     auto s2 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 20);
-    assert(s2 == std::string("Invalid leading_bytes_to_strip: must be < data size"));
+    assert(s2 == std::string("Number of leading bytes to strip must be < data size"));
     
     // Test value equal to data size (should also fail)
     auto s3 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 12);
-    assert(s3 == std::string("Invalid leading_bytes_to_strip: must be < data size"));
+    assert(s3 == std::string("Number of leading bytes to strip must be < data size"));
 }
 
 static void test_leading_bytes_to_strip_valid_case() {
