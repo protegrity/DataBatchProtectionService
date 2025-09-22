@@ -163,7 +163,8 @@ public:
                 std::vector<uint8_t> plaintext(original_data.begin(), original_data.end());
                 
                 // First encrypt
-                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext));
+                std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
                     std::cout << "  ERROR: Cannot demo decryption - encryption failed" << std::endl;
@@ -189,7 +190,7 @@ public:
                 std::cout << std::endl;
                 
                 // Then decrypt
-                auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+                auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
                 
                 if (!decrypt_result || !decrypt_result->success()) {
                     std::cout << "  ERROR: Decryption failed" << std::endl;
@@ -251,7 +252,8 @@ public:
                 std::vector<uint8_t> plaintext(test_data.begin(), test_data.end());
                 
                 // Encrypt
-                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext));
+                std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
                     std::cout << "  ERROR: Encryption failed" << std::endl;
@@ -259,7 +261,7 @@ public:
                 }
                 
                 // Decrypt
-                auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+                auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
                 
                 if (!decrypt_result || !decrypt_result->success()) {
                     std::cout << "  ERROR: Decryption failed" << std::endl;
@@ -323,7 +325,8 @@ public:
             std::cout << "Binary size: " << float_binary_data.size() << " bytes" << std::endl;
             
             // Encrypt the float data
-            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(float_binary_data));
+            std::map<std::string, std::string> float_encoding_attributes = {{"format", "PLAIN"}};
+            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(float_binary_data), float_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: Float encryption failed" << std::endl;
@@ -336,7 +339,7 @@ public:
             std::cout << "OK: Float data encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
             
             // Decrypt the float data
-            auto decrypt_result = float_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+            auto decrypt_result = float_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {
                 std::cout << "ERROR: Float decryption failed" << std::endl;
@@ -421,7 +424,8 @@ public:
             std::cout << "Total size: " << fixed_length_data.size() << " bytes" << std::endl;
             
             // Test encryption with FIXED_LEN_BYTE_ARRAY and datatype_length
-            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data));
+            std::map<std::string, std::string> fixed_len_encoding_attributes = {{"format", "PLAIN"}};
+            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data), fixed_len_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY encryption failed" << std::endl;
@@ -434,7 +438,7 @@ public:
             std::cout << "OK: FIXED_LEN_BYTE_ARRAY encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
             
             // Test decryption
-            auto decrypt_result = fixed_len_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()));
+            auto decrypt_result = fixed_len_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), fixed_len_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY decryption failed" << std::endl;
@@ -473,7 +477,8 @@ public:
         std::cout << "\nTesting empty data handling:" << std::endl;
         try {
             std::vector<uint8_t> empty_data;
-            auto result = agent_->Encrypt(span<const uint8_t>(empty_data));
+            std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+            auto result = agent_->Encrypt(span<const uint8_t>(empty_data), encoding_attributes);
             
             if (result && result->success()) {
                 std::cout << "  OK: Empty data handled successfully" << std::endl;
@@ -491,7 +496,8 @@ public:
         try {
             std::string large_data(10000, 'X');  // 10KB of data
             std::vector<uint8_t> plaintext(large_data.begin(), large_data.end());
-            auto result = agent_->Encrypt(span<const uint8_t>(plaintext));
+            std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+            auto result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
             
             if (result && result->success()) {
                 std::cout << "  OK: Large data (" << plaintext.size() << " bytes) encrypted successfully" << std::endl;

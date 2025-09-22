@@ -94,10 +94,12 @@ public:
         CompressionCodec::type compression_type) override;
     
     std::unique_ptr<EncryptionResult> Encrypt(
-        span<const uint8_t> plaintext) override;
+        span<const uint8_t> plaintext,
+        std::map<std::string, std::string> encoding_attributes) override;
     
     std::unique_ptr<DecryptionResult> Decrypt(
-        span<const uint8_t> ciphertext) override;
+        span<const uint8_t> ciphertext,
+        std::map<std::string, std::string> encoding_attributes) override;
     
     ~RemoteDataBatchProtectionAgent() override = default;
 

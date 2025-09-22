@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <map>
 
 // Simple test framework
 #define TEST(name) void test_##name()
@@ -59,7 +60,8 @@ public:
 
 class MockAgent : public DataBatchProtectionAgentInterface {
 public:
-    std::unique_ptr<EncryptionResult> Encrypt(span<const uint8_t> plaintext) override {
+    std::unique_ptr<EncryptionResult> Encrypt(span<const uint8_t> plaintext, std::map<std::string, std::string> encoding_attributes) override {
+        // Simple mock implementation ignores encoding_attributes for now
         std::vector<uint8_t> encrypted(plaintext.size());
         for (std::size_t i = 0; i < plaintext.size(); ++i) {
             encrypted[i] = plaintext[i] + 1; // Simple mock: add 1
@@ -67,7 +69,8 @@ public:
         return std::make_unique<MockEncryptionResult>(std::move(encrypted));
     }
 
-    std::unique_ptr<DecryptionResult> Decrypt(span<const uint8_t> ciphertext) override {
+    std::unique_ptr<DecryptionResult> Decrypt(span<const uint8_t> ciphertext, std::map<std::string, std::string> encoding_attributes) override {
+        // Simple mock implementation ignores encoding_attributes for now
         std::vector<uint8_t> decrypted(ciphertext.size());
         for (std::size_t i = 0; i < ciphertext.size(); ++i) {
             decrypted[i] = ciphertext[i] - 1; // Simple mock: subtract 1
@@ -99,10 +102,11 @@ TEST(AgentEncryptDecrypt) {
     MockAgent agent;
     std::vector<uint8_t> original = {10, 20, 30};
     
-    auto encrypted = agent.Encrypt(span<const uint8_t>(original.data(), original.size()));
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto encrypted = agent.Encrypt(span<const uint8_t>(original.data(), original.size()), encoding_attributes);
     ASSERT_TRUE(encrypted->success());
     
-    auto decrypted = agent.Decrypt(encrypted->ciphertext());
+    auto decrypted = agent.Decrypt(encrypted->ciphertext(), encoding_attributes);
     ASSERT_TRUE(decrypted->success());
     
     ASSERT_EQ(original.size(), decrypted->size());

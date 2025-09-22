@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>
+#include <map>
 
 using namespace dbps::external;
 
@@ -119,7 +120,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptWithoutInit) {
     
     // Don't call init() - leave agent uninitialized
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Decrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_FALSE(result->success());
@@ -147,7 +149,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, MissingServerUrl) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Encrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_FALSE(result->success());
@@ -177,7 +180,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Encrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_FALSE(result->success());
@@ -209,7 +213,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, HealthCheckFailure) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Encrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_FALSE(result->success());
@@ -244,7 +249,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulEncryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Encrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_TRUE(result->success());
@@ -284,7 +290,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Decrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_TRUE(result->success());
