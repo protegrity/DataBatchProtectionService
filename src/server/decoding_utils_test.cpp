@@ -125,6 +125,39 @@ static void test_unsupported_type() {
     assert(s == std::string("Unsupported type"));
 }
 
+static void test_leading_bytes_to_strip_error_cases() {
+    std::vector<uint8_t> buf;
+    append_le<int32_t>(buf, 1);
+    append_le<int32_t>(buf, 2);
+    append_le<int32_t>(buf, 3);
+    
+    // Test negative value
+    auto s1 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, -1);
+    assert(s1 == std::string("Number of leading bytes to strip must be >= 0"));
+    
+    // Test value larger than data size
+    auto s2 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 20);
+    assert(s2 == std::string("Number of leading bytes to strip must be < data size"));
+    
+    // Test value equal to data size (should also fail)
+    auto s3 = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 12);
+    assert(s3 == std::string("Number of leading bytes to strip must be < data size"));
+}
+
+static void test_leading_bytes_to_strip_valid_case() {
+    std::vector<uint8_t> buf;
+    // Add some prefix bytes (5 bytes of level bytes)
+    buf.insert(buf.end(), {0x01, 0x02, 0x03, 0x04, 0x05});
+    append_le<int32_t>(buf, 100);
+    append_le<int32_t>(buf, 200);
+    append_le<int32_t>(buf, 300);
+    
+    auto s = PrintPlainDecoded(buf, Type::INT32, std::nullopt, 5);
+    assert(contains(s, "[0] 100"));
+    assert(contains(s, "[1] 200"));
+    assert(contains(s, "[2] 300"));
+}
+
 // ----------------- main -----------------
 int main() {
     test_INT32_ok();
@@ -137,6 +170,8 @@ int main() {
     test_FIXED_LEN_BYTE_ARRAY_multiple_elements();
     test_decode_error_misaligned();
     test_unsupported_type();
+    test_leading_bytes_to_strip_error_cases();
+    test_leading_bytes_to_strip_valid_case();
 
     std::cout << "All tests passed.\n";
     return 0;
