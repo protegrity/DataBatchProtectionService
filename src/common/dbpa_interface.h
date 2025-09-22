@@ -95,11 +95,23 @@ public:
         compression_type_ = compression_type;
     }
 
+    /*
+    * Encrypts the provided plaintext data using the configured encryption parameters.
+    * 
+    * @param plaintext Binary data to be encrypted, provided as a span of bytes
+    * @param encoding_attributes A map of string key-values. The plaintext is encoded with a type defined in enums.h Format::type.
+    *   Each encoding type requires additional attributes to be properly decoded. These attributes are specified in the map so an 
+    *   implementation can properly interpret and process the input text.
+    * 
+    * @return A unique pointer to an EncryptionResult containing the encrypted data and operation status
+    */
     virtual std::unique_ptr<EncryptionResult> Encrypt(
-        span<const uint8_t> plaintext) = 0;
+        span<const uint8_t> plaintext,
+        std::map<std::string, std::string> encoding_attributes) = 0;
 
     virtual std::unique_ptr<DecryptionResult> Decrypt(
-        span<const uint8_t> ciphertext) = 0;
+        span<const uint8_t> ciphertext,
+        std::map<std::string, std::string> encoding_attributes) = 0;
 
     virtual ~DataBatchProtectionAgentInterface() = default;
 

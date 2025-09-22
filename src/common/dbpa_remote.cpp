@@ -180,7 +180,7 @@ void RemoteDataBatchProtectionAgent::init(
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Initialization completed successfully" << std::endl;
 }
 
-std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<const uint8_t> plaintext) {
+std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<const uint8_t> plaintext,std::map<std::string, std::string> encoding_attributes) {
     if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<EncryptApiResponse>();
@@ -196,6 +196,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     }
     
     // Make the encryption call to the server
+    // TODO: Update API client to accept encoding_attributes parameter
     auto response = api_client_->Encrypt(
         plaintext,
         column_name_,
@@ -212,7 +213,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     return std::make_unique<RemoteEncryptionResult>(std::make_unique<EncryptApiResponse>(std::move(response)));
 }
 
-std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<const uint8_t> ciphertext) {
+std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<const uint8_t> ciphertext, std::map<std::string, std::string> encoding_attributes) {
     if (!initialized_.has_value()) {
         // Return a result indicating initialization failure
         auto empty_response = std::make_unique<DecryptApiResponse>();
@@ -228,6 +229,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     }
     
     // Make the decryption call to the server
+    // TODO: Update API client to accept encoding_attributes parameter
     auto response = api_client_->Decrypt(
         ciphertext,
         column_name_,
