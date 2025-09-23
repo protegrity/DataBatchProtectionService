@@ -196,7 +196,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     }
     
     // Make the encryption call to the server
-    // TODO: Update API client to accept encoding_attributes parameter
+    // TODO: Update API client to accept encoding_attributes parameter and validate that it contains mandatory fields.
     auto response = api_client_->Encrypt(
         plaintext,
         column_name_,
@@ -229,7 +229,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     }
     
     // Make the decryption call to the server
-    // TODO: Update API client to accept encoding_attributes parameter
+    // TODO: Update API client to accept encoding_attributes parameter and validate that it contains mandatory fields.
     auto response = api_client_->Decrypt(
         ciphertext,
         column_name_,
