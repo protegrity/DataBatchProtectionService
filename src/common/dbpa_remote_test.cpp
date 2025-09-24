@@ -306,6 +306,108 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
     EXPECT_EQ(plaintext_str, "test_data");
 }
 
+// Test decryption field validation mismatches
+TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
+    struct TestCase {
+        std::string response_json;
+        std::string expected_error_field;
+        std::string expected_request_value;
+        std::string expected_response_value;
+    };
+    
+    std::vector<TestCase> test_cases = {
+        // Datatype mismatch
+        {
+            "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},"
+            "\"debug\":{\"reference_id\":\"123\"},"
+            "\"data_batch\":{"
+            "\"datatype_info\":{\"datatype\":\"STRING\"},"
+            "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"PLAIN\"},"
+            "\"value\":\"dGVzdF9kYXRh\""
+            "}}",
+            "datatype mismatch",
+            "BYTE_ARRAY",
+            "STRING"
+        },
+        // Compression mismatch
+        {
+            "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},"
+            "\"debug\":{\"reference_id\":\"123\"},"
+            "\"data_batch\":{"
+            "\"datatype_info\":{\"datatype\":\"BYTE_ARRAY\"},"
+            "\"value_format\":{\"compression\":\"GZIP\",\"format\":\"PLAIN\"},"
+            "\"value\":\"dGVzdF9kYXRh\""
+            "}}",
+            "compression mismatch",
+            "UNCOMPRESSED",
+            "GZIP"
+        }
+    };
+    
+    for (const auto& test_case : test_cases) {
+        auto mock_client = std::make_unique<MockHttpClient>();
+        mock_client->health_response = {200, "OK", ""};
+        mock_client->decrypt_response = MockHttpClient::MockResponse(200, test_case.response_json, "");
+        
+        auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client));
+        
+        std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+        std::string app_context = "{\"user_id\": \"test_user\"}";
+        
+        // init() should not throw an exception for valid configuration
+        EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+                                   Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+        
+        std::vector<uint8_t> test_data = {1, 2, 3, 4};
+        auto result = agent.Decrypt(test_data);
+        
+        ASSERT_NE(result, nullptr);
+        EXPECT_FALSE(result->success());
+        
+        // Check that the error message contains expected content
+        std::string error_msg = result->error_message();
+        EXPECT_TRUE(error_msg.find(test_case.expected_error_field) != std::string::npos);
+        EXPECT_TRUE(error_msg.find(test_case.expected_request_value) != std::string::npos);
+        EXPECT_TRUE(error_msg.find(test_case.expected_response_value) != std::string::npos);
+    }
+}
+
+// Test encryption field validation mismatch
+TEST_F(RemoteDataBatchProtectionAgentTest, EncryptionFieldMismatch) {
+    mock_client_->health_response = {200, "OK", ""};
+    mock_client_->encrypt_response = MockHttpClient::MockResponse(
+        200, 
+        "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},"
+        "\"debug\":{\"reference_id\":\"123\"},"
+        "\"data_batch_encrypted\":{"
+        "\"value_format\":{\"compression\":\"GZIP\"},"
+        "\"value\":\"dGVzdF9kYXRh\""
+        "}}", 
+        ""
+    );
+    
+    auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
+    
+    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    std::string app_context = "{\"user_id\": \"test_user\"}";
+    
+    // init() should not throw an exception for valid configuration
+    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+    
+    std::vector<uint8_t> test_data = {1, 2, 3, 4};
+    auto result = agent.Encrypt(test_data);
+    
+    ASSERT_NE(result, nullptr);
+    EXPECT_FALSE(result->success());
+    
+    // Check that the error message contains expected content
+    std::string error_msg = result->error_message();
+    EXPECT_TRUE(error_msg.find("encrypted_compression mismatch") != std::string::npos);
+    EXPECT_TRUE(error_msg.find("UNCOMPRESSED") != std::string::npos);
+    EXPECT_TRUE(error_msg.find("GZIP") != std::string::npos);
+}
+
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

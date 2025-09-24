@@ -1,10 +1,12 @@
 #include "dbpa_remote.h"
 #include "../client/dbps_api_client.h"
 #include "../client/httplib_client.h"
+#include "enum_utils.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
 using namespace dbps::external;
+using namespace dbps::enum_utils;
 
 RemoteEncryptionResult::RemoteEncryptionResult(std::unique_ptr<EncryptApiResponse> response)
     : response_(std::move(response)) {
@@ -88,6 +90,41 @@ const std::map<std::string, std::string>& RemoteDecryptionResult::error_fields()
         }
     }
     return cached_error_fields_;
+}
+
+// Helper functions for validating that fields of the request <> response match.
+static std::unique_ptr<DecryptApiResponse> ValidateDecryptFieldMatch(
+    const std::string& response_value,
+    const std::string& request_value,
+    const std::string& field_name) {
+    
+    if (response_value != request_value) {
+        std::string error_msg = "Decrypt response " + field_name + " mismatch: expected " + request_value + 
+                               ", got " + response_value;
+        std::cerr << "ERROR: Decrypt response " << field_name << " mismatch - request: " << request_value 
+                  << ", response: " << response_value << std::endl;
+        auto error_response = std::make_unique<DecryptApiResponse>();
+        error_response->SetApiClientError(error_msg);
+        return error_response;
+    }
+    return nullptr;
+}
+
+static std::unique_ptr<EncryptApiResponse> ValidateEncryptFieldMatch(
+    const std::string& response_value,
+    const std::string& request_value,
+    const std::string& field_name) {
+    
+    if (response_value != request_value) {
+        std::string error_msg = "Encrypt response " + field_name + " mismatch: expected " + request_value + 
+                               ", got " + response_value;
+        std::cerr << "ERROR: Encrypt response " << field_name << " mismatch - request: " << request_value 
+                  << ", response: " << response_value << std::endl;
+        auto error_response = std::make_unique<EncryptApiResponse>();
+        error_response->SetApiClientError(error_msg);
+        return error_response;
+    }
+    return nullptr;
 }
 
 RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientInterface> http_client)
@@ -208,6 +245,19 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         column_key_id_,
         user_id_
     );
+
+    // Validate that response fields match request fields
+    if (response.Success()) {
+        const auto& response_attrs = response.GetResponseAttributes();
+        
+        // Validate encrypted compression matches request compression
+        auto compression_error = ValidateEncryptFieldMatch(response_attrs.encrypted_compression_, 
+                                                         std::string(to_string(compression_type_)), 
+                                                         "encrypted_compression");
+        if (compression_error) {
+            return std::make_unique<RemoteEncryptionResult>(std::move(compression_error));
+        }
+    }
     
     // Wrap the API response in our result class
     return std::make_unique<RemoteEncryptionResult>(std::make_unique<EncryptApiResponse>(std::move(response)));
@@ -241,6 +291,24 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         column_key_id_,
         user_id_
     );
+
+    // Validate that response fields match request fields
+    // TODO: Add validation for format when these are expanded beyond PLAIN.
+    if (response.Success()) {
+        const auto& response_attrs = response.GetResponseAttributes();
+        
+        // Validate datatype
+        auto datatype_error = ValidateDecryptFieldMatch(response_attrs.datatype_, std::string(to_string(datatype_)), "datatype");
+        if (datatype_error) {
+            return std::make_unique<RemoteDecryptionResult>(std::move(datatype_error));
+        }
+        
+        // Validate compression
+        auto compression_error = ValidateDecryptFieldMatch(response_attrs.compression_, std::string(to_string(compression_type_)), "compression");
+        if (compression_error) {
+            return std::make_unique<RemoteDecryptionResult>(std::move(compression_error));
+        }
+    }
 
     // Wrap the API response in our result class
     return std::make_unique<RemoteDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
