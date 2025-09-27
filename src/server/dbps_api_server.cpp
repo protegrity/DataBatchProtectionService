@@ -49,6 +49,9 @@ int main() {
         response.access_control_ = "granted";
         response.reference_id_ = request.reference_id_;
         response.encrypted_compression_ = request.encrypted_compression_;
+        
+        // TODO: Use encoding_attributes in encryption sequencer
+        const auto& encoding_attributes = request.encoding_attributes_;
 
         // Use DataBatchEncryptionSequencer for actual encryption
         DataBatchEncryptionSequencer sequencer(
@@ -85,6 +88,9 @@ int main() {
             }
             return CreateErrorResponse(error_msg);
         }
+
+        // TODO: Use encoding_attributes in decryption sequencer
+        const auto& encoding_attributes = request.encoding_attributes_;
 
         // Create response using our JsonResponse class
         DecryptJsonResponse response;

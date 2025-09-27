@@ -163,7 +163,7 @@ public:
                 std::vector<uint8_t> plaintext(original_data.begin(), original_data.end());
                 
                 // First encrypt
-                std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+                std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
                 auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
@@ -252,7 +252,7 @@ public:
                 std::vector<uint8_t> plaintext(test_data.begin(), test_data.end());
                 
                 // Encrypt
-                std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+                std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
                 auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
@@ -325,7 +325,7 @@ public:
             std::cout << "Binary size: " << float_binary_data.size() << " bytes" << std::endl;
             
             // Encrypt the float data
-            std::map<std::string, std::string> float_encoding_attributes = {{"format", "PLAIN"}};
+            std::map<std::string, std::string> float_encoding_attributes = {{"page_encoding", "PLAIN"}};
             auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(float_binary_data), float_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
@@ -424,7 +424,7 @@ public:
             std::cout << "Total size: " << fixed_length_data.size() << " bytes" << std::endl;
             
             // Test encryption with FIXED_LEN_BYTE_ARRAY and datatype_length
-            std::map<std::string, std::string> fixed_len_encoding_attributes = {{"format", "PLAIN"}};
+            std::map<std::string, std::string> fixed_len_encoding_attributes = {{"page_encoding", "PLAIN"}};
             auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data), fixed_len_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
@@ -477,7 +477,7 @@ public:
         std::cout << "\nTesting empty data handling:" << std::endl;
         try {
             std::vector<uint8_t> empty_data;
-            std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
             auto result = agent_->Encrypt(span<const uint8_t>(empty_data), encoding_attributes);
             
             if (result && result->success()) {
@@ -496,7 +496,7 @@ public:
         try {
             std::string large_data(10000, 'X');  // 10KB of data
             std::vector<uint8_t> plaintext(large_data.begin(), large_data.end());
-            std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
             auto result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
             
             if (result && result->success()) {

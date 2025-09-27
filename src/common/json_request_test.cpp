@@ -414,6 +414,106 @@ TEST(EncryptJsonRequestToJson) {
     ASSERT_TRUE(json_string.find("user456") != std::string::npos);
 }
 
+TEST(EncryptJsonRequestWithEncodingAttributes) {
+    const std::string json_with_encoding_attrs = R"({
+        "column_reference": {
+            "name": "email"
+        },
+        "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "PLAIN",
+                "encoding_attributes": {
+                    "page_type": "DATA_PAGE",
+                    "page_encoding": "PLAIN",
+                    "data_page_num_values": "1"
+                }
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {
+                "compression": "GZIP"
+            }
+        },
+        "encryption": {
+            "key_id": "key123"
+        },
+        "access": {
+            "user_id": "user456"
+        },
+        "debug": {
+            "reference_id": "ref789"
+        }
+    })";
+    
+    EncryptJsonRequest request;
+    request.Parse(json_with_encoding_attrs);
+    
+    // Verify common fields are parsed correctly
+    ASSERT_EQ("email", request.column_name_);
+    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
+    ASSERT_EQ("UNCOMPRESSED", request.compression_);
+    ASSERT_EQ("PLAIN", request.format_);
+    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ("key123", request.key_id_);
+    ASSERT_EQ("user456", request.user_id_);
+    ASSERT_EQ("ref789", request.reference_id_);
+    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_);
+    
+    // Verify encoding_attributes are parsed correctly
+    ASSERT_EQ(3, request.encoding_attributes_.size());
+    ASSERT_EQ("DATA_PAGE", request.encoding_attributes_["page_type"]);
+    ASSERT_EQ("PLAIN", request.encoding_attributes_["page_encoding"]);
+    ASSERT_EQ("1", request.encoding_attributes_["data_page_num_values"]);
+    
+    ASSERT_TRUE(request.IsValid());
+}
+
+TEST(EncryptJsonRequestToJsonWithEncodingAttributes) {
+    EncryptJsonRequest request;
+    
+    // Set up request with encoding_attributes
+    request.column_name_ = "email";
+    request.datatype_ = "BYTE_ARRAY";
+    request.compression_ = "UNCOMPRESSED";
+    request.format_ = "PLAIN";
+    request.encrypted_compression_ = "GZIP";
+    request.key_id_ = "key123";
+    request.user_id_ = "user456";
+    request.reference_id_ = "ref789";
+    request.value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
+    
+    // Add encoding_attributes
+    request.encoding_attributes_["page_type"] = "DATA_PAGE";
+    request.encoding_attributes_["page_encoding"] = "PLAIN";
+    request.encoding_attributes_["data_page_num_values"] = "1";
+    
+    ASSERT_TRUE(request.IsValid());
+    
+    // Generate JSON from the parsed object
+    std::string json_string = request.ToJson();
+    
+    // Verify the generated JSON contains expected fields
+    ASSERT_TRUE(json_string.find("email") != std::string::npos);
+    ASSERT_TRUE(json_string.find("dGVzdEBleGFtcGxlLmNvbQ==") != std::string::npos);
+    ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
+    ASSERT_TRUE(json_string.find("key123") != std::string::npos);
+    ASSERT_TRUE(json_string.find("user456") != std::string::npos);
+    
+    // Verify encoding_attributes are serialized correctly
+    ASSERT_TRUE(json_string.find("encoding_attributes") != std::string::npos);
+    ASSERT_TRUE(json_string.find("page_type") != std::string::npos);
+    ASSERT_TRUE(json_string.find("DATA_PAGE") != std::string::npos);
+    ASSERT_TRUE(json_string.find("page_encoding") != std::string::npos);
+    ASSERT_TRUE(json_string.find("PLAIN") != std::string::npos);
+    ASSERT_TRUE(json_string.find("data_page_num_values") != std::string::npos);
+    ASSERT_TRUE(json_string.find("\"1\"") != std::string::npos);
+}
+
 TEST(DecryptJsonRequestToJson) {
     DecryptJsonRequest request;
     request.Parse(VALID_DECRYPT_JSON);
@@ -867,6 +967,22 @@ int main() {
         PrintTestResult("EncryptJsonRequest ToJson", true);
     } catch (...) {
         PrintTestResult("EncryptJsonRequest ToJson", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptJsonRequestWithEncodingAttributes();
+        PrintTestResult("EncryptJsonRequest with encoding attributes", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonRequest with encoding attributes", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptJsonRequestToJsonWithEncodingAttributes();
+        PrintTestResult("EncryptJsonRequest ToJson with encoding attributes", true);
+    } catch (...) {
+        PrintTestResult("EncryptJsonRequest ToJson with encoding attributes", false);
         all_tests_passed = false;
     }
     

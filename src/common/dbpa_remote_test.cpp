@@ -120,7 +120,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptWithoutInit) {
     
     // Don't call init() - leave agent uninitialized
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -149,7 +149,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, MissingServerUrl) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -180,7 +180,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -213,7 +213,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, HealthCheckFailure) {
     
     // Test that Encrypt() returns a failed result with the initialization error
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -249,7 +249,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulEncryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -290,7 +290,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -359,7 +359,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
                                    Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
         
         std::vector<uint8_t> test_data = {1, 2, 3, 4};
-        auto result = agent.Decrypt(test_data);
+        std::map<std::string, std::string> encoding_attributes = {
+            {"page_type", "DATA_PAGE"},
+            {"page_encoding", "PLAIN"},
+            {"data_page_num_values", "4"}
+        };
+        auto result = agent.Decrypt(test_data, encoding_attributes);
         
         ASSERT_NE(result, nullptr);
         EXPECT_FALSE(result->success());
@@ -396,7 +401,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, EncryptionFieldMismatch) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    auto result = agent.Encrypt(test_data);
+    std::map<std::string, std::string> encoding_attributes = {
+        {"page_type", "DATA_PAGE"},
+        {"page_encoding", "PLAIN"},
+        {"data_page_num_values", "4"}
+    };
+    auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
     EXPECT_FALSE(result->success());

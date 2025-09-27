@@ -99,6 +99,19 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"debug", "reference_id"})) {
         reference_id_ = *parsed_value;
     }
+    
+    // Extract encoding_attributes
+    if (json_body.has("data_batch") && json_body["data_batch"].has("value_format") && 
+        json_body["data_batch"]["value_format"].has("encoding_attributes")) {
+        auto attrs_json = json_body["data_batch"]["value_format"]["encoding_attributes"];
+        if (attrs_json && attrs_json.t() == crow::json::type::Object) {
+            encoding_attributes_.clear();
+            auto keys = attrs_json.keys();
+            for (const auto& key : keys) {
+                encoding_attributes_[key] = std::string(attrs_json[key]);
+            }
+        }
+    }
 }
 
 bool JsonRequest::IsValid() const {
@@ -206,6 +219,16 @@ std::string EncryptJsonRequest::ToJsonString() const {
     crow::json::wvalue value_format;
     value_format["compression"] = compression_;
     value_format["format"] = format_;
+    
+    // Add encoding_attributes if not empty
+    if (!encoding_attributes_.empty()) {
+        crow::json::wvalue encoding_attrs;
+        for (const auto& pair : encoding_attributes_) {
+            encoding_attrs[pair.first] = pair.second;
+        }
+        value_format["encoding_attributes"] = std::move(encoding_attrs);
+    }
+    
     data_batch["value_format"] = std::move(value_format);
     
     json["data_batch"] = std::move(data_batch);
