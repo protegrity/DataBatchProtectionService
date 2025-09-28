@@ -104,8 +104,8 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (json_body.has("data_batch") && json_body["data_batch"].has("value_format") && 
         json_body["data_batch"]["value_format"].has("encoding_attributes")) {
         auto attrs_json = json_body["data_batch"]["value_format"]["encoding_attributes"];
+        // Check that attrs_json is not empty and is not an array or literal value
         if (attrs_json && attrs_json.t() == crow::json::type::Object) {
-            encoding_attributes_.clear();
             auto keys = attrs_json.keys();
             for (const auto& key : keys) {
                 encoding_attributes_[key] = std::string(attrs_json[key]);

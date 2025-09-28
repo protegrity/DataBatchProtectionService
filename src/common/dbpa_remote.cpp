@@ -368,5 +368,6 @@ std::optional<Format::type> RemoteDataBatchProtectionAgent::ExtractPageEncoding(
         }
     }
     // Return nullopt if page_encoding not found
+    std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - page_encoding not found." << std::endl;
     return std::nullopt;
 }
