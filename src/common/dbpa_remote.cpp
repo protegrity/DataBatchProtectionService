@@ -232,15 +232,24 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
     }
     
+    // Extract page_encoding from encoding_attributes and convert to Format::type
+    auto format_opt = ExtractPageEncoding(encoding_attributes);
+    if (!format_opt.has_value()) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Encrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
+        auto empty_response = std::make_unique<EncryptApiResponse>();
+        empty_response->SetApiClientError("page_encoding not found or invalid in encoding_attributes");
+        return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
+    }
+    
     // Make the encryption call to the server
-    // TODO: Update API client to accept encoding_attributes parameter and validate that it contains mandatory fields.
     auto response = api_client_->Encrypt(
         plaintext,
         column_name_,
         datatype_,
         datatype_length_,
         compression_type_,
-        Format::PLAIN,  // Currently only PLAIN is supported
+        format_opt.value(),
+        encoding_attributes,
         compression_type_,
         column_key_id_,
         user_id_
@@ -278,15 +287,24 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
     }
     
+    // Extract page_encoding from encoding_attributes and convert to Format::type
+    auto format_opt = ExtractPageEncoding(encoding_attributes);
+    if (!format_opt.has_value()) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Decrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
+        auto empty_response = std::make_unique<DecryptApiResponse>();
+        empty_response->SetApiClientError("page_encoding not found or invalid in encoding_attributes");
+        return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
+    }
+    
     // Make the decryption call to the server
-    // TODO: Update API client to accept encoding_attributes parameter and validate that it contains mandatory fields.
     auto response = api_client_->Decrypt(
         ciphertext,
         column_name_,
         datatype_,
         datatype_length_,
         compression_type_,
-        Format::PLAIN,  // Currently only PLAIN is supported
+        format_opt.value(),
+        encoding_attributes,
         compression_type_,
         column_key_id_,
         user_id_
@@ -334,5 +352,22 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const s
     } catch (const nlohmann::json::exception& e) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - Failed to parse app_context JSON: " << e.what() << std::endl;
     }
+    return std::nullopt;
+}
+
+std::optional<Format::type> RemoteDataBatchProtectionAgent::ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const {
+    auto it = encoding_attributes.find("page_encoding");
+    if (it != encoding_attributes.end()) {
+        const std::string& encoding_str = it->second;
+        auto format_opt = to_format_enum(encoding_str);
+        if (format_opt.has_value()) {
+            return format_opt.value();
+        } else {
+            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - Unknown page_encoding: " << encoding_str << std::endl;
+            return std::nullopt;
+        }
+    }
+    // Return nullopt if page_encoding not found
+    std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - page_encoding not found." << std::endl;
     return std::nullopt;
 }

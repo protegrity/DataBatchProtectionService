@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <map>
 
 /**
  * Base class for parsing and validating JSON request fields.
@@ -17,6 +18,7 @@ public:
     std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
+    std::map<std::string, std::string> encoding_attributes_;
     std::string encrypted_compression_;
     std::string key_id_;
     std::string user_id_;

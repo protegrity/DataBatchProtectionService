@@ -302,6 +302,7 @@ TEST(EncryptWithValidData) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -391,6 +392,7 @@ TEST(DecryptWithValidData) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -436,6 +438,7 @@ TEST(EncryptWithInvalidData) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -465,6 +468,7 @@ TEST(DecryptWithInvalidData) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -535,6 +539,7 @@ TEST(EncryptWithInvalidBase64Response) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -609,6 +614,7 @@ TEST(DecryptWithInvalidBase64Response) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -672,6 +678,7 @@ TEST(EncryptWithInvalidJsonResponse) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -735,6 +742,7 @@ TEST(DecryptWithInvalidJsonResponse) {
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
         Format::PLAIN,         // format
+        std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456"             // user_id
@@ -742,6 +750,95 @@ TEST(DecryptWithInvalidJsonResponse) {
     
     // Verify the response indicates failure
     ASSERT_FALSE(response.Success());
+}
+
+TEST(EncryptWithEncodingAttributes) {
+    // Create mock HTTP client
+    auto mock_client = std::make_unique<MockHttpClient>();
+    
+    // Set up mock response for /encrypt endpoint with encoding_attributes
+    std::string expected_request = R"({
+        "column_reference": {"name": "email"},
+        "data_batch": {
+            "datatype_info": {
+                "datatype": "BYTE_ARRAY"
+            },
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
+            "value_format": {
+                "compression": "UNCOMPRESSED",
+                "format": "PLAIN",
+                "encoding_attributes": {
+                    "page_type": "DATA_PAGE",
+                    "page_encoding": "PLAIN",
+                    "data_page_num_values": "1"
+                }
+            }
+        },
+        "data_batch_encrypted": {
+            "value_format": {"compression": "UNCOMPRESSED"}
+        },
+        "encryption": {"key_id": "test_key_123"},
+        "access": {"user_id": "test_user_456"},
+        "debug": {"reference_id": "1755831549871"}
+    })";
+    
+    std::string mock_response = R"({
+        "data_batch_encrypted": {
+            "value": "ZW5jcnlwdGVkX3Rlc3RAZXhhbXBsZS5jb20=",
+            "value_format": {
+                "compression": "UNCOMPRESSED"
+            }
+        },
+        "access": {
+            "user_id": "test_user",
+            "role": "test_role",
+            "access_control": "test_access"
+        },
+        "debug": {
+            "reference_id": "test_ref"
+        }
+    })";
+    
+    mock_client->SetMockPostResponse("/encrypt", expected_request, 
+        HttpClientInterface::HttpResponse(200, mock_response));
+    
+    // Create DBPSApiClient with mock client
+    DBPSApiClient client(std::move(mock_client));
+    
+    // Create test data
+    std::string test_plaintext = "test@example.com";
+    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    
+    // Create encoding_attributes map
+    std::map<std::string, std::string> encoding_attributes;
+    encoding_attributes["page_type"] = "DATA_PAGE";
+    encoding_attributes["page_encoding"] = "PLAIN";
+    encoding_attributes["data_page_num_values"] = "1";
+    
+    // Call Encrypt() with encoding_attributes
+    auto response = client.Encrypt(
+        span<const uint8_t>(plaintext_data),
+        "email",                    // column_name
+        Type::BYTE_ARRAY,           // datatype
+        std::nullopt,               // datatype_length
+        CompressionCodec::UNCOMPRESSED, // compression
+        Format::PLAIN,         // format
+        encoding_attributes,        // encoding_attributes
+        CompressionCodec::UNCOMPRESSED, // encrypted_compression
+        "test_key_123",             // key_id
+        "test_user_456"             // user_id
+    );
+    
+    // Verify the response
+    ASSERT_TRUE(response.Success());
+    
+    // Get the encrypted data and verify it's not empty
+    auto ciphertext = response.GetResponseCiphertext();
+    ASSERT_TRUE(!ciphertext.empty());
+    
+    // Verify we can access the response attributes
+    auto& json_response = response.GetResponseAttributes();
+    ASSERT_TRUE(json_response.IsValid());
 }
 
 int main() {
@@ -870,6 +967,14 @@ int main() {
         PrintTestResult("Decrypt with invalid JSON response", true);
     } catch (...) {
         PrintTestResult("Decrypt with invalid JSON response", false);
+        all_tests_passed = false;
+    }
+    
+    try {
+        test_EncryptWithEncodingAttributes();
+        PrintTestResult("Encrypt with encoding attributes", true);
+    } catch (...) {
+        PrintTestResult("Encrypt with encoding attributes", false);
         all_tests_passed = false;
     }
     

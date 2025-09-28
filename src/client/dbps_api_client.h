@@ -148,6 +148,7 @@ public:
      * @param datatype The data type of the plaintext (e.g., BYTE_ARRAY, STRING, etc.)
      * @param compression Compression algorithm used to compress the plaintext before this call (format of the input)
      * @param format Data format specification (Parquet formats supported)
+     * @param encoding_attributes Map of string key-value pairs containing encoding-specific attributes
      * @param encrypted_compression Compression algorithm to be used to compress the encrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used (not the key itself)
      * @param user_id Identifier for the user requesting the encryption
@@ -163,6 +164,7 @@ public:
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
         Format::type format,
+        const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
         const std::string& user_id
@@ -176,6 +178,7 @@ public:
      * @param datatype The data type of the original plaintext (e.g., BYTE_ARRAY, STRING, etc.)
      * @param compression Compression algorithm used to compress the encrypted data before this call (format of the input)
      * @param format Data format specification (Parquet formats supported)
+     * @param encoding_attributes Map of string key-value pairs containing encoding-specific attributes
      * @param encrypted_compression Compression algorithm to be used to compress the decrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used for decryption (not the key itself)
      * @param user_id Identifier for the user requesting the decryption
@@ -191,6 +194,7 @@ public:
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
         Format::type format,
+        const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
         const std::string& user_id
