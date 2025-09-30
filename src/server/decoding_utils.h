@@ -199,10 +199,17 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         total_level_bytes = def_level_length + rep_level_length;
         
     } else if (page_type == "DATA_PAGE_V1") {
-        int32_t max_rep_level = std::get<int32_t>(encoding_attribs.at("data_page_max_repetition_level"));
-        int32_t max_def_level = std::get<int32_t>(encoding_attribs.at("data_page_max_definition_level"));
+        // Check that encoding types are RLE (instead of BIT_PACKED which is deprecated)
+        const std::string& rep_encoding = std::get<std::string>(encoding_attribs.at("page_v1_repetition_level_encoding"));
+        const std::string& def_encoding = std::get<std::string>(encoding_attribs.at("page_v1_definition_level_encoding"));
+        if (rep_encoding != "RLE" || def_encoding != "RLE") {
+            // TODO: Throw an exception
+            return -1;
+        }
 
         // if max_rep_level > 0, there are repetition levels bytes. Same for definition levels.
+        int32_t max_rep_level = std::get<int32_t>(encoding_attribs.at("data_page_max_repetition_level"));
+        int32_t max_def_level = std::get<int32_t>(encoding_attribs.at("data_page_max_definition_level"));
         size_t offset = 0;
         if (max_rep_level > 0) {
             total_level_bytes += SkipV1RLELevel(offset);

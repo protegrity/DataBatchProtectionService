@@ -62,7 +62,7 @@ public:
     bool ConvertAndEncrypt(const std::string& plaintext);
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
-private:
+protected:
     // Corresponding enum values for the string parameters
     Type::type datatype_enum_;
     CompressionCodec::type compression_enum_;
@@ -102,5 +102,4 @@ private:
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);
     std::vector<uint8_t> DecryptData(const std::vector<uint8_t>& data);
-    
 };

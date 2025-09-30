@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cassert>
 #include <string>
+#include <map>
+#include <variant>
 
 // Test helper function to print test results
 void PrintTestResult(const std::string& test_name, bool passed) {
@@ -597,6 +599,142 @@ bool TestFixedLenByteArrayValidation() {
     return true;
 }
 
+
+// Helper function to check if an encoding attribute variant contains expected value
+template<typename T>
+bool CheckEncodingAttribValue(const std::map<std::string, std::variant<int32_t, bool, std::string>>& converted,
+                      const std::string& key, const T& expected) {
+    auto it = converted.find(key);
+    if (it == converted.end()) {
+        return false;
+    }
+    
+    try {
+        const T& actual = std::get<T>(it->second);
+        return actual == expected;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool TestConvertEncodingAttributesToValuesComplete() {
+    std::cout << "Testing ConvertEncodingAttributesToValues - Positive cases..." << std::endl;
+    
+    // Test DATA_PAGE_V2 with the required attributes
+    std::map<std::string, std::string> attribs_v2 = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "100"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "true"}
+    };
+    
+    DataBatchEncryptionSequencer sequencer_v2("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", attribs_v2, "UNCOMPRESSED", "test_key");
+    if (!sequencer_v2.ConvertEncodingAttributesToValues()) {
+        std::cout << "ERROR: DATA_PAGE_V2 conversion failed: " << sequencer_v2.error_stage_ << " - " << sequencer_v2.error_message_ << std::endl;
+        return false;
+    }
+    
+    // Verify converted values for DATA_PAGE_V2
+    if (!CheckEncodingAttribValue(sequencer_v2.encoding_attributes_converted_, "page_type", std::string("DATA_PAGE_V2"))) {
+        std::cout << "ERROR: page_type not converted correctly for DATA_PAGE_V2" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(sequencer_v2.encoding_attributes_converted_, "data_page_num_values", int32_t(100))) {
+        std::cout << "ERROR: data_page_num_values not converted correctly" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(sequencer_v2.encoding_attributes_converted_, "page_v2_is_compressed", true)) {
+        std::cout << "ERROR: page_v2_is_compressed not converted correctly" << std::endl;
+        return false;
+    }
+    
+    // Test DATA_PAGE_V1 with the required attributes
+    std::map<std::string, std::string> attribs_v1 = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "200"},
+        {"data_page_max_definition_level", "3"},
+        {"data_page_max_repetition_level", "2"},
+        {"page_v1_definition_level_encoding", "RLE"},
+        {"page_v1_repetition_level_encoding", "BIT_PACKED"}
+    };
+    
+    DataBatchEncryptionSequencer sequencer_v1("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", attribs_v1, "UNCOMPRESSED", "test_key");
+    if (!sequencer_v1.ConvertEncodingAttributesToValues()) {
+        std::cout << "ERROR: DATA_PAGE_V1 conversion failed: " << sequencer_v1.error_stage_ << " - " << sequencer_v1.error_message_ << std::endl;
+        return false;
+    }
+    
+    // Verify converted values for DATA_PAGE_V1
+    if (!CheckEncodingAttribValue(sequencer_v1.encoding_attributes_converted_, "page_type", std::string("DATA_PAGE_V1"))) {
+        std::cout << "ERROR: page_type not converted correctly for DATA_PAGE_V1" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(sequencer_v1.encoding_attributes_converted_, "data_page_num_values", int32_t(200))) {
+        std::cout << "ERROR: data_page_num_values not converted correctly" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(sequencer_v1.encoding_attributes_converted_, "page_v1_definition_level_encoding", std::string("RLE"))) {
+        std::cout << "ERROR: page_v1_definition_level_encoding not converted correctly" << std::endl;
+        return false;
+    }
+        
+    return true;
+}
+
+bool TestConvertEncodingAttributesToValuesInvalid() {
+    std::cout << "Testing ConvertEncodingAttributesToValues - Negative cases..." << std::endl;
+    
+    // Test missing page_type
+    std::map<std::string, std::string> empty_attribs;
+    DataBatchEncryptionSequencer sequencer1("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", empty_attribs, "UNCOMPRESSED", "test_key");
+    if (sequencer1.ConvertEncodingAttributesToValues() || sequencer1.error_stage_ != "encoding_attribute_validation") {
+        std::cout << "ERROR: Missing page_type should fail with encoding_attribute_validation error" << std::endl;
+        return false;
+    }
+    
+    // Test invalid int conversion
+    std::map<std::string, std::string> invalid_int = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "not_a_number"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "true"}
+    };
+    
+    DataBatchEncryptionSequencer sequencer2("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", invalid_int, "UNCOMPRESSED", "test_key");
+    if (sequencer2.ConvertEncodingAttributesToValues() || sequencer2.error_stage_ != "encoding_attribute_conversion") {
+        std::cout << "ERROR: Invalid int should fail with encoding_attribute_conversion error" << std::endl;
+        return false;
+    }
+    
+    // Test invalid bool conversion
+    std::map<std::string, std::string> invalid_bool = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "100"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "maybe"}
+    };
+    
+    DataBatchEncryptionSequencer sequencer3("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", invalid_bool, "UNCOMPRESSED", "test_key");
+    if (sequencer3.ConvertEncodingAttributesToValues() || sequencer3.error_stage_ != "encoding_attribute_conversion") {
+        std::cout << "ERROR: Invalid bool should fail with encoding_attribute_conversion error" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
 int main() {
     std::cout << "Running DataBatchEncryptionSequencer tests..." << std::endl;
     std::cout << "=============================================" << std::endl;
@@ -627,6 +765,12 @@ int main() {
     
     all_tests_passed &= TestResultStorage();
     PrintTestResult("Result Storage", all_tests_passed);
+    
+    all_tests_passed &= TestConvertEncodingAttributesToValuesComplete();
+    PrintTestResult("ConvertEncodingAttributesToValues (Positive)", all_tests_passed);
+    
+    all_tests_passed &= TestConvertEncodingAttributesToValuesInvalid();
+    PrintTestResult("ConvertEncodingAttributesToValues (Negative)", all_tests_passed);
     
     std::cout << "=============================================" << std::endl;
     if (all_tests_passed) {
