@@ -102,4 +102,5 @@ protected:
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);
     std::vector<uint8_t> DecryptData(const std::vector<uint8_t>& data);
+    
 };
