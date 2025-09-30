@@ -70,7 +70,7 @@ private:
     Format::type format_enum_;
     
     // Converted encoding attributes values to corresponding types
-    std::map<std::string, std::variant<int, bool, std::string>> encoding_attributes_converted_;
+    std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
     /**
      * Converts string values to corresponding enum values using enum_utils.

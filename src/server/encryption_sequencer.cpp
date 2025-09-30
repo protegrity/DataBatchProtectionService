@@ -194,7 +194,7 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
             return false;
         }
         try {
-            int value_int = std::stoi(*value);
+            int32_t value_int = static_cast<int32_t>(std::stol(*value));
             encoding_attributes_converted_[key] = value_int;
             assert(value_int >= 0);
             return true;
@@ -250,6 +250,8 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
         if (!SafeAddIntToMap("page_v2_repetition_levels_byte_length")) return false;
         if (!SafeAddIntToMap("page_v2_num_nulls")) return false;
         if (!SafeAddBoolToMap("page_v2_is_compressed")) return false;
+    } else if (page_type == "DICTIONARY_PAGE") {
+        // DICTIONARY_PAGE has no specific encoding attributes
     }
     
     return true;

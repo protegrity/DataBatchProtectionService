@@ -163,13 +163,14 @@ std::string PrintPlainDecoded(const std::vector<uint8_t>& raw, Type::type physic
 
 /**
  * Calculates the total length of level bytes based on encoding attributes.
+ * Assumes the input encoding attributes are already validated with the required keys and expected value types.
  * 
  * @param raw Raw binary data (currently unused but kept for future V1 implementation)
  * @param encoding_attribs Converted encoding attributes map
  * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
  */
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
-    const std::map<std::string, std::variant<int, bool, std::string>>& encoding_attribs) {
+    const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs) {
     
     // Helper function to skip V1 RLE level data in raw bytes
     // Returns number of bytes consumed: [4-byte len] + [level bytes indicated by `len`]
@@ -193,13 +194,13 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
 
     if (page_type == "DATA_PAGE_V2") {
         // For DATA_PAGE_V2: sum of definition and repetition level byte lengths
-        int def_level_length = std::get<int>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
-        int rep_level_length = std::get<int>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
+        int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
+        int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
         total_level_bytes = def_level_length + rep_level_length;
         
     } else if (page_type == "DATA_PAGE_V1") {
-        int max_rep_level = std::get<int>(encoding_attribs.at("data_page_max_repetition_level"));
-        int max_def_level = std::get<int>(encoding_attribs.at("data_page_max_definition_level"));
+        int32_t max_rep_level = std::get<int32_t>(encoding_attribs.at("data_page_max_repetition_level"));
+        int32_t max_def_level = std::get<int32_t>(encoding_attribs.at("data_page_max_definition_level"));
 
         // if max_rep_level > 0, there are repetition levels bytes. Same for definition levels.
         size_t offset = 0;
