@@ -313,6 +313,16 @@ std::string DecryptJsonRequest::ToJsonString() const {
     crow::json::wvalue value_format;
     value_format["compression"] = compression_;
     value_format["format"] = format_;
+    
+    // Add encoding_attributes if not empty
+    if (!encoding_attributes_.empty()) {
+        crow::json::wvalue encoding_attrs;
+        for (const auto& pair : encoding_attributes_) {
+            encoding_attrs[pair.first] = pair.second;
+        }
+        value_format["encoding_attributes"] = std::move(encoding_attrs);
+    }
+    
     data_batch["value_format"] = std::move(value_format);
     
     json["data_batch"] = std::move(data_batch);

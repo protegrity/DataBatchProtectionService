@@ -50,7 +50,7 @@ int main() {
         response.reference_id_ = request.reference_id_;
         response.encrypted_compression_ = request.encrypted_compression_;
         
-        // TODO: Use encoding_attributes in encryption sequencer
+        // Use encoding_attributes in encryption sequencer
         const auto& encoding_attributes = request.encoding_attributes_;
 
         // Use DataBatchEncryptionSequencer for actual encryption
@@ -59,6 +59,7 @@ int main() {
             request.datatype_length_,
             request.compression_,
             request.format_,
+            encoding_attributes,
             request.encrypted_compression_,
             request.key_id_
         );
@@ -89,7 +90,7 @@ int main() {
             return CreateErrorResponse(error_msg);
         }
 
-        // TODO: Use encoding_attributes in decryption sequencer
+        // Use encoding_attributes in decryption sequencer
         const auto& encoding_attributes = request.encoding_attributes_;
 
         // Create response using our JsonResponse class
@@ -113,6 +114,7 @@ int main() {
             request.datatype_length_,
             request.compression_,
             request.format_,
+            encoding_attributes,
             request.encrypted_compression_,
             request.key_id_
         );

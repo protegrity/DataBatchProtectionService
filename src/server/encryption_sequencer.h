@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
+#include <map>
 #include "enums.h"
 
 using namespace dbps::external;
@@ -27,6 +29,7 @@ public:
     std::optional<int> datatype_length_;
     std::string compression_;
     std::string format_;
+    std::map<std::string, std::string> encoding_attributes_;
     std::string encrypted_compression_;
     std::string key_id_;
     
@@ -44,6 +47,7 @@ public:
         const std::optional<int>& datatype_length,
         const std::string& compression,
         const std::string& format,
+        const std::map<std::string, std::string>& encoding_attributes,
         const std::string& encrypted_compression,
         const std::string& key_id
     );
@@ -58,12 +62,15 @@ public:
     bool ConvertAndEncrypt(const std::string& plaintext);
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
-private:
+protected:
     // Corresponding enum values for the string parameters
     Type::type datatype_enum_;
     CompressionCodec::type compression_enum_;
     CompressionCodec::type encrypted_compression_enum_;
     Format::type format_enum_;
+    
+    // Converted encoding attributes values to corresponding types
+    std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
     /**
      * Converts string values to corresponding enum values using enum_utils.
@@ -71,6 +78,14 @@ private:
      * Sets error_stage_ and error_message_ if conversion fails.
      */
     bool ConvertStringsToEnums();
+    
+    /**
+     * Converts encoding attributes string values to corresponding typed values.
+     * Reads specific keys from encoding_attributes_ corresponding to Parquet encoding attributes.
+     * Returns true if all conversions are successful, false otherwise.
+     * Sets error_stage_ and error_message_ if conversion fails.
+     */
+    bool ConvertEncodingAttributesToValues();
     
     /**
      * Performs comprehensive validation of all parameters and key_id.

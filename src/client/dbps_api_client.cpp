@@ -242,9 +242,13 @@ EncryptApiResponse DBPSApiClient::Encrypt(
         auto http_response = http_client_->Post("/encrypt", json_request.ToJson());
         api_response.SetHttpStatusCode(http_response.status_code);
 
-        // Check if the HTTP response has an error
+        // Check if the HTTP response has an error and include the server response body when available
         if (!http_response.error_message.empty() || !IsHttpSuccess(http_response.status_code)) {
-            api_response.SetApiClientError("HTTP POST request failed for /encrypt: " + http_response.error_message);
+            std::string error_msg = "HTTP POST request failed for /encrypt: [" + std::to_string(http_response.status_code) + "] [" + http_response.error_message + "]";
+            if (!http_response.result.empty()) {
+                error_msg += " Server response: " + http_response.result;
+            }
+            api_response.SetApiClientError(error_msg);
             api_response.SetRawResponse(http_response.result);
             return api_response;
         }
@@ -324,9 +328,13 @@ DecryptApiResponse DBPSApiClient::Decrypt(
         auto http_response = http_client_->Post("/decrypt", json_request.ToJson());
         api_response.SetHttpStatusCode(http_response.status_code);
 
-        // Check if the HTTP response has an error
+        // Check if the HTTP response has an error and include the server response body when available
         if (!http_response.error_message.empty() || !IsHttpSuccess(http_response.status_code)) {
-            api_response.SetApiClientError("HTTP POST request failed for /decrypt: " + http_response.error_message);
+            std::string error_msg = "HTTP POST request failed for /decrypt: [" + std::to_string(http_response.status_code) + "] [" + http_response.error_message + "]";
+            if (!http_response.result.empty()) {
+                error_msg += " Server response: " + http_response.result;
+            }
+            api_response.SetApiClientError(error_msg);
             api_response.SetRawResponse(http_response.result);
             return api_response;
         }

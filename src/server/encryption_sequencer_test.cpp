@@ -2,6 +2,32 @@
 #include <iostream>
 #include <cassert>
 #include <string>
+#include <map>
+#include <variant>
+
+// Test class that inherits from DataBatchEncryptionSequencer to access protected members
+class TestDataBatchEncryptionSequencer : public DataBatchEncryptionSequencer {
+public:
+    // Forward constructor
+    TestDataBatchEncryptionSequencer(
+        const std::string& datatype,
+        const std::optional<int>& datatype_length,
+        const std::string& compression,
+        const std::string& format,
+        const std::map<std::string, std::string>& encoding_attributes,
+        const std::string& encrypted_compression,
+        const std::string& key_id
+    ) : DataBatchEncryptionSequencer(datatype, datatype_length, compression, format, encoding_attributes, encrypted_compression, key_id) {}
+    
+    // Public access to protected methods
+    bool TestConvertEncodingAttributesToValues() {
+        return ConvertEncodingAttributesToValues();
+    }
+    
+    const std::map<std::string, std::variant<int32_t, bool, std::string>>& GetEncodingAttributesConverted() const {
+        return encoding_attributes_converted_;
+    }
+};
 
 // Test helper function to print test results
 void PrintTestResult(const std::string& test_name, bool passed) {
@@ -17,6 +43,7 @@ bool TestEncryptionDecryption() {
             std::nullopt,      // datatype_length
             "UNCOMPRESSED",    // compression
             "PLAIN",           // format
+            {{"page_type", "DICTIONARY_PAGE"}},   // encoding_attributes (mostly empty for basic test)
             "UNCOMPRESSED",    // encrypted_compression
             "test_key_123"     // key_id
         );
@@ -35,11 +62,11 @@ bool TestEncryptionDecryption() {
     // Test 2: Different key_id produces different encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "key1"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "key2"
         );
         
         std::string test_data = "SGVsbG8sIFdvcmxkIQ==";
@@ -56,11 +83,11 @@ bool TestEncryptionDecryption() {
     // Test 3: Same key_id produces consistent encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "same_key"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "same_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "same_key"
         );
         
         std::string test_data = "SGVsbG8sIFdvcmxkIQ==";
@@ -77,7 +104,7 @@ bool TestEncryptionDecryption() {
     // Test 4: Empty data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         
         // This should fail because empty input is rejected
@@ -91,7 +118,7 @@ bool TestEncryptionDecryption() {
     // Test 5: Binary data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         
         // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
@@ -112,7 +139,7 @@ bool TestParameterValidation() {
     // Test 1: Valid parameters, should succeed
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -124,7 +151,7 @@ bool TestParameterValidation() {
     // Test 2: Invalid compression (should succeed with warning)
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "GZIP", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "GZIP", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -139,7 +166,7 @@ bool TestParameterValidation() {
     // Test 3: Undefined format is supported
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "UNDEFINED", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "UNDEFINED", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -156,7 +183,7 @@ bool TestParameterValidation() {
     // Test 4: All formats now supported (including RLE)
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "RLE", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "RLE", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -178,7 +205,7 @@ bool TestInputValidation() {
     // Test 1: Empty plaintext
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("");
         if (result) {
@@ -194,7 +221,7 @@ bool TestInputValidation() {
     // Test 2: Empty ciphertext
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndDecrypt("");
         if (result) {
@@ -210,7 +237,7 @@ bool TestInputValidation() {
     // Test 3: Empty key_id
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", ""
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", ""
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (result) {
@@ -231,7 +258,7 @@ bool TestEnumConversion() {
     // Test 1: Valid enum conversion
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -243,7 +270,7 @@ bool TestEnumConversion() {
     // Test 2: Invalid datatype
     {
         DataBatchEncryptionSequencer sequencer(
-            "INVALID_TYPE", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "INVALID_TYPE", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (result) {
@@ -264,7 +291,7 @@ bool TestBase64Decoding() {
     // Test 1: Valid base64 - "Hello, World!"
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ==");
         if (!result) {
@@ -276,7 +303,7 @@ bool TestBase64Decoding() {
     // Test 2: Valid base64 - empty string
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("");
         if (result) {
@@ -288,7 +315,7 @@ bool TestBase64Decoding() {
     // Test 3: Valid base64 - single character
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("QQ=="); // "A"
         if (!result) {
@@ -300,7 +327,7 @@ bool TestBase64Decoding() {
     // Test 4: Valid base64 - binary data
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("AAECAwQF"); // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
         if (!result) {
@@ -312,7 +339,7 @@ bool TestBase64Decoding() {
     // Test 5: Invalid base64 - garbage characters
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("InvalidBase64!@#");
         if (result) {
@@ -328,7 +355,7 @@ bool TestBase64Decoding() {
     // Test 6: Invalid base64 - incomplete padding
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         bool result = sequencer.ConvertAndEncrypt("SGVsbG8sIFdvcmxkIQ"); // Missing padding
         if (result) {
@@ -349,7 +376,7 @@ bool TestRoundTripEncryption() {
     // Test 1: Basic round trip - "Hello, World!"
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key_123"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ=="; // "Hello, World!"
@@ -380,7 +407,7 @@ bool TestRoundTripEncryption() {
     // Test 2: Binary data round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "binary_test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "binary_test_key"
         );
         
         std::string original_base64 = "AAECAwQF"; // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
@@ -411,7 +438,7 @@ bool TestRoundTripEncryption() {
     // Test 3: Single character round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "single_char_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "single_char_key"
         );
         
         std::string original_base64 = "QQ=="; // "A"
@@ -442,11 +469,11 @@ bool TestRoundTripEncryption() {
     // Test 4: Different keys produce different encrypted results
     {
         DataBatchEncryptionSequencer sequencer1(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key1"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "key1"
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "key2"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "key2"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ==";
@@ -488,7 +515,7 @@ bool TestResultStorage() {
     // Test 1: Verify encrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         
         std::string original_base64 = "SGVsbG8sIFdvcmxkIQ==";
@@ -520,7 +547,7 @@ bool TestResultStorage() {
     // Test 2: Verify decrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key"
+            "BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key"
         );
         
         // First encrypt something
@@ -562,7 +589,7 @@ bool TestFixedLenByteArrayValidation() {
     // Helper function to test validation failure
     auto testValidationFailure = [&](const std::optional<int>& datatype_length, const std::string& expected_msg) -> bool {
         DataBatchEncryptionSequencer sequencer(
-            "FIXED_LEN_BYTE_ARRAY", datatype_length, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123"
+            "FIXED_LEN_BYTE_ARRAY", datatype_length, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key_123"
         );
         
         bool result = sequencer.ConvertAndEncrypt(test_data);
@@ -586,11 +613,149 @@ bool TestFixedLenByteArrayValidation() {
     if (!testValidationFailure(0, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive")) return false;
     
     // Test valid case (should pass parameter validation)
-    DataBatchEncryptionSequencer sequencer("FIXED_LEN_BYTE_ARRAY", 16, "UNCOMPRESSED", "PLAIN", "UNCOMPRESSED", "test_key_123");
+    DataBatchEncryptionSequencer sequencer("FIXED_LEN_BYTE_ARRAY", 16, "UNCOMPRESSED", "PLAIN", {{"page_type", "DICTIONARY_PAGE"}}, "UNCOMPRESSED", "test_key_123");
     bool result = sequencer.ConvertAndEncrypt(test_data);
     
     if (!result && sequencer.error_stage_ == "parameter_validation") {
         std::cout << "ERROR: Valid datatype_length should pass parameter validation" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+
+// Helper function to check if an encoding attribute variant contains expected value
+template<typename T>
+bool CheckEncodingAttribValue(const std::map<std::string, std::variant<int32_t, bool, std::string>>& converted,
+                      const std::string& key, const T& expected) {
+    auto it = converted.find(key);
+    if (it == converted.end()) {
+        return false;
+    }
+    
+    try {
+        const T& actual = std::get<T>(it->second);
+        return actual == expected;
+    } catch (const std::bad_variant_access&) {
+        return false;
+    }
+}
+
+bool TestConvertEncodingAttributesToValuesComplete() {
+    std::cout << "Testing ConvertEncodingAttributesToValues - Positive cases..." << std::endl;
+    
+    // Test DATA_PAGE_V2 with the required attributes
+    std::map<std::string, std::string> attribs_v2 = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "100"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "true"}
+    };
+    
+    TestDataBatchEncryptionSequencer sequencer_v2("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", attribs_v2, "UNCOMPRESSED", "test_key");
+    if (!sequencer_v2.TestConvertEncodingAttributesToValues()) {
+        std::cout << "ERROR: DATA_PAGE_V2 conversion failed: " << sequencer_v2.error_stage_ << " - " << sequencer_v2.error_message_ << std::endl;
+        return false;
+    }
+    
+    // Verify converted values for DATA_PAGE_V2
+    const auto& converted_v2 = sequencer_v2.GetEncodingAttributesConverted();
+    if (!CheckEncodingAttribValue(converted_v2, "page_type", std::string("DATA_PAGE_V2"))) {
+        std::cout << "ERROR: page_type not converted correctly for DATA_PAGE_V2" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(converted_v2, "data_page_num_values", int32_t(100))) {
+        std::cout << "ERROR: data_page_num_values not converted correctly" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(converted_v2, "page_v2_is_compressed", true)) {
+        std::cout << "ERROR: page_v2_is_compressed not converted correctly" << std::endl;
+        return false;
+    }
+    
+    // Test DATA_PAGE_V1 with the required attributes
+    std::map<std::string, std::string> attribs_v1 = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "200"},
+        {"data_page_max_definition_level", "3"},
+        {"data_page_max_repetition_level", "2"},
+        {"page_v1_definition_level_encoding", "RLE"},
+        {"page_v1_repetition_level_encoding", "BIT_PACKED"}
+    };
+    
+    TestDataBatchEncryptionSequencer sequencer_v1("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", attribs_v1, "UNCOMPRESSED", "test_key");
+    if (!sequencer_v1.TestConvertEncodingAttributesToValues()) {
+        std::cout << "ERROR: DATA_PAGE_V1 conversion failed: " << sequencer_v1.error_stage_ << " - " << sequencer_v1.error_message_ << std::endl;
+        return false;
+    }
+    
+    // Verify converted values for DATA_PAGE_V1
+    const auto& converted_v1 = sequencer_v1.GetEncodingAttributesConverted();
+    if (!CheckEncodingAttribValue(converted_v1, "page_type", std::string("DATA_PAGE_V1"))) {
+        std::cout << "ERROR: page_type not converted correctly for DATA_PAGE_V1" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(converted_v1, "data_page_num_values", int32_t(200))) {
+        std::cout << "ERROR: data_page_num_values not converted correctly" << std::endl;
+        return false;
+    }
+    if (!CheckEncodingAttribValue(converted_v1, "page_v1_definition_level_encoding", std::string("RLE"))) {
+        std::cout << "ERROR: page_v1_definition_level_encoding not converted correctly" << std::endl;
+        return false;
+    }
+        
+    return true;
+}
+
+bool TestConvertEncodingAttributesToValuesInvalid() {
+    std::cout << "Testing ConvertEncodingAttributesToValues - Negative cases..." << std::endl;
+    
+    // Test missing page_type
+    std::map<std::string, std::string> empty_attribs;
+    TestDataBatchEncryptionSequencer sequencer1("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", empty_attribs, "UNCOMPRESSED", "test_key");
+    if (sequencer1.TestConvertEncodingAttributesToValues() || sequencer1.error_stage_ != "encoding_attribute_validation") {
+        std::cout << "ERROR: Missing page_type should fail with encoding_attribute_validation error" << std::endl;
+        return false;
+    }
+    
+    // Test invalid int conversion
+    std::map<std::string, std::string> invalid_int = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "not_a_number"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "true"}
+    };
+    
+    TestDataBatchEncryptionSequencer sequencer2("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", invalid_int, "UNCOMPRESSED", "test_key");
+    if (sequencer2.TestConvertEncodingAttributesToValues() || sequencer2.error_stage_ != "encoding_attribute_conversion") {
+        std::cout << "ERROR: Invalid int should fail with encoding_attribute_conversion error" << std::endl;
+        return false;
+    }
+    
+    // Test invalid bool conversion
+    std::map<std::string, std::string> invalid_bool = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "100"},
+        {"data_page_max_definition_level", "2"},
+        {"data_page_max_repetition_level", "1"},
+        {"page_v2_definition_levels_byte_length", "50"},
+        {"page_v2_repetition_levels_byte_length", "25"},
+        {"page_v2_num_nulls", "10"},
+        {"page_v2_is_compressed", "maybe"}
+    };
+    
+    TestDataBatchEncryptionSequencer sequencer3("BYTE_ARRAY", std::nullopt, "UNCOMPRESSED", "PLAIN", invalid_bool, "UNCOMPRESSED", "test_key");
+    if (sequencer3.TestConvertEncodingAttributesToValues() || sequencer3.error_stage_ != "encoding_attribute_conversion") {
+        std::cout << "ERROR: Invalid bool should fail with encoding_attribute_conversion error" << std::endl;
         return false;
     }
     
@@ -627,6 +792,12 @@ int main() {
     
     all_tests_passed &= TestResultStorage();
     PrintTestResult("Result Storage", all_tests_passed);
+    
+    all_tests_passed &= TestConvertEncodingAttributesToValuesComplete();
+    PrintTestResult("ConvertEncodingAttributesToValues (Positive)", all_tests_passed);
+    
+    all_tests_passed &= TestConvertEncodingAttributesToValuesInvalid();
+    PrintTestResult("ConvertEncodingAttributesToValues (Negative)", all_tests_passed);
     
     std::cout << "=============================================" << std::endl;
     if (all_tests_passed) {
