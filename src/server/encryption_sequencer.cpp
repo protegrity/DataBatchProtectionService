@@ -4,6 +4,8 @@
 #include <cppcodec/base64_rfc4648.hpp>
 #include <functional>
 #include <iostream>
+#include <sstream>
+#include <optional>
 
 using namespace dbps::external;
 
@@ -13,12 +15,14 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     const std::optional<int>& datatype_length,
     const std::string& compression,
     const std::string& format,
+    const std::map<std::string, std::string>& encoding_attributes,
     const std::string& encrypted_compression,
     const std::string& key_id
 ) : datatype_(datatype),
     datatype_length_(datatype_length),
     compression_(compression),
     format_(format),
+    encoding_attributes_(encoding_attributes),
     encrypted_compression_(encrypted_compression),
     key_id_(key_id) {}
 
@@ -59,8 +63,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
                   << decoded_data.size() << " bytes" << std::endl;
     }    
     if (is_uncompressed && is_plain) {
-        // TODO: Pass calculation of level bytes count when passed on the Sequencer constructor.
-        int leading_bytes_to_strip = 0;
+        // Calculate the number of leading bytes to strip based on the encoding attributes
+        int leading_bytes_to_strip = CalculateLevelBytesLength(decoded_data, encoding_attributes_converted_);
 
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
         std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_, datatype_length_, leading_bytes_to_strip);
@@ -171,9 +175,94 @@ bool DataBatchEncryptionSequencer::ConvertStringsToEnums() {
     return true;
 }
 
+bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
+    // Helper to find key and return value or null
+    auto FindKey = [this](const std::string& key) -> const std::string* {
+        auto it = encoding_attributes_.find(key);
+        if (it == encoding_attributes_.end()) {
+            error_stage_ = "encoding_attribute_validation";
+            error_message_ = "Required encoding attribute [" + key + "] is missing";
+            return nullptr;
+        }
+        return &it->second;
+    };
+    
+    // Type-specific conversion helpers
+    auto SafeAddIntToMap = [this, &FindKey](const std::string& key) -> bool {
+        const std::string* value = FindKey(key);
+        if (!value) {
+            return false;
+        }
+        try {
+            int value_int = std::stoi(*value);
+            encoding_attributes_converted_[key] = value_int;
+            assert(value_int >= 0);
+            return true;
+        } catch (const std::exception& e) {
+            error_stage_ = "encoding_attribute_conversion";
+            error_message_ = "Failed to convert [" + key + "] with value [" + *value + "] to int: " + e.what();
+            return false;
+        }
+    };
+    
+    auto SafeAddBoolToMap = [this, &FindKey](const std::string& key) -> bool {
+        const std::string* value = FindKey(key);
+        if (!value) {
+            return false;
+        }
+        if (*value == "true") {
+            encoding_attributes_converted_[key] = true;
+            return true;
+        } else if (*value == "false") {
+            encoding_attributes_converted_[key] = false;
+            return true;
+        } else {
+            error_stage_ = "encoding_attribute_conversion";
+            error_message_ = "Failed to convert [" + key + "] with value [" + *value + "] to bool";
+            return false;
+        }
+    };
+    
+    auto SafeAddStringToMap = [this, &FindKey](const std::string& key) -> bool {
+        const std::string* value = FindKey(key);
+        if (!value) {
+            return false;
+        }
+        encoding_attributes_converted_[key] = *value;
+        return true;
+    };
+    
+    if (!SafeAddStringToMap("page_type")) return false;
+    std::string page_type = encoding_attributes_["page_type"];
+    
+    // Convert common attributes for DATA_PAGE_V1 and DATA_PAGE_V2
+    if (page_type == "DATA_PAGE_V1" || page_type == "DATA_PAGE_V2") {
+        if (!SafeAddIntToMap("data_page_num_values")) return false;
+        if (!SafeAddIntToMap("data_page_max_definition_level")) return false;
+        if (!SafeAddIntToMap("data_page_max_repetition_level")) return false;
+    }
+    if (page_type == "DATA_PAGE_V1") {
+        if (!SafeAddStringToMap("page_v1_definition_level_encoding")) return false;
+        if (!SafeAddStringToMap("page_v1_repetition_level_encoding")) return false;
+        
+    } else if (page_type == "DATA_PAGE_V2") {
+        if (!SafeAddIntToMap("page_v2_definition_levels_byte_length")) return false;
+        if (!SafeAddIntToMap("page_v2_repetition_levels_byte_length")) return false;
+        if (!SafeAddIntToMap("page_v2_num_nulls")) return false;
+        if (!SafeAddBoolToMap("page_v2_is_compressed")) return false;
+    }
+    
+    return true;
+}
+
 bool DataBatchEncryptionSequencer::ValidateParameters() {
     // First check: convert string values to enums
     if (!ConvertStringsToEnums()) {
+        return false;
+    }
+    
+    // Convert encoding attributes to typed values
+    if (!ConvertEncodingAttributesToValues()) {
         return false;
     }
     
