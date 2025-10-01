@@ -3,10 +3,9 @@
 #include "json_request.h"
 #include "encryption_sequencer.h"
 
-
-
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
+    std::cout << "CreateErrorResponse: Status=" << status_code << ", Message=\"" << error_msg << "\"" << std::endl;
     crow::json::wvalue error_response;
     error_response["error"] = error_msg;
     return crow::response(status_code, error_response);
@@ -39,6 +38,11 @@ int main() {
             }
             return CreateErrorResponse(error_msg);
         }
+
+        // Log the validated request JSON for debugging
+        std::cout << "=== /encrypt Request (Validated) ===" << std::endl;
+        std::cout << request.ToJson() << std::endl;
+        std::cout << "=====================================" << std::endl;
 
         // Create response using our JsonResponse class
         EncryptJsonResponse response;
@@ -89,6 +93,11 @@ int main() {
             }
             return CreateErrorResponse(error_msg);
         }
+
+        // Log the validated request JSON for debugging
+        std::cout << "=== /decrypt Request (Validated) ===" << std::endl;
+        std::cout << request.ToJson() << std::endl;
+        std::cout << "=====================================" << std::endl;
 
         // Use encoding_attributes in decryption sequencer
         const auto& encoding_attributes = request.encoding_attributes_;

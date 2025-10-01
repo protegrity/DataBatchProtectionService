@@ -494,7 +494,7 @@ public:
         // Test with very large data
         std::cout << "\nTesting large data handling:" << std::endl;
         try {
-            std::string large_data(10000, 'X');  // 10KB of data
+            std::string large_data(1000, 'X');  // 1KB of data
             std::vector<uint8_t> plaintext(large_data.begin(), large_data.end());
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
             auto result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);

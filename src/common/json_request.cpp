@@ -1,6 +1,7 @@
 #include "json_request.h"
 #include <crow/app.h>
 #include <sstream>
+#include <nlohmann/json.hpp>
 
 /**
 * Safely extracts a string value from a nested JSON path.
@@ -56,6 +57,18 @@ static std::string BuildValidationError(const std::vector<std::string>& missing_
         oss << missing_fields[i];
     }
     return oss.str();
+}
+
+// Pretty prints a JSON string with 4-space indentation using nlohmann JSON.
+// If the input is not valid JSON, returns the original string.
+std::string PrettyPrintJson(const std::string& json_str) {
+    try {
+        nlohmann::json j = nlohmann::json::parse(json_str);
+        return j.dump(4);
+    } catch (const nlohmann::json::exception& e) {
+        // If parsing fails, return the original string
+        return json_str;
+    }
 }
 
 // JsonRequest implementation
@@ -255,8 +268,8 @@ std::string EncryptJsonRequest::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    // Converts crow json object to a string
-    return json.dump();
+    // Converts crow json object to a string with pretty printing
+    return PrettyPrintJson(json.dump());
 }
 
 // DecryptJsonRequest implementation
@@ -351,8 +364,8 @@ std::string DecryptJsonRequest::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
 
-    // Converts crow json object to a string
-    return json.dump();
+    // Converts crow json object to a string with pretty printing
+    return PrettyPrintJson(json.dump());
 }
 
 // JsonResponse implementations
@@ -500,8 +513,8 @@ std::string EncryptJsonResponse::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    // Converts crow json object to a string
-    return json.dump();
+    // Converts crow json object to a string with pretty printing
+    return PrettyPrintJson(json.dump());
 }
 
 bool DecryptJsonResponse::IsValid() const {
@@ -577,6 +590,6 @@ std::string DecryptJsonResponse::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
     
-    // Converts crow json object to a string
-    return json.dump();
+    // Converts crow json object to a string with pretty printing
+    return PrettyPrintJson(json.dump());
 }
