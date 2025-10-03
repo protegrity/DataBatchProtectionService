@@ -17,6 +17,8 @@ class JsonRequest {
 
 public:
     // Common required fields
+    // - Some fields are declared as optional to determine if these are unassigned for validation checking.
+    //   However, all fields except datatype_length_ are required.
     std::string column_name_;
     std::optional<Type::type> datatype_;
     std::optional<int> datatype_length_;

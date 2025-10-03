@@ -53,9 +53,9 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
     // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
     //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
-    bool is_uncompressed = compression_ == CompressionCodec::UNCOMPRESSED;
+    bool is_compressed = compression_ != CompressionCodec::UNCOMPRESSED;
     bool is_plain = format_ == Format::PLAIN;
-    if (!is_uncompressed) {
+    if (is_compressed) {
         std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
     }
@@ -63,7 +63,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
     }    
-    if (is_uncompressed && is_plain) {
+    if (!is_compressed && is_plain) {
         // Calculate the number of leading bytes to strip based on the encoding attributes
         int leading_bytes_to_strip = CalculateLevelBytesLength(decoded_data, encoding_attributes_converted_);
 
