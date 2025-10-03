@@ -209,12 +209,12 @@ EncryptApiResponse DBPSApiClient::Encrypt(
 ) {
     EncryptJsonRequest json_request;
     json_request.column_name_ = column_name;
-    json_request.datatype_ = std::string(to_string(datatype));
+    json_request.datatype_ = datatype;
     json_request.datatype_length_ = datatype_length;
-    json_request.compression_ = std::string(to_string(compression));
-    json_request.format_ = std::string(to_string(format));
+    json_request.compression_ = compression;
+    json_request.format_ = format;
     json_request.encoding_attributes_ = encoding_attributes;
-    json_request.encrypted_compression_ = std::string(to_string(encrypted_compression));
+    json_request.encrypted_compression_ = encrypted_compression;
     json_request.key_id_ = key_id;
     json_request.user_id_ = user_id;
     json_request.reference_id_ = GenerateReferenceId();
@@ -294,12 +294,12 @@ DecryptApiResponse DBPSApiClient::Decrypt(
 ) {
     DecryptJsonRequest json_request;
     json_request.column_name_ = column_name;
-    json_request.datatype_ = std::string(to_string(datatype));
+    json_request.datatype_ = datatype;
     json_request.datatype_length_ = datatype_length;
-    json_request.compression_ = std::string(to_string(compression));
-    json_request.format_ = std::string(to_string(format));
+    json_request.compression_ = compression;
+    json_request.format_ = format;
     json_request.encoding_attributes_ = encoding_attributes;
-    json_request.encrypted_compression_ = std::string(to_string(encrypted_compression));
+    json_request.encrypted_compression_ = encrypted_compression;
     json_request.key_id_ = key_id;
     json_request.user_id_ = user_id;
     json_request.reference_id_ = GenerateReferenceId();

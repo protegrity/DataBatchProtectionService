@@ -58,13 +58,14 @@ int main() {
         const auto& encoding_attributes = request.encoding_attributes_;
 
         // Use DataBatchEncryptionSequencer for actual encryption
+        // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
-            request.datatype_,
+            request.datatype_.value(),
             request.datatype_length_,
-            request.compression_,
-            request.format_,
+            request.compression_.value(),
+            request.format_.value(),
             encoding_attributes,
-            request.encrypted_compression_,
+            request.encrypted_compression_.value(),
             request.key_id_
         );
         
@@ -118,13 +119,14 @@ int main() {
         response.format_ = request.format_;
         
         // Use DataBatchEncryptionSequencer for actual decryption
+        // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
-            request.datatype_,
+            request.datatype_.value(),
             request.datatype_length_,
-            request.compression_,
-            request.format_,
+            request.compression_.value(),
+            request.format_.value(),
             encoding_attributes,
-            request.encrypted_compression_,
+            request.encrypted_compression_.value(),
             request.key_id_
         );
         

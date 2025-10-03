@@ -25,12 +25,13 @@ using namespace dbps::external;
  */
 class DataBatchEncryptionSequencer {
 public:
-    std::string datatype_;
+    // TODO: Move these to protected attributes if no external access is needed.
+    Type::type datatype_;
     std::optional<int> datatype_length_;
-    std::string compression_;
-    std::string format_;
+    CompressionCodec::type compression_;
+    Format::type format_;
     std::map<std::string, std::string> encoding_attributes_;
-    std::string encrypted_compression_;
+    CompressionCodec::type encrypted_compression_;
     std::string key_id_;
     
     // Error reporting fields
@@ -43,12 +44,12 @@ public:
     
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
-        const std::string& datatype,
+        Type::type datatype,
         const std::optional<int>& datatype_length,
-        const std::string& compression,
-        const std::string& format,
+        CompressionCodec::type compression,
+        Format::type format,
         const std::map<std::string, std::string>& encoding_attributes,
-        const std::string& encrypted_compression,
+        CompressionCodec::type encrypted_compression,
         const std::string& key_id
     );
     
@@ -63,21 +64,8 @@ public:
     bool ConvertAndDecrypt(const std::string& ciphertext);
 
 protected:
-    // Corresponding enum values for the string parameters
-    Type::type datatype_enum_;
-    CompressionCodec::type compression_enum_;
-    CompressionCodec::type encrypted_compression_enum_;
-    Format::type format_enum_;
-    
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
-    
-    /**
-     * Converts string values to corresponding enum values using enum_utils.
-     * Returns true if all conversions are successful, false otherwise.
-     * Sets error_stage_ and error_message_ if conversion fails.
-     */
-    bool ConvertStringsToEnums();
     
     /**
      * Converts encoding attributes string values to corresponding typed values.

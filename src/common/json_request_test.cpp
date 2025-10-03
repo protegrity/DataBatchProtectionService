@@ -3,6 +3,9 @@
 #include <cassert>
 #include <crow/app.h>
 #include "json_request.h"
+#include "enums.h"
+
+using namespace dbps::external;
 
 // Forward declarations for internal functions from json_request.cpp
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
@@ -116,10 +119,10 @@ TEST(JsonRequestValidParse) {
     request.Parse(VALID_ENCRYPT_JSON);
     
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -142,10 +145,10 @@ TEST(JsonRequestMissingRequiredFields) {
     request.Parse(incomplete_json);
     
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("", request.datatype_);
-    ASSERT_EQ("", request.compression_);
-    ASSERT_EQ("", request.format_);
-    ASSERT_EQ("", request.encrypted_compression_);
+    ASSERT_FALSE(request.datatype_.has_value());
+    ASSERT_FALSE(request.compression_.has_value());
+    ASSERT_FALSE(request.format_.has_value());
+    ASSERT_FALSE(request.encrypted_compression_.has_value());
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
     ASSERT_EQ("", request.reference_id_);
@@ -165,10 +168,10 @@ TEST(JsonRequestInvalidJson) {
     
     // All fields should remain empty/default
     ASSERT_EQ("", request.column_name_);
-    ASSERT_EQ("", request.datatype_);
-    ASSERT_EQ("", request.compression_);
-    ASSERT_EQ("", request.format_);
-    ASSERT_EQ("", request.encrypted_compression_);
+    ASSERT_FALSE(request.datatype_.has_value());
+    ASSERT_FALSE(request.compression_.has_value());
+    ASSERT_FALSE(request.format_.has_value());
+    ASSERT_FALSE(request.encrypted_compression_.has_value());
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
     ASSERT_EQ("", request.reference_id_);
@@ -207,10 +210,10 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
     request.Parse(json_without_ref);
     
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("", request.reference_id_);
@@ -230,10 +233,10 @@ TEST(EncryptJsonRequestValidParse) {
     
     // Check common fields
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -281,10 +284,10 @@ TEST(EncryptJsonRequestMissingValue) {
     
     // Common fields should be parsed
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -304,10 +307,10 @@ TEST(DecryptJsonRequestValidParse) {
     
     // Check common fields
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -355,10 +358,10 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
     
     // Common fields should be parsed
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("UNDEFINED", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -455,10 +458,10 @@ TEST(EncryptJsonRequestWithEncodingAttributes) {
     
     // Verify common fields are parsed correctly
     ASSERT_EQ("email", request.column_name_);
-    ASSERT_EQ("BYTE_ARRAY", request.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", request.compression_);
-    ASSERT_EQ("PLAIN", request.format_);
-    ASSERT_EQ("GZIP", request.encrypted_compression_);
+    ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
+    ASSERT_EQ(Format::PLAIN, request.format_.value());
+    ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
@@ -478,10 +481,10 @@ TEST(EncryptJsonRequestToJsonWithEncodingAttributes) {
     
     // Set up request with encoding_attributes
     request.column_name_ = "email";
-    request.datatype_ = "BYTE_ARRAY";
-    request.compression_ = "UNCOMPRESSED";
-    request.format_ = "PLAIN";
-    request.encrypted_compression_ = "GZIP";
+    request.datatype_ = Type::BYTE_ARRAY;
+    request.compression_ = CompressionCodec::UNCOMPRESSED;
+    request.format_ = Format::PLAIN;
+    request.encrypted_compression_ = CompressionCodec::GZIP;
     request.key_id_ = "key123";
     request.user_id_ = "user456";
     request.reference_id_ = "ref789";
@@ -581,7 +584,7 @@ TEST(EncryptJsonResponseValidParse) {
     ASSERT_EQ("admin", response.role_);
     ASSERT_EQ("read_write", response.access_control_);
     ASSERT_EQ("ref789", response.reference_id_);
-    ASSERT_EQ("GZIP", response.encrypted_compression_);
+    ASSERT_EQ(CompressionCodec::GZIP, response.encrypted_compression_.value());
     ASSERT_EQ("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=", response.encrypted_value_); // "ENCRYPTED_test@example.com"
     
     ASSERT_TRUE(response.IsValid());
@@ -596,9 +599,9 @@ TEST(DecryptJsonResponseValidParse) {
     ASSERT_EQ("admin", response.role_);
     ASSERT_EQ("read_write", response.access_control_);
     ASSERT_EQ("ref789", response.reference_id_);
-    ASSERT_EQ("BYTE_ARRAY", response.datatype_);
-    ASSERT_EQ("UNCOMPRESSED", response.compression_);
-    ASSERT_EQ("UNDEFINED", response.format_);
+    ASSERT_EQ(Type::BYTE_ARRAY, response.datatype_.value());
+    ASSERT_EQ(CompressionCodec::UNCOMPRESSED, response.compression_.value());
+    ASSERT_EQ(Format::UNDEFINED, response.format_.value());
     ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", response.decrypted_value_); // "test@example.com"
     
     ASSERT_TRUE(response.IsValid());
@@ -689,7 +692,7 @@ TEST(EncryptJsonResponseToJson) {
     response.role_ = "admin";
     response.access_control_ = "read_write";
     response.reference_id_ = "ref456";
-    response.encrypted_compression_ = "GZIP";
+    response.encrypted_compression_ = CompressionCodec::GZIP;
     response.encrypted_value_ = "RU5DUllQVEVEX2RhdGE="; // "ENCRYPTED_data"
     
     ASSERT_TRUE(response.IsValid());
@@ -709,9 +712,9 @@ TEST(DecryptJsonResponseToJson) {
     response.role_ = "admin";
     response.access_control_ = "read_write";
     response.reference_id_ = "ref456";
-    response.datatype_ = "BYTE_ARRAY";
-    response.compression_ = "UNCOMPRESSED";
-    response.format_ = "UNDEFINED";
+    response.datatype_ = Type::BYTE_ARRAY;
+    response.compression_ = CompressionCodec::UNCOMPRESSED;
+    response.format_ = Format::UNDEFINED;
     response.decrypted_value_ = "ZGVjcnlwdGVkX2RhdGE="; // "decrypted_data"
     
     ASSERT_TRUE(response.IsValid());
@@ -813,11 +816,11 @@ static void test_DatatypeLengthSerialization() {
     TestableEncryptJsonRequest request;
     request.user_id_ = "test_user";
     request.reference_id_ = "test_ref_123";
-    request.datatype_ = "FIXED_LEN_BYTE_ARRAY";
+    request.datatype_ = Type::FIXED_LEN_BYTE_ARRAY;
     request.datatype_length_ = 16;
-    request.compression_ = "UNCOMPRESSED";
-    request.format_ = "PLAIN";
-    request.encrypted_compression_ = "UNCOMPRESSED";
+    request.compression_ = CompressionCodec::UNCOMPRESSED;
+    request.format_ = Format::PLAIN;
+    request.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     request.key_id_ = "test_key_123";
     request.value_ = "SGVsbG8sIFdvcmxkIQ==";
     

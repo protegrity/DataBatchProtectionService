@@ -260,9 +260,9 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         const auto& response_attrs = response.GetResponseAttributes();
         
         // Validate encrypted compression matches request compression
-        auto compression_error = ValidateEncryptFieldMatch(response_attrs.encrypted_compression_, 
-                                                         std::string(to_string(compression_type_)), 
-                                                         "encrypted_compression");
+        auto compression_error = ValidateEncryptFieldMatch(std::string(to_string(response_attrs.encrypted_compression_.value())), 
+                                                           std::string(to_string(compression_type_)), 
+                                                           "encrypted_compression");
         if (compression_error) {
             return std::make_unique<RemoteEncryptionResult>(std::move(compression_error));
         }
@@ -316,13 +316,15 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         const auto& response_attrs = response.GetResponseAttributes();
         
         // Validate datatype
-        auto datatype_error = ValidateDecryptFieldMatch(response_attrs.datatype_, std::string(to_string(datatype_)), "datatype");
+        auto datatype_error = ValidateDecryptFieldMatch(std::string(to_string(response_attrs.datatype_.value())), 
+                                                        std::string(to_string(datatype_)), "datatype");
         if (datatype_error) {
             return std::make_unique<RemoteDecryptionResult>(std::move(datatype_error));
         }
         
         // Validate compression
-        auto compression_error = ValidateDecryptFieldMatch(response_attrs.compression_, std::string(to_string(compression_type_)), "compression");
+        auto compression_error = ValidateDecryptFieldMatch(std::string(to_string(response_attrs.compression_.value())), 
+                                                           std::string(to_string(compression_type_)), "compression");
         if (compression_error) {
             return std::make_unique<RemoteDecryptionResult>(std::move(compression_error));
         }

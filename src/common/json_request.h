@@ -4,6 +4,10 @@
 #include <string>
 #include <optional>
 #include <map>
+#include "enums.h"
+#include "enum_utils.h"
+
+using namespace dbps::external;
 
 /**
  * Base class for parsing and validating JSON request fields.
@@ -14,12 +18,12 @@ class JsonRequest {
 public:
     // Common required fields
     std::string column_name_;
-    std::string datatype_;
+    std::optional<Type::type> datatype_;
     std::optional<int> datatype_length_;
-    std::string compression_;
-    std::string format_;
+    std::optional<CompressionCodec::type> compression_;
+    std::optional<Format::type> format_;
     std::map<std::string, std::string> encoding_attributes_;
-    std::string encrypted_compression_;
+    std::optional<CompressionCodec::type> encrypted_compression_;
     std::string key_id_;
     std::string user_id_;
     std::string reference_id_;
@@ -220,7 +224,7 @@ protected:
 class EncryptJsonResponse : public JsonResponse {
 public:
     // Encrypt-specific required fields
-    std::string encrypted_compression_;
+    std::optional<CompressionCodec::type> encrypted_compression_;
     std::string encrypted_value_;
     
     /**
@@ -261,10 +265,10 @@ protected:
 class DecryptJsonResponse : public JsonResponse {
 public:
     // Decrypt-specific required fields
-    std::string datatype_;
+    std::optional<Type::type> datatype_;
     std::optional<int> datatype_length_;
-    std::string compression_;
-    std::string format_;
+    std::optional<CompressionCodec::type> compression_;
+    std::optional<Format::type> format_;
     std::string decrypted_value_;
     
     /**
