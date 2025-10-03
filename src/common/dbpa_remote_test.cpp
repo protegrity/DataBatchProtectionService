@@ -321,13 +321,13 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
             "{\"access\":{\"user_id\":\"test_user\",\"role\":\"EmailReader\",\"access_control\":\"granted\"},"
             "\"debug\":{\"reference_id\":\"123\"},"
             "\"data_batch\":{"
-            "\"datatype_info\":{\"datatype\":\"STRING\"},"
+            "\"datatype_info\":{\"datatype\":\"INT32\"},"
             "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"PLAIN\"},"
             "\"value\":\"dGVzdF9kYXRh\""
             "}}",
             "datatype mismatch",
-            "BYTE_ARRAY",
-            "STRING"
+            "INT32",
+            "BYTE_ARRAY"
         },
         // Compression mismatch
         {

@@ -8,15 +8,16 @@
 #include <optional>
 
 using namespace dbps::external;
+using namespace dbps::enum_utils;
 
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
-    const std::string& datatype,
+    Type::type datatype,
     const std::optional<int>& datatype_length,
-    const std::string& compression,
-    const std::string& format,
+    CompressionCodec::type compression,
+    Format::type format,
     const std::map<std::string, std::string>& encoding_attributes,
-    const std::string& encrypted_compression,
+    CompressionCodec::type encrypted_compression,
     const std::string& key_id
 ) : datatype_(datatype),
     datatype_length_(datatype_length),
@@ -52,22 +53,22 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
     // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
     //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
-    bool is_uncompressed = compression_enum_ == CompressionCodec::UNCOMPRESSED;
-    bool is_plain = format_enum_ == Format::PLAIN;
-    if (!is_uncompressed) {
-        std::cout << "Encrypt value - Data is compressed (" << compression_ << "), skipping detailed decode output. Raw size: " 
+    bool is_compressed = compression_ != CompressionCodec::UNCOMPRESSED;
+    bool is_plain = format_ == Format::PLAIN;
+    if (is_compressed) {
+        std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
     }
     if (!is_plain) {
-        std::cout << "Encrypt value - Data format is not PLAIN (" << format_ << "), skipping detailed decode output. Raw size: " 
+        std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
                   << decoded_data.size() << " bytes" << std::endl;
     }    
-    if (is_uncompressed && is_plain) {
+    if (!is_compressed && is_plain) {
         // Calculate the number of leading bytes to strip based on the encoding attributes
         int leading_bytes_to_strip = CalculateLevelBytesLength(decoded_data, encoding_attributes_converted_);
 
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_enum_, datatype_length_, leading_bytes_to_strip);
+        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_, datatype_length_, leading_bytes_to_strip);
         if (debug_decoded.length() > 1000) {
             std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
@@ -131,46 +132,6 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::string& cipherte
         error_message_ = "Failed to encode decrypted data to base64";
         return false;
     }
-    
-    return true;
-}
-
-bool DataBatchEncryptionSequencer::ConvertStringsToEnums() {
-    // Convert datatype string to enum
-    auto datatype_result = dbps::enum_utils::to_datatype_enum(datatype_);
-    if (!datatype_result) {
-        error_stage_ = "datatype_conversion";
-        error_message_ = "Invalid datatype: " + datatype_;
-        return false;
-    }
-    datatype_enum_ = *datatype_result;
-    
-    // Convert compression string to enum
-    auto compression_result = dbps::enum_utils::to_compression_enum(compression_);
-    if (!compression_result) {
-        error_stage_ = "compression_conversion";
-        error_message_ = "Invalid compression: " + compression_;
-        return false;
-    }
-    compression_enum_ = *compression_result;
-    
-    // Convert encrypted_compression string to enum (same as compression)
-    auto encrypted_compression_result = dbps::enum_utils::to_compression_enum(encrypted_compression_);
-    if (!encrypted_compression_result) {
-        error_stage_ = "encrypted_compression_conversion";
-        error_message_ = "Invalid encrypted_compression: " + encrypted_compression_;
-        return false;
-    }
-    encrypted_compression_enum_ = *encrypted_compression_result;
-    
-    // Convert format string to enum
-    auto format_result = dbps::enum_utils::to_format_enum(format_);
-    if (!format_result) {
-        error_stage_ = "format_conversion";
-        error_message_ = "Invalid format: " + format_;
-        return false;
-    }
-    format_enum_ = *format_result;
     
     return true;
 }
@@ -258,11 +219,6 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
 }
 
 bool DataBatchEncryptionSequencer::ValidateParameters() {
-    // First check: convert string values to enums
-    if (!ConvertStringsToEnums()) {
-        return false;
-    }
-    
     // Convert encoding attributes to typed values
     if (!ConvertEncodingAttributesToValues()) {
         return false;
@@ -276,7 +232,7 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     }
 
     // Check FIXED_LEN_BYTE_ARRAY datatype_length requirement
-    if (datatype_enum_ == Type::FIXED_LEN_BYTE_ARRAY) {
+    if (datatype_ == Type::FIXED_LEN_BYTE_ARRAY) {
         if (!datatype_length_.has_value()) {
             error_stage_ = "parameter_validation";
             error_message_ = "FIXED_LEN_BYTE_ARRAY datatype requires datatype_length parameter";

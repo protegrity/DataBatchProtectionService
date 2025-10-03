@@ -6,6 +6,7 @@
 #include "../common/tcb/span.hpp"
 #include "dbps_api_client.h"
 #include "http_client_interface.h"
+#include "../common/enums.h"
 #include <nlohmann/json.hpp>
 
 using namespace dbps::external;
@@ -114,7 +115,7 @@ TEST(ApiResponseSuccessWithValidResponse) {
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -134,7 +135,7 @@ TEST(ApiResponseSuccessWithInvalidHttpStatus) {
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
-    json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -155,7 +156,7 @@ TEST(ApiResponseSuccessWithApiClientError) {
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
-    json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -173,7 +174,7 @@ TEST(EncryptApiResponseGetResponseCiphertextWithValidData) {
     // Create a valid EncryptJsonResponse with base64 encoded data
     EncryptJsonResponse json_response;
     json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    json_response.encrypted_compression_ = "UNCOMPRESSED";
+    json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -210,9 +211,9 @@ TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     // Create a valid DecryptJsonResponse with base64 encoded data
     DecryptJsonResponse json_response;
     json_response.decrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    json_response.datatype_ = "BYTE_ARRAY";
-    json_response.compression_ = "UNCOMPRESSED";
-    json_response.format_ = "PLAIN";
+    json_response.datatype_ = Type::BYTE_ARRAY;
+    json_response.compression_ = CompressionCodec::UNCOMPRESSED;
+    json_response.format_ = Format::PLAIN;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
