@@ -26,22 +26,13 @@ using namespace dbps::external;
  */
 class DataBatchEncryptionSequencer {
 public:
-    // TODO: Move these to protected attributes if no external access is needed.
-    Type::type datatype_;
-    std::optional<int> datatype_length_;
-    CompressionCodec::type compression_;
-    Format::type format_;
-    std::map<std::string, std::string> encoding_attributes_;
-    CompressionCodec::type encrypted_compression_;
-    std::string key_id_;
+    // Result storage
+    std::vector<uint8_t> encrypted_result_;
+    std::vector<uint8_t> decrypted_result_;
     
     // Error reporting fields
     std::string error_stage_;
     std::string error_message_;
-    
-    // Result storage
-    std::vector<uint8_t> encrypted_result_;
-    std::vector<uint8_t> decrypted_result_;
     
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
@@ -65,6 +56,15 @@ public:
     bool ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext);
 
 protected:
+    // Parameters for encryption/decryption operations
+    Type::type datatype_;
+    std::optional<int> datatype_length_;
+    CompressionCodec::type compression_;
+    Format::type format_;
+    std::map<std::string, std::string> encoding_attributes_;
+    CompressionCodec::type encrypted_compression_;
+    std::string key_id_;
+
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
