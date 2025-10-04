@@ -70,6 +70,7 @@ target_include_directories(dbps_common_lib PUBLIC
   src/common
   src/common/tcb
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
 )
 
 # Server components library

@@ -4,6 +4,7 @@
 #include <string>
 #include <optional>
 #include <map>
+#include <cstdint>
 #include "enums.h"
 #include "enum_utils.h"
 
@@ -90,7 +91,7 @@ protected:
 class EncryptJsonRequest : public JsonRequest {
 public:
     // Encrypt-specific required fields
-    std::string value_;
+    std::vector<uint8_t> value_;
     
     /**
      * Default constructor.
@@ -130,7 +131,7 @@ protected:
 class DecryptJsonRequest : public JsonRequest {
 public:
     // Decrypt-specific required fields
-    std::string encrypted_value_;
+    std::vector<uint8_t> encrypted_value_;
     
     /**
      * Default constructor.
@@ -227,7 +228,7 @@ class EncryptJsonResponse : public JsonResponse {
 public:
     // Encrypt-specific required fields
     std::optional<CompressionCodec::type> encrypted_compression_;
-    std::string encrypted_value_;
+    std::vector<uint8_t> encrypted_value_;
     
     /**
      * Default constructor.
@@ -271,7 +272,7 @@ public:
     std::optional<int> datatype_length_;
     std::optional<CompressionCodec::type> compression_;
     std::optional<Format::type> format_;
-    std::string decrypted_value_;
+    std::vector<uint8_t> decrypted_value_;
     
     /**
      * Default constructor.

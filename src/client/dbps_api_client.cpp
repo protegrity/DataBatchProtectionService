@@ -7,33 +7,8 @@
 #include <stdexcept>
 #include <chrono>
 
-// Third-party library includes
-#include <cppcodec/base64_rfc4648.hpp>
-
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-
-// Auxiliary function for base64 encoding
-std::optional<std::string> EncodeBase64(span<const uint8_t> data) {
-    try {
-        // Use cppcodec library for robust base64 encoding
-        return cppcodec::base64_rfc4648::encode(data);
-    } catch (const std::exception& e) {
-        // Return empty optional on any encoding error
-        return std::nullopt;
-    }
-}
-
-// Auxiliary function for base64 decoding
-std::optional<std::vector<uint8_t>> DecodeBase64(const std::string& base64_string) {
-    try {
-        // Use cppcodec library for robust base64 decoding
-        return cppcodec::base64_rfc4648::decode(base64_string);
-    } catch (const std::exception& e) {
-        // Return empty optional on any decoding error
-        return std::nullopt;
-    }
-}
 
 // Generate a simple unique reference ID using timestamp
 // TODO: Potentially not-unique if concurrent calls are made on the same millisecond.
@@ -112,12 +87,7 @@ std::map<std::string, std::string> ApiResponse::ErrorFields() const {
 // EncryptApiResponse method implementations
 void EncryptApiResponse::SetJsonResponse(const EncryptJsonResponse& response) { 
     if (response.IsValid()) {
-        auto decoded = DecodeBase64(response.encrypted_value_);
-        if (decoded.has_value()) {
-            decoded_ciphertext_ = decoded.value();
-        } else {
-            decoded_ciphertext_.reset();
-        }
+        decoded_ciphertext_ = response.encrypted_value_;
     } else {
         decoded_ciphertext_.reset();
     }
@@ -146,12 +116,7 @@ const JsonRequest& EncryptApiResponse::GetJsonRequest() const { return json_requ
 // DecryptApiResponse method implementations
 void DecryptApiResponse::SetJsonResponse(const DecryptJsonResponse& response) { 
     if (response.IsValid()) {
-        auto decoded = DecodeBase64(response.decrypted_value_);
-        if (decoded.has_value()) {
-            decoded_plaintext_ = decoded.value();
-        } else {
-            decoded_plaintext_.reset();
-        }
+        decoded_plaintext_ = response.decrypted_value_;
     } else {
         decoded_plaintext_.reset();
     }
@@ -221,13 +186,8 @@ EncryptApiResponse DBPSApiClient::Encrypt(
 
     EncryptApiResponse api_response;
     try {
-        // Encode the plaintext as base64 and set the value_ param.
-        auto plaintext_b64 = EncodeBase64(plaintext);
-        if (!plaintext_b64.has_value()) {
-            api_response.SetApiClientError("Encrypt plaintext request - invalid base64 encoding");
-            return api_response;
-        }
-        json_request.value_ = plaintext_b64.value();
+        // Set the binary plaintext data directly (base64 conversion handled on json request functions)
+        json_request.value_ = std::vector<uint8_t>(plaintext.begin(), plaintext.end());
         
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
@@ -265,9 +225,9 @@ EncryptApiResponse DBPSApiClient::Encrypt(
             return api_response;
         }
 
-        // Check if the decoded ciphertext failed base64 decoding
+        // Check if the decoded ciphertext is empty
         if (api_response.GetResponseCiphertext().empty()) {
-            api_response.SetApiClientError("Decoded ciphertext response failed base64 decoding");
+            api_response.SetApiClientError("Decoded ciphertext response is empty");
             api_response.SetRawResponse(http_response.result);
             return api_response;
         }
@@ -306,14 +266,8 @@ DecryptApiResponse DBPSApiClient::Decrypt(
 
     DecryptApiResponse api_response;
     try {
-        // Encode the ciphertext as base64 and set the encrypted_value_ param and 
-        // check if it's valid before setting it.
-        auto ciphertext_b64 = EncodeBase64(ciphertext);
-        if (!ciphertext_b64.has_value()) {
-            api_response.SetApiClientError("Decrypt ciphertext request  - invalid base64 encoding");
-            return api_response;
-        }
-        json_request.encrypted_value_ = ciphertext_b64.value();
+        // Set the binary ciphertext data directly (base64 conversion handled on json request functions)
+        json_request.encrypted_value_ = std::vector<uint8_t>(ciphertext.begin(), ciphertext.end());
         
         // Set the complete request after all fields are populated
         api_response.SetJsonRequest(json_request);
@@ -351,9 +305,9 @@ DecryptApiResponse DBPSApiClient::Decrypt(
             return api_response;
         }
         
-        // Check if the decoded plaintext failed base64 decoding
+        // Check if the decoded plaintext is empty
         if (api_response.GetResponsePlaintext().empty()) {
-            api_response.SetApiClientError("Decoded plaintext response failed base64 decoding");
+            api_response.SetApiClientError("Decoded plaintext response is empty");
             api_response.SetRawResponse(http_response.result);
             return api_response;
         }

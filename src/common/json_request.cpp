@@ -2,6 +2,7 @@
 #include <crow/app.h>
 #include <sstream>
 #include <nlohmann/json.hpp>
+#include <cppcodec/base64_rfc4648.hpp>
 
 using namespace dbps::enum_utils;
 
@@ -70,6 +71,34 @@ std::string PrettyPrintJson(const std::string& json_str) {
     } catch (const nlohmann::json::exception& e) {
         // If parsing fails, return the original string
         return json_str;
+    }
+}
+
+/**
+ * Safely decodes a base64 string to binary data.
+ * @param base64_string The base64 encoded string
+ * @return std::optional<std::vector<uint8_t>> containing the decoded data, std::nullopt if decoding fails
+ */
+std::optional<std::vector<uint8_t>> DecodeBase64Safe(const std::string& base64_string) {
+    try {
+        return cppcodec::base64_rfc4648::decode(base64_string);
+    } catch (const std::exception& e) {
+        // Return nullopt on decoding failure
+        return std::nullopt;
+    }
+}
+
+/**
+ * Safely encodes binary data to a base64 string.
+ * @param data The binary data to encode
+ * @return std::string containing the base64 encoded data
+ */
+std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
+    try {
+        return cppcodec::base64_rfc4648::encode(data);
+    } catch (const std::exception& e) {
+        // Return empty string on encoding failure
+        return std::string();
     }
 }
 
@@ -197,7 +226,9 @@ void EncryptJsonRequest::Parse(const std::string& request_body) {
     
     // Extract encrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value"})) {
-        value_ = *parsed_value;
+        if (auto decoded_value = DecodeBase64Safe(*parsed_value)) {
+            value_ = *decoded_value;
+        }
     }
 }
 
@@ -237,7 +268,7 @@ std::string EncryptJsonRequest::ToJsonString() const {
     }
     data_batch["datatype_info"] = std::move(datatype_info);
     
-    data_batch["value"] = value_;
+    data_batch["value"] = EncodeBase64Safe(value_);
     
     crow::json::wvalue value_format;
     value_format["compression"] = std::string(to_string(compression_.value()));
@@ -293,7 +324,9 @@ void DecryptJsonRequest::Parse(const std::string& request_body) {
     
     // Extract decrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value"})) {
-        encrypted_value_ = *parsed_value;
+        if (auto decoded_value = DecodeBase64Safe(*parsed_value)) {
+            encrypted_value_ = *decoded_value;
+        }
     }
 }
 
@@ -352,7 +385,7 @@ std::string DecryptJsonRequest::ToJsonString() const {
     
     // Build data_batch_encrypted
     crow::json::wvalue data_batch_encrypted;
-    data_batch_encrypted["value"] = encrypted_value_;
+    data_batch_encrypted["value"] = EncodeBase64Safe(encrypted_value_);
     
     crow::json::wvalue encrypted_value_format;
     encrypted_value_format["compression"] = std::string(to_string(encrypted_compression_.value()));
@@ -415,7 +448,9 @@ void EncryptJsonResponse::Parse(const std::string& response_body) {
         }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value"})) {
-        encrypted_value_ = *parsed_value;
+        if (auto decoded_value = DecodeBase64Safe(*parsed_value)) {
+            encrypted_value_ = *decoded_value;
+        }
     }
 }
 
@@ -453,7 +488,9 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
         }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value"})) {
-        decrypted_value_ = *parsed_value;
+        if (auto decoded_value = DecodeBase64Safe(*parsed_value)) {
+            decrypted_value_ = *decoded_value;
+        }
     }
 }
 
@@ -516,7 +553,7 @@ std::string EncryptJsonResponse::ToJsonString() const {
     crow::json::wvalue encrypted_value_format;
     encrypted_value_format["compression"] = std::string(to_string(encrypted_compression_.value()));
     data_batch_encrypted["value_format"] = std::move(encrypted_value_format);
-    data_batch_encrypted["value"] = encrypted_value_;
+    data_batch_encrypted["value"] = EncodeBase64Safe(encrypted_value_);
     json["data_batch_encrypted"] = std::move(data_batch_encrypted);
     
     // Build access
@@ -587,7 +624,7 @@ std::string DecryptJsonResponse::ToJsonString() const {
     }
     data_batch["datatype_info"] = std::move(datatype_info);
     
-    data_batch["value"] = decrypted_value_;
+    data_batch["value"] = EncodeBase64Safe(decrypted_value_);
     
     crow::json::wvalue value_format;
     value_format["compression"] = std::string(to_string(compression_.value()));
