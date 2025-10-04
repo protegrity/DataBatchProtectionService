@@ -12,11 +12,6 @@
 using namespace dbps::external;
 using namespace dbps::enum_utils;
 
-// Helper function to convert string to binary data
-std::vector<uint8_t> StringToBytes(const std::string& str) {
-    return std::vector<uint8_t>(str.begin(), str.end());
-}
-
 // Simple test framework (matching existing project style)
 #define TEST(name) void test_##name()
 #define ASSERT(condition) assert(condition)
@@ -27,6 +22,11 @@ std::vector<uint8_t> StringToBytes(const std::string& str) {
 // Test utilities
 void PrintTestResult(const std::string& test_name, bool passed) {
     std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
+}
+
+// Helper function to convert string to binary data
+std::vector<uint8_t> StringToBytes(const std::string& str) {
+    return std::vector<uint8_t>(str.begin(), str.end());
 }
 
 // Utility function to compare JSON strings, ignoring specified fields
