@@ -8,6 +8,7 @@
 
 using namespace dbps::external;
 
+// TODO: Move this to a common test utility file.
 // Helper function to convert string to binary data
 std::vector<uint8_t> StringToBytes(const std::string& str) {
     return std::vector<uint8_t>(str.begin(), str.end());

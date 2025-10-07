@@ -24,6 +24,7 @@ void PrintTestResult(const std::string& test_name, bool passed) {
     std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
 }
 
+// TODO: Move this to a common test utility file.
 // Helper function to convert string to binary data
 std::vector<uint8_t> StringToBytes(const std::string& str) {
     return std::vector<uint8_t>(str.begin(), str.end());

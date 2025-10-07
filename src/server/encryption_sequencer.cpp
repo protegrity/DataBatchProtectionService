@@ -28,6 +28,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     key_id_(key_id) {}
 
 // Main processing methods
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -41,9 +42,6 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return false;
     }
     
-    // The plaintext is in binary format, so we can use it directly
-    const std::vector<uint8_t>& decoded_data = plaintext;
-    
     // Integration point for data element based encryptors.
     // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
     // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
@@ -52,18 +50,18 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     bool is_plain = format_ == Format::PLAIN;
     if (is_compressed) {
         std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
-                  << decoded_data.size() << " bytes" << std::endl;
+                  << plaintext.size() << " bytes" << std::endl;
     }
     if (!is_plain) {
         std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
-                  << decoded_data.size() << " bytes" << std::endl;
+                  << plaintext.size() << " bytes" << std::endl;
     }    
     if (!is_compressed && is_plain) {
         // Calculate the number of leading bytes to strip based on the encoding attributes
-        int leading_bytes_to_strip = CalculateLevelBytesLength(decoded_data, encoding_attributes_converted_);
+        int leading_bytes_to_strip = CalculateLevelBytesLength(plaintext, encoding_attributes_converted_);
 
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_, datatype_length_, leading_bytes_to_strip);
+        std::string debug_decoded = PrintPlainDecoded(plaintext, datatype_, datatype_length_, leading_bytes_to_strip);
         if (debug_decoded.length() > 1000) {
             std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
@@ -73,7 +71,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     }
     
     // Simple XOR encryption
-    encrypted_result_ = EncryptData(decoded_data);
+    encrypted_result_ = EncryptData(plaintext);
     if (encrypted_result_.empty()) {
         error_stage_ = "encryption";
         error_message_ = "Failed to encrypt data";
@@ -83,6 +81,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     return true;
 }
 
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -96,11 +95,8 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         return false;
     }
     
-    // The ciphertext is in binary format, so we can use it directly
-    const std::vector<uint8_t>& encrypted_data = ciphertext;
-    
     // Simple XOR decryption (same operation as encryption)
-    decrypted_result_ = DecryptData(encrypted_data);
+    decrypted_result_ = DecryptData(ciphertext);
     if (decrypted_result_.empty()) {
         error_stage_ = "decryption";
         error_message_ = "Failed to decrypt data";
