@@ -2,7 +2,6 @@
 #include "../client/dbps_api_client.h"
 #include "../client/httplib_client.h"
 #include "enum_utils.h"
-#include "dbpa_utils.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
@@ -159,7 +158,7 @@ void RemoteDataBatchProtectionAgent::init(
         );
 
         // Either with the injected HTTP client or not, the server_url should be there.
-        auto server_url_opt = dbps::external::ExtractServerUrl(connection_config_);
+        auto server_url_opt = ExtractServerUrl(connection_config_);
         if (!server_url_opt || server_url_opt->empty()) {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
             initialized_ = "Agent not properly initialized - server_url missing";
@@ -176,7 +175,7 @@ void RemoteDataBatchProtectionAgent::init(
         }
 
         // Extract user_id from app_context
-        auto user_id_opt = dbps::external::ExtractUserId(app_context_);
+        auto user_id_opt = ExtractUserId(app_context_);
         if (!user_id_opt || user_id_opt->empty()) {
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No user_id provided in app_context." << std::endl;
             initialized_ = "Agent not properly initialized - user_id missing";
@@ -234,7 +233,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
     }
     
     // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    auto format_opt = ExtractPageEncoding(encoding_attributes);
     if (!format_opt.has_value()) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Encrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         auto empty_response = std::make_unique<EncryptApiResponse>();
@@ -289,7 +288,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     }
     
     // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    auto format_opt = ExtractPageEncoding(encoding_attributes);
     if (!format_opt.has_value()) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Decrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         auto empty_response = std::make_unique<DecryptApiResponse>();
@@ -333,4 +332,88 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
 
     // Wrap the API response in our result class
     return std::make_unique<RemoteDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
+}
+
+std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
+  const std::map<std::string, std::string>& connection_config) const {
+    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::ExtractServerUrl() - ";
+    auto config_file_it = connection_config.find("connection_config_file_path");
+    if (config_file_it == connection_config.end()) {
+        std::cerr << error_trace 
+                  << "connection_config does not provide connection_config_file_path" << std::endl;
+        return std::nullopt;
+    }
+    
+    auto config_file_path = config_file_it->second;
+    if (!std::filesystem::exists(config_file_path)) {
+        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+                  << "] does not exist" << std::endl;
+        return std::nullopt;
+    }
+
+    std::ifstream config_file(config_file_path);
+    if (!config_file.is_open()) {
+        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+                  << "] could not be opened" << std::endl;
+        return std::nullopt;
+    }
+
+    std::string config_file_contents((std::istreambuf_iterator<char>(config_file)),
+                                      std::istreambuf_iterator<char>());
+    config_file.close();
+
+    if (config_file_contents.empty()) {
+        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+                  << "] is empty" << std::endl;
+        return std::nullopt;
+    }
+
+    try {
+        auto json = nlohmann::json::parse(config_file_contents);
+        if (json.contains("server_url") && json["server_url"].is_string()) {
+            std::string server_url = json["server_url"];
+            if (!server_url.empty()) {
+                return server_url;
+            }
+        }
+        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+                  << "] does not contain a valid server_url" << std::endl;
+        return std::nullopt;
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+                  << "] is not a valid JSON file: " << e.what() << std::endl;
+        return std::nullopt;
+    }
+}
+
+std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
+    try {
+        auto json = nlohmann::json::parse(app_context);
+        if (json.contains("user_id") && json["user_id"].is_string()) {
+            std::string user_id = json["user_id"];
+            if (!user_id.empty()) {
+                return user_id;
+            }
+        }
+    } catch (const nlohmann::json::exception& e) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - Failed to parse app_context JSON: " << e.what() << std::endl;
+    }
+    return std::nullopt;
+}
+
+std::optional<Format::type> RemoteDataBatchProtectionAgent::ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const {
+    auto it = encoding_attributes.find("page_encoding");
+    if (it != encoding_attributes.end()) {
+        const std::string& encoding_str = it->second;
+        auto format_opt = to_format_enum(encoding_str);
+        if (format_opt.has_value()) {
+            return format_opt.value();
+        } else {
+            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - Unknown page_encoding: " << encoding_str << std::endl;
+            return std::nullopt;
+        }
+    }
+    // Return nullopt if page_encoding not found
+    std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - page_encoding not found." << std::endl;
+    return std::nullopt;
 }
