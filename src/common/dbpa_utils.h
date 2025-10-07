@@ -8,6 +8,8 @@
 #include "enum_utils.h"
 #include <nlohmann/json.hpp>
 
+// TODO: Define all constant/literal (e.g. "server_url", "user_id", "page_encoding") as constants here.
+
 namespace dbps::external {
 
 /**

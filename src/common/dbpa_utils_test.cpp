@@ -17,6 +17,7 @@ TEST(DBPAUtilsTest, ExtractServerUrl_ValidUrl) {
 TEST(DBPAUtilsTest, ExtractServerUrl_ValidUrlWithOtherFields) {
     std::map<std::string, std::string> connection_config = {
         {"server_url", "https://example.com:443"},
+        // timeout and retry_count are for testing purposes only
         {"timeout", "30"},
         {"retry_count", "3"}
     };
