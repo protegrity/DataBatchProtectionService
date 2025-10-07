@@ -1,6 +1,9 @@
 #include "dbpa_remote.h"
 #include "../client/dbps_api_client.h"
 #include "../client/httplib_client.h"
+
+#include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>
@@ -79,9 +82,69 @@ protected:
     
     void TearDown() override {
         mock_client_.reset();
+        for (const auto& file_path : tmp_test_data_dir_) {
+            if (std::filesystem::exists(file_path)) {
+                std::filesystem::remove(file_path);
+            }
+        }
+        tmp_test_data_dir_.clear();
+    }
+
+    void CreateTemporaryConnectionConfigFile(
+      const std::string& file_contents, const std::string& file_name) {
+        std::string tmp_file_path = std::filesystem::temp_directory_path() / file_name;
+
+        std::ofstream file(tmp_file_path);
+        if (file.is_open()) {
+            file << file_contents;
+            file.close();
+            tmp_test_data_dir_.push_back(tmp_file_path);
+        } else {
+            throw std::runtime_error(
+                "Failed to create temporary connection config file: " + tmp_file_path);
+        }
+    }
+
+    std::map<std::string, std::string> GetConnectionConfig(
+      const std::string& file_contents, const std::string& file_name) {
+        std::string tmp_file_path = std::filesystem::temp_directory_path() / file_name;
+        if (!std::filesystem::exists(tmp_file_path)) {
+            CreateTemporaryConnectionConfigFile(file_contents, file_name);
+        }
+        return {{"connection_config_file_path", tmp_file_path}};
+    }
+
+    void TestConnectionConfigFailures(const std::map<std::string, std::string>& connection_config) {
+        auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
+        
+        std::string app_context = "{\"user_id\": \"test_user\"}";
+        
+        // init() should throw DBPSException for missing server URL
+        EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), 
+                     DBPSException);
+        
+        // Test that the initialized_ state reflects the failure
+        EXPECT_TRUE(agent.get_initialized().has_value());
+        EXPECT_FALSE(agent.get_initialized()->empty());
+        EXPECT_TRUE(agent.get_initialized()->find("server_url") != std::string::npos);
+        
+        // Test that Encrypt() returns a failed result with the initialization error
+        std::vector<uint8_t> test_data = {1, 2, 3, 4};
+        std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
+        auto result = agent.Encrypt(test_data, encoding_attributes);
+        
+        ASSERT_NE(result, nullptr);
+        EXPECT_FALSE(result->success());
+        
+        // Check that the error message contains expected content
+        std::string error_msg = result->error_message();
+        EXPECT_TRUE(error_msg.find("initialized") != std::string::npos);
+        EXPECT_TRUE(error_msg.find("server_url") != std::string::npos);
     }
     
     std::unique_ptr<MockHttpClient> mock_client_;
+    std::vector<std::string> tmp_test_data_dir_;
 };
 
 // Test basic initialization with valid configuration
@@ -90,7 +153,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, BasicInitialization) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
@@ -104,8 +168,10 @@ TEST_F(RemoteDataBatchProtectionAgentTest, BasicInitialization) {
     EXPECT_EQ(agent.get_compression_type(), CompressionCodec::UNCOMPRESSED);
     
     // Test that connection config and app context are accessible
-    EXPECT_TRUE(agent.get_connection_config().find("server_url") != agent.get_connection_config().end());
-    EXPECT_EQ(agent.get_connection_config().at("server_url"), "http://localhost:8080");
+    EXPECT_TRUE(agent.get_connection_config().find("connection_config_file_path") 
+                != agent.get_connection_config().end());
+    EXPECT_TRUE(std::filesystem::exists(
+        agent.get_connection_config().at("connection_config_file_path")));
     EXPECT_EQ(agent.get_app_context(), app_context);
     
     // Test that RemoteDataBatchProtectionAgent specific variables are set
@@ -130,42 +196,25 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptWithoutInit) {
     EXPECT_TRUE(error_msg.find("init() was not called") != std::string::npos);
 }
 
-// Test initialization with missing server URL
-TEST_F(RemoteDataBatchProtectionAgentTest, MissingServerUrl) {
-    auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
-    
-    std::map<std::string, std::string> connection_config = {}; // No server_url
-    std::string app_context = "{\"user_id\": \"test_user\"}";
-    
-    // init() should throw DBPSException for missing server URL
-    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), 
-                 DBPSException);
-    
-    // Test that the initialized_ state reflects the failure
-    EXPECT_TRUE(agent.get_initialized().has_value());
-    EXPECT_FALSE(agent.get_initialized()->empty());
-    EXPECT_TRUE(agent.get_initialized()->find("server_url") != std::string::npos);
-    
-    // Test that Encrypt() returns a failed result with the initialization error
-    std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
-    auto result = agent.Encrypt(test_data, encoding_attributes);
-    
-    ASSERT_NE(result, nullptr);
-    EXPECT_FALSE(result->success());
-    
-    // Check that the error message contains expected content
-    std::string error_msg = result->error_message();
-    EXPECT_TRUE(error_msg.find("initialized") != std::string::npos);
-    EXPECT_TRUE(error_msg.find("server_url") != std::string::npos);
+// Test initialization with bad connection configurations
+TEST_F(RemoteDataBatchProtectionAgentTest, EmptyConnectionConfig) {
+    TestConnectionConfigFailures(GetConnectionConfig("", "empty_connection_config.json"));
+}
+
+TEST_F(RemoteDataBatchProtectionAgentTest, NonExistingConnectionConfigFile) {
+    TestConnectionConfigFailures({{"connection_config_file_path", "foo"}});
+}
+
+TEST_F(RemoteDataBatchProtectionAgentTest, BadJsonConfigFile) {
+    TestConnectionConfigFailures(GetConnectionConfig("foo", "bad_json_connection_config.json"));
 }
 
 // Test initialization with missing user ID
 TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
-    
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{}"; // No user_id
     
     // init() should throw DBPSException for missing user ID
@@ -198,7 +247,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, HealthCheckFailure) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should throw DBPSException for health check failure
@@ -241,7 +291,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulEncryption) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
@@ -282,7 +333,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
@@ -351,7 +403,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
         
         auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client));
         
-        std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+        auto connection_config = GetConnectionConfig(
+            "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
         std::string app_context = "{\"user_id\": \"test_user\"}";
         
         // init() should not throw an exception for valid configuration
@@ -393,7 +446,8 @@ TEST_F(RemoteDataBatchProtectionAgentTest, EncryptionFieldMismatch) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
+    auto connection_config = GetConnectionConfig(
+        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
