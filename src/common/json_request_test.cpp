@@ -4,8 +4,34 @@
 #include <crow/app.h>
 #include "json_request.h"
 #include "enums.h"
+#include <cppcodec/base64_rfc4648.hpp>
 
 using namespace dbps::external;
+
+// Helper function to convert base64 string to binary data for testing
+std::vector<uint8_t> Base64ToBinary(const std::string& base64_str) {
+    return cppcodec::base64_rfc4648::decode(base64_str);
+}
+
+// Helper function to convert binary data to base64 string for testing
+std::string BinaryToBase64(const std::vector<uint8_t>& binary_data) {
+    return cppcodec::base64_rfc4648::encode(binary_data);
+}
+
+// Helper function to convert a human-readable string to binary data (via base64)
+// This simulates what happens in the real system: string -> base64 -> binary
+std::vector<uint8_t> StringToBinary(const std::string& input_str) {
+    std::string base64_str = cppcodec::base64_rfc4648::encode(input_str);
+    return cppcodec::base64_rfc4648::decode(base64_str);
+}
+
+// Helper function to convert binary data back to a human-readable string
+// This simulates what happens in the real system: binary -> base64 -> string
+std::string BinaryToString(const std::vector<uint8_t>& binary_data) {
+    std::string base64_str = cppcodec::base64_rfc4648::encode(binary_data);
+    std::vector<uint8_t> decoded_bytes = cppcodec::base64_rfc4648::decode(base64_str);
+    return std::string(decoded_bytes.begin(), decoded_bytes.end());
+}
 
 // Forward declarations for internal functions from json_request.cpp
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
@@ -128,7 +154,7 @@ TEST(JsonRequestValidParse) {
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific field
-    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_); // "test@example.com"
+    ASSERT_EQ(StringToBinary("test@example.com"), request.value_);
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -219,7 +245,7 @@ TEST(JsonRequestRequiredReferenceIdMissing) {
     ASSERT_EQ("", request.reference_id_);
     
     // Check encrypt-specific field (should be empty since no value in JSON)
-    ASSERT_EQ("", request.value_);
+    ASSERT_EQ(std::vector<uint8_t>{}, request.value_);
     
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
@@ -242,7 +268,7 @@ TEST(EncryptJsonRequestValidParse) {
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check encrypt-specific fields
-    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_); // "test@example.com"
+    ASSERT_EQ(StringToBinary("test@example.com"), request.value_);
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -293,7 +319,7 @@ TEST(EncryptJsonRequestMissingValue) {
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Encrypt-specific field should be empty
-    ASSERT_EQ("", request.value_);
+    ASSERT_EQ(std::vector<uint8_t>{}, request.value_);
     
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
@@ -316,7 +342,7 @@ TEST(DecryptJsonRequestValidParse) {
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Check decrypt-specific fields
-    ASSERT_EQ("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=", request.encrypted_value_); // "ENCRYPTED_test@example.com"
+    ASSERT_EQ(StringToBinary("ENCRYPTED_test@example.com"), request.encrypted_value_);
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -367,7 +393,7 @@ TEST(DecryptJsonRequestMissingEncryptedValue) {
     ASSERT_EQ("ref789", request.reference_id_);
     
     // Decrypt-specific field should be empty
-    ASSERT_EQ("", request.encrypted_value_);
+    ASSERT_EQ(std::vector<uint8_t>{}, request.encrypted_value_);
     
     ASSERT_FALSE(request.IsValid());
     std::string error = request.GetValidationError();
@@ -465,7 +491,7 @@ TEST(EncryptJsonRequestWithEncodingAttributes) {
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
     ASSERT_EQ("ref789", request.reference_id_);
-    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", request.value_);
+    ASSERT_EQ(StringToBinary("test@example.com"), request.value_);
     
     // Verify encoding_attributes are parsed correctly
     ASSERT_EQ(3, request.encoding_attributes_.size());
@@ -488,7 +514,7 @@ TEST(EncryptJsonRequestToJsonWithEncodingAttributes) {
     request.key_id_ = "key123";
     request.user_id_ = "user456";
     request.reference_id_ = "ref789";
-    request.value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
+    request.value_ = StringToBinary("test@example.com");
     
     // Add encoding_attributes
     request.encoding_attributes_["page_type"] = "DATA_PAGE";
@@ -585,7 +611,7 @@ TEST(EncryptJsonResponseValidParse) {
     ASSERT_EQ("read_write", response.access_control_);
     ASSERT_EQ("ref789", response.reference_id_);
     ASSERT_EQ(CompressionCodec::GZIP, response.encrypted_compression_.value());
-    ASSERT_EQ("RU5DUllQVEVEX3Rlc3RAZXhhbXBsZS5jb20=", response.encrypted_value_); // "ENCRYPTED_test@example.com"
+    ASSERT_EQ(StringToBinary("ENCRYPTED_test@example.com"), response.encrypted_value_);
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -602,7 +628,7 @@ TEST(DecryptJsonResponseValidParse) {
     ASSERT_EQ(Type::BYTE_ARRAY, response.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, response.compression_.value());
     ASSERT_EQ(Format::UNDEFINED, response.format_.value());
-    ASSERT_EQ("dGVzdEBleGFtcGxlLmNvbQ==", response.decrypted_value_); // "test@example.com"
+    ASSERT_EQ(StringToBinary("test@example.com"), response.decrypted_value_);
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -693,7 +719,7 @@ TEST(EncryptJsonResponseToJson) {
     response.access_control_ = "read_write";
     response.reference_id_ = "ref456";
     response.encrypted_compression_ = CompressionCodec::GZIP;
-    response.encrypted_value_ = "RU5DUllQVEVEX2RhdGE="; // "ENCRYPTED_data"
+    response.encrypted_value_ = StringToBinary("ENCRYPTED_data");
     
     ASSERT_TRUE(response.IsValid());
     
@@ -715,7 +741,7 @@ TEST(DecryptJsonResponseToJson) {
     response.datatype_ = Type::BYTE_ARRAY;
     response.compression_ = CompressionCodec::UNCOMPRESSED;
     response.format_ = Format::UNDEFINED;
-    response.decrypted_value_ = "ZGVjcnlwdGVkX2RhdGE="; // "decrypted_data"
+    response.decrypted_value_ = StringToBinary("decrypted_data");
     
     ASSERT_TRUE(response.IsValid());
     
@@ -740,7 +766,7 @@ TEST(JsonResponsePartialParsing) {
     
     // Should parse what it can, but validation should fail
     ASSERT_EQ("user123", response.user_id_);
-    ASSERT_EQ("RU5DUllQVEVEX2RhdGE=", response.encrypted_value_); // "ENCRYPTED_data"
+    ASSERT_EQ(StringToBinary("ENCRYPTED_data"), response.encrypted_value_);
     ASSERT_FALSE(response.IsValid()); // Missing other required fields
 }
 
@@ -822,7 +848,7 @@ static void test_DatatypeLengthSerialization() {
     request.format_ = Format::PLAIN;
     request.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     request.key_id_ = "test_key_123";
-    request.value_ = "SGVsbG8sIFdvcmxkIQ==";
+    request.value_ = StringToBinary("Hello, World!");
     
     std::string json_output = request.ToJsonString();
     auto json_obj = crow::json::load(json_output);

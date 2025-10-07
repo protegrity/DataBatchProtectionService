@@ -5,6 +5,7 @@
 #include <optional>
 #include <variant>
 #include <map>
+#include <cstdint>
 #include "enums.h"
 
 using namespace dbps::external;
@@ -25,22 +26,13 @@ using namespace dbps::external;
  */
 class DataBatchEncryptionSequencer {
 public:
-    // TODO: Move these to protected attributes if no external access is needed.
-    Type::type datatype_;
-    std::optional<int> datatype_length_;
-    CompressionCodec::type compression_;
-    Format::type format_;
-    std::map<std::string, std::string> encoding_attributes_;
-    CompressionCodec::type encrypted_compression_;
-    std::string key_id_;
+    // Result storage
+    std::vector<uint8_t> encrypted_result_;
+    std::vector<uint8_t> decrypted_result_;
     
     // Error reporting fields
     std::string error_stage_;
     std::string error_message_;
-    
-    // Result storage
-    std::string encrypted_result_;
-    std::string decrypted_result_;
     
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
@@ -60,10 +52,19 @@ public:
     ~DataBatchEncryptionSequencer() = default;
     
     // Main processing methods
-    bool ConvertAndEncrypt(const std::string& plaintext);
-    bool ConvertAndDecrypt(const std::string& ciphertext);
+    bool ConvertAndEncrypt(const std::vector<uint8_t>& plaintext);
+    bool ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext);
 
 protected:
+    // Parameters for encryption/decryption operations
+    Type::type datatype_;
+    std::optional<int> datatype_length_;
+    CompressionCodec::type compression_;
+    Format::type format_;
+    std::map<std::string, std::string> encoding_attributes_;
+    CompressionCodec::type encrypted_compression_;
+    std::string key_id_;
+
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
@@ -82,10 +83,6 @@ protected:
      * Returns true if all validation passes, false otherwise.
      */
     bool ValidateParameters();
-    
-    // Encode-decode base64 string to binary data using cppcodec library
-    std::vector<uint8_t> DecodeBase64(const std::string& base64_string);
-    std::string EncodeBase64(const std::vector<uint8_t>& data);
     
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);

@@ -54,9 +54,6 @@ int main() {
         response.reference_id_ = request.reference_id_;
         response.encrypted_compression_ = request.encrypted_compression_;
         
-        // Use encoding_attributes in encryption sequencer
-        const auto& encoding_attributes = request.encoding_attributes_;
-
         // Use DataBatchEncryptionSequencer for actual encryption
         // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
@@ -64,7 +61,7 @@ int main() {
             request.datatype_length_,
             request.compression_.value(),
             request.format_.value(),
-            encoding_attributes,
+            request.encoding_attributes_,
             request.encrypted_compression_.value(),
             request.key_id_
         );
@@ -100,9 +97,6 @@ int main() {
         std::cout << request.ToJson() << std::endl;
         std::cout << "=====================================" << std::endl;
 
-        // Use encoding_attributes in decryption sequencer
-        const auto& encoding_attributes = request.encoding_attributes_;
-
         // Create response using our JsonResponse class
         DecryptJsonResponse response;
         
@@ -125,7 +119,7 @@ int main() {
             request.datatype_length_,
             request.compression_.value(),
             request.format_.value(),
-            encoding_attributes,
+            request.encoding_attributes_,
             request.encrypted_compression_.value(),
             request.key_id_
         );

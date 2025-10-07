@@ -1,11 +1,11 @@
 #include "encryption_sequencer.h"
 #include "enum_utils.h"
 #include "decoding_utils.h"
-#include <cppcodec/base64_rfc4648.hpp>
 #include <functional>
 #include <iostream>
 #include <sstream>
 #include <optional>
+#include <cassert>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -28,7 +28,8 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     key_id_(key_id) {}
 
 // Main processing methods
-bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintext) {
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;
@@ -41,14 +42,6 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
         return false;
     }
     
-    // Decode the base64 plaintext to get the original binary data
-    std::vector<uint8_t> decoded_data = DecodeBase64(plaintext);
-    if (decoded_data.empty()) {
-        error_stage_ = "base64_decoding";
-        error_message_ = "Failed to decode base64 plaintext";
-        return false;
-    }
-    
     // Integration point for data element based encryptors.
     // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
     // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
@@ -57,18 +50,18 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     bool is_plain = format_ == Format::PLAIN;
     if (is_compressed) {
         std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
-                  << decoded_data.size() << " bytes" << std::endl;
+                  << plaintext.size() << " bytes" << std::endl;
     }
     if (!is_plain) {
         std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
-                  << decoded_data.size() << " bytes" << std::endl;
+                  << plaintext.size() << " bytes" << std::endl;
     }    
     if (!is_compressed && is_plain) {
         // Calculate the number of leading bytes to strip based on the encoding attributes
-        int leading_bytes_to_strip = CalculateLevelBytesLength(decoded_data, encoding_attributes_converted_);
+        int leading_bytes_to_strip = CalculateLevelBytesLength(plaintext, encoding_attributes_converted_);
 
         // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(decoded_data, datatype_, datatype_length_, leading_bytes_to_strip);
+        std::string debug_decoded = PrintPlainDecoded(plaintext, datatype_, datatype_length_, leading_bytes_to_strip);
         if (debug_decoded.length() > 1000) {
             std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
                       << debug_decoded.substr(0, 1000) << "..." << std::endl;
@@ -78,25 +71,18 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::string& plaintex
     }
     
     // Simple XOR encryption
-    std::vector<uint8_t> encrypted_data = EncryptData(decoded_data);
-    if (encrypted_data.empty()) {
+    encrypted_result_ = EncryptData(plaintext);
+    if (encrypted_result_.empty()) {
         error_stage_ = "encryption";
         error_message_ = "Failed to encrypt data";
-        return false;
-    }
-    
-    // Encode encrypted data back to base64
-    encrypted_result_ = EncodeBase64(encrypted_data);
-    if (encrypted_result_.empty()) {
-        error_stage_ = "base64_encoding";
-        error_message_ = "Failed to encode encrypted data to base64";
         return false;
     }
     
     return true;
 }
 
-bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::string& ciphertext) {
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;
@@ -109,27 +95,11 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::string& cipherte
         return false;
     }
     
-    // Decode the base64 ciphertext to get the encrypted binary data
-    std::vector<uint8_t> encrypted_data = DecodeBase64(ciphertext);
-    if (encrypted_data.empty()) {
-        error_stage_ = "base64_decoding";
-        error_message_ = "Failed to decode base64 ciphertext";
-        return false;
-    }
-    
     // Simple XOR decryption (same operation as encryption)
-    std::vector<uint8_t> decrypted_data = DecryptData(encrypted_data);
-    if (decrypted_data.empty()) {
+    decrypted_result_ = DecryptData(ciphertext);
+    if (decrypted_result_.empty()) {
         error_stage_ = "decryption";
         error_message_ = "Failed to decrypt data";
-        return false;
-    }
-    
-    // Encode decrypted data back to base64
-    decrypted_result_ = EncodeBase64(decrypted_data);
-    if (decrypted_result_.empty()) {
-        error_stage_ = "base64_encoding";
-        error_message_ = "Failed to encode decrypted data to base64";
         return false;
     }
     
@@ -246,26 +216,6 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     }
     
     return true;
-}
-
-std::vector<uint8_t> DataBatchEncryptionSequencer::DecodeBase64(const std::string& base64_string) {
-    try {
-        // Use cppcodec library for robust base64 decoding
-        return cppcodec::base64_rfc4648::decode(base64_string);
-    } catch (const std::exception& e) {
-        // Return empty vector on any decoding error
-        return std::vector<uint8_t>();
-    }
-}
-
-std::string DataBatchEncryptionSequencer::EncodeBase64(const std::vector<uint8_t>& data) {
-    try {
-        // Use cppcodec library for robust base64 encoding
-        return cppcodec::base64_rfc4648::encode(data);
-    } catch (const std::exception& e) {
-        // Return empty string on any encoding error
-        return "";
-    }
 }
 
 std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector<uint8_t>& data) {

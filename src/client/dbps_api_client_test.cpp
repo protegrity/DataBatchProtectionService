@@ -24,6 +24,12 @@ void PrintTestResult(const std::string& test_name, bool passed) {
     std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
 }
 
+// TODO: Move this to a common test utility file.
+// Helper function to convert string to binary data
+std::vector<uint8_t> StringToBytes(const std::string& str) {
+    return std::vector<uint8_t>(str.begin(), str.end());
+}
+
 // Utility function to compare JSON strings, ignoring specified fields
 bool CompareJsonStrings(const std::string& json1, const std::string& json2, const std::vector<std::string>& ignore_fields = {}) {
     try {
@@ -114,7 +120,7 @@ TEST(ApiResponseSuccessWithValidResponse) {
     
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
-    json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
+    json_response.encrypted_value_ = StringToBytes("test@example.com");
     json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
@@ -134,7 +140,7 @@ TEST(ApiResponseSuccessWithInvalidHttpStatus) {
     
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
-    json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
+    json_response.encrypted_value_ = StringToBytes("test@example.com");
     json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
@@ -155,7 +161,7 @@ TEST(ApiResponseSuccessWithApiClientError) {
     
     // Create a valid EncryptJsonResponse
     EncryptJsonResponse json_response;
-    json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ==";
+    json_response.encrypted_value_ = StringToBytes("test@example.com");
     json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
@@ -171,9 +177,9 @@ TEST(ApiResponseSuccessWithApiClientError) {
 TEST(EncryptApiResponseGetResponseCiphertextWithValidData) {
     TestableEncryptApiResponse response;
     
-    // Create a valid EncryptJsonResponse with base64 encoded data
+    // Create a valid EncryptJsonResponse with binary data
     EncryptJsonResponse json_response;
-    json_response.encrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
+    json_response.encrypted_value_ = StringToBytes("test@example.com");
     json_response.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
@@ -208,9 +214,9 @@ TEST(EncryptApiResponseGetResponseCiphertextWithNoData) {
 TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     TestableDecryptApiResponse response;
     
-    // Create a valid DecryptJsonResponse with base64 encoded data
+    // Create a valid DecryptJsonResponse with binary data
     DecryptJsonResponse json_response;
-    json_response.decrypted_value_ = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
+    json_response.decrypted_value_ = StringToBytes("test@example.com");
     json_response.datatype_ = Type::BYTE_ARRAY;
     json_response.compression_ = CompressionCodec::UNCOMPRESSED;
     json_response.format_ = Format::PLAIN;
@@ -292,8 +298,7 @@ TEST(EncryptWithValidData) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_plaintext = "test@example.com";
-    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    std::vector<uint8_t> plaintext_data = StringToBytes("test@example.com");
     
     // Call Encrypt() with valid parameters
     auto response = client.Encrypt(
@@ -346,7 +351,7 @@ TEST(DecryptWithValidData) {
             }
         },
         "data_batch_encrypted": {
-            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {"compression": "UNCOMPRESSED"}
         },
         "encryption": {"key_id": "test_key_123"},
@@ -382,8 +387,7 @@ TEST(DecryptWithValidData) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
+    std::vector<uint8_t> ciphertext_data = StringToBytes("test@example.com");
     
     // Call Decrypt() with valid parameters
     auto response = client.Decrypt(
@@ -427,8 +431,7 @@ TEST(EncryptWithInvalidData) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_plaintext = "test@example.com";
-    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    std::vector<uint8_t> plaintext_data = StringToBytes("test@example.com");
     
     // Test empty plaintext
     std::vector<uint8_t> empty_data;
@@ -457,8 +460,7 @@ TEST(DecryptWithInvalidData) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
+    std::vector<uint8_t> ciphertext_data = StringToBytes("test@example.com");
     
     // Test empty ciphertext
     std::vector<uint8_t> empty_data;
@@ -477,152 +479,6 @@ TEST(DecryptWithInvalidData) {
     
     // Verify the response indicates failure
     ASSERT_FALSE(response1.Success());
-}
-
-TEST(EncryptWithInvalidBase64Response) {
-    // Create mock HTTP client
-    auto mock_client = std::make_unique<MockHttpClient>();
-    
-    // Set up mock response for /encrypt endpoint with invalid base64
-    std::string expected_request = R"({
-        "column_reference": {"name": "email"},
-        "data_batch": {
-            "datatype_info": {
-                "datatype": "BYTE_ARRAY"
-            },
-            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
-            "value_format": {
-                "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
-            }
-        },
-        "data_batch_encrypted": {
-            "value_format": {"compression": "UNCOMPRESSED"}
-        },
-        "encryption": {"key_id": "test_key_123"},
-        "access": {"user_id": "test_user_456"},
-        "debug": {"reference_id": "1755831549871"}
-    })";
-    
-    // Response with valid JSON structure but invalid base64 value
-    std::string mock_response = R"({
-        "data_batch_encrypted": {
-            "value": "INVALID_BASE64_VALUE!!!",
-            "value_format": {
-                "compression": "UNCOMPRESSED"
-            }
-        },
-        "access": {
-            "user_id": "test_user",
-            "role": "test_role",
-            "access_control": "test_access"
-        },
-        "debug": {
-            "reference_id": "test_ref"
-        }
-    })";
-    
-    mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
-    
-    // Create DBPSApiClient with mock client
-    DBPSApiClient client(std::move(mock_client));
-    
-    // Create test data
-    std::string test_plaintext = "test@example.com";
-    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
-    
-    // Call Encrypt() with valid parameters
-    auto response = client.Encrypt(
-        span<const uint8_t>(plaintext_data),
-        "email",                    // column_name
-        Type::BYTE_ARRAY,           // datatype
-        std::nullopt,               // datatype_length
-        CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
-        std::map<std::string, std::string>{}, // encoding_attributes
-        CompressionCodec::UNCOMPRESSED, // encrypted_compression
-        "test_key_123",             // key_id
-        "test_user_456"             // user_id
-    );
-    
-    // Verify the response indicates failure
-    ASSERT_FALSE(response.Success());
-}
-
-TEST(DecryptWithInvalidBase64Response) {
-    // Create mock HTTP client
-    auto mock_client = std::make_unique<MockHttpClient>();
-    
-    // Set up mock response for /decrypt endpoint with invalid base64
-    std::string expected_request = R"({
-        "column_reference": {"name": "email"},
-        "data_batch": {
-            "datatype_info": {
-                "datatype": "BYTE_ARRAY"
-            },
-            "value_format": {
-                "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
-            }
-        },
-        "data_batch_encrypted": {
-            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
-            "value_format": {"compression": "UNCOMPRESSED"}
-        },
-        "encryption": {"key_id": "test_key_123"},
-        "access": {"user_id": "test_user_456"},
-        "debug": {"reference_id": "1755831549871"}
-    })";
-    
-    // Response with valid JSON structure but invalid base64 value
-    std::string mock_response = R"({
-        "data_batch": {
-            "datatype_info": {
-                "datatype": "BYTE_ARRAY"
-            },
-            "value": "INVALID_BASE64_VALUE!!!",
-            "value_format": {
-                "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
-            }
-        },
-        "access": {
-            "user_id": "test_user",
-            "role": "test_role",
-            "access_control": "test_access"
-        },
-        "debug": {
-            "reference_id": "test_ref"
-        }
-    })";
-    
-    mock_client->SetMockPostResponse("/decrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
-    
-    // Create DBPSApiClient with mock client
-    DBPSApiClient client(std::move(mock_client));
-    
-    // Create test data
-    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
-    
-    // Call Decrypt() with valid parameters
-    auto response = client.Decrypt(
-        span<const uint8_t>(ciphertext_data),
-        "email",                    // column_name
-        Type::BYTE_ARRAY,           // datatype
-        std::nullopt,               // datatype_length
-        CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
-        std::map<std::string, std::string>{}, // encoding_attributes
-        CompressionCodec::UNCOMPRESSED, // encrypted_compression
-        "test_key_123",             // key_id
-        "test_user_456"             // user_id
-    );
-    
-    // Verify the response indicates failure
-    ASSERT_FALSE(response.Success());
 }
 
 TEST(EncryptWithInvalidJsonResponse) {
@@ -668,8 +524,7 @@ TEST(EncryptWithInvalidJsonResponse) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_plaintext = "test@example.com";
-    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    std::vector<uint8_t> plaintext_data = StringToBytes("test@example.com");
     
     // Call Encrypt() with valid parameters
     auto response = client.Encrypt(
@@ -706,7 +561,7 @@ TEST(DecryptWithInvalidJsonResponse) {
             }
         },
         "data_batch_encrypted": {
-            "value": "ZEdWemRFQmxlR0Z0Y0d4bExtTnZiUT09",
+            "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {"compression": "UNCOMPRESSED"}
         },
         "encryption": {"key_id": "test_key_123"},
@@ -732,8 +587,7 @@ TEST(DecryptWithInvalidJsonResponse) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_ciphertext = "dGVzdEBleGFtcGxlLmNvbQ=="; // "test@example.com" in base64
-    std::vector<uint8_t> ciphertext_data(test_ciphertext.begin(), test_ciphertext.end());
+    std::vector<uint8_t> ciphertext_data = StringToBytes("test@example.com");
     
     // Call Decrypt() with valid parameters
     auto response = client.Decrypt(
@@ -807,8 +661,7 @@ TEST(EncryptWithEncodingAttributes) {
     DBPSApiClient client(std::move(mock_client));
     
     // Create test data
-    std::string test_plaintext = "test@example.com";
-    std::vector<uint8_t> plaintext_data(test_plaintext.begin(), test_plaintext.end());
+    std::vector<uint8_t> plaintext_data = StringToBytes("test@example.com");
     
     // Create encoding_attributes map
     std::map<std::string, std::string> encoding_attributes;
@@ -936,22 +789,6 @@ int main() {
         PrintTestResult("Decrypt with invalid data", true);
     } catch (...) {
         PrintTestResult("Decrypt with invalid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptWithInvalidBase64Response();
-        PrintTestResult("Encrypt with invalid base64 response", true);
-    } catch (...) {
-        PrintTestResult("Encrypt with invalid base64 response", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_DecryptWithInvalidBase64Response();
-        PrintTestResult("Decrypt with invalid base64 response", true);
-    } catch (...) {
-        PrintTestResult("Decrypt with invalid base64 response", false);
         all_tests_passed = false;
     }
     
