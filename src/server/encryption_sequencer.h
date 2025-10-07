@@ -36,13 +36,16 @@ public:
     
     // Constructor - simple setter of parameters
     DataBatchEncryptionSequencer(
+        const std::string& column_name,
         Type::type datatype,
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
         Format::type format,
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
-        const std::string& key_id
+        const std::string& key_id,
+        const std::string& user_id,
+        const std::string& application_context
     );
     
     // Default constructor
@@ -57,6 +60,7 @@ public:
 
 protected:
     // Parameters for encryption/decryption operations
+    std::string column_name_;
     Type::type datatype_;
     std::optional<int> datatype_length_;
     CompressionCodec::type compression_;
@@ -64,6 +68,8 @@ protected:
     std::map<std::string, std::string> encoding_attributes_;
     CompressionCodec::type encrypted_compression_;
     std::string key_id_;
+    std::string user_id_;
+    std::string application_context_;
 
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;

@@ -109,6 +109,21 @@ target_include_directories(dbps_remote_lib PUBLIC
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
 )
 
+# Local DBPA library
+add_library(dbps_local_lib STATIC 
+  src/common/dbpa_local.cpp
+)
+target_link_libraries(dbps_local_lib PUBLIC 
+  dbps_server_lib
+  dbps_common_lib
+)
+target_include_directories(dbps_local_lib PUBLIC
+  src/server
+  ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+)
+
 # =============================================================================
 # Main Executables
 # =============================================================================
@@ -166,6 +181,13 @@ if(BUILD_TESTS)
   add_executable(dbpa_interface_test src/common/dbpa_interface_test.cpp)
   target_link_libraries(dbpa_interface_test dbps_common_lib)
 
+  # DBPA utils tests
+  add_executable(dbpa_utils_test src/common/dbpa_utils_test.cpp)
+  target_link_libraries(dbpa_utils_test 
+    dbps_common_lib
+    gtest_main
+  )
+
   # Client API tests
   add_executable(dbps_api_client_test src/client/dbps_api_client_test.cpp)
   target_link_libraries(dbps_api_client_test 
@@ -181,6 +203,15 @@ if(BUILD_TESTS)
   target_link_libraries(dbpa_remote_test 
     dbps_remote_lib
     dbps_client_lib
+    dbps_common_lib
+    gtest_main
+  )
+
+  # Local DBPA tests
+  add_executable(dbpa_local_test src/common/dbpa_local_test.cpp)
+  target_link_libraries(dbpa_local_test 
+    dbps_local_lib
+    dbps_server_lib
     dbps_common_lib
     gtest_main
   )
@@ -236,6 +267,7 @@ add_custom_target(libraries
     dbps_server_lib
     dbps_client_lib
     dbps_remote_lib
+    dbps_local_lib
   COMMENT "Building all libraries"
 )
 
@@ -256,8 +288,10 @@ if(BUILD_TESTS)
       encryption_sequencer_test
       decoding_utils_test
       dbpa_interface_test
+      dbpa_utils_test
       dbps_api_client_test
       dbpa_remote_test
+      dbpa_local_test
     COMMENT "Building all tests"
   )
 endif()

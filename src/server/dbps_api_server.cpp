@@ -57,13 +57,17 @@ int main() {
         // Use DataBatchEncryptionSequencer for actual encryption
         // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
+            request.column_name_,
             request.datatype_.value(),
             request.datatype_length_,
             request.compression_.value(),
             request.format_.value(),
             request.encoding_attributes_,
             request.encrypted_compression_.value(),
-            request.key_id_
+            request.key_id_,
+            request.user_id_,
+            // TODO(Issue #129): Add application context from request when ready.
+            "{}"
         );
         
         bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
@@ -115,13 +119,17 @@ int main() {
         // Use DataBatchEncryptionSequencer for actual decryption
         // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
+            request.column_name_,
             request.datatype_.value(),
             request.datatype_length_,
             request.compression_.value(),
             request.format_.value(),
             request.encoding_attributes_,
             request.encrypted_compression_.value(),
-            request.key_id_
+            request.key_id_,
+            request.user_id_,
+            // TODO(Issue #129): Add application context from request when ready.
+            "{}"
         );
         
         bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);

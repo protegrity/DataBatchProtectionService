@@ -111,11 +111,6 @@ protected:
     std::string user_id_;
 
 private:
-    // Helper methods for configuration parsing
-    std::optional<std::string> ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const;
-    std::optional<std::string> ExtractUserId(const std::string& app_context) const;
-    std::optional<Format::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const;
-    
     // Client instance
     std::unique_ptr<DBPSApiClient> api_client_;
 };

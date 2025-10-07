@@ -12,20 +12,26 @@ using namespace dbps::enum_utils;
 
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
+    const std::string& column_name,
     Type::type datatype,
     const std::optional<int>& datatype_length,
     CompressionCodec::type compression,
     Format::type format,
     const std::map<std::string, std::string>& encoding_attributes,
     CompressionCodec::type encrypted_compression,
-    const std::string& key_id
-) : datatype_(datatype),
+    const std::string& key_id,
+    const std::string& user_id,
+    const std::string& application_context
+) : column_name_(column_name),
+    datatype_(datatype),
     datatype_length_(datatype_length),
     compression_(compression),
     format_(format),
     encoding_attributes_(encoding_attributes),
     encrypted_compression_(encrypted_compression),
-    key_id_(key_id) {}
+    key_id_(key_id),
+    user_id_(user_id),
+    application_context_(application_context) {}
 
 // Main processing methods
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
