@@ -85,6 +85,7 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_utils_test && ./build/dbpa_utils_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test && ./build/dbps_api_client_test
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test && ./build/dbpa_remote_test
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_local_test && ./build/dbpa_local_test
 cmake -B build -S . -G Ninja && cmake --build build --target decoding_utils_test && ./build/decoding_utils_test
 ```
 
@@ -120,6 +121,10 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_tes
 echo "----- build: dbpa_remote_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test \
   || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
+
+echo "----- build: dbpa_local_test -----" && \
+cmake -B build -S . -G Ninja && cmake --build build --target dbpa_local_test \
+  || { echo "❌ FAILED: dbpa_local_test"; false; } && echo
 
 echo "----- build: decoding_utils_test -----" && \
 cmake -B build -S . -G Ninja && cmake --build build --target decoding_utils_test \
@@ -158,6 +163,10 @@ echo "----- run: dbps_api_client_test -----" && \
 echo "----- run: dbpa_remote_test -----" && \
 ./build/dbpa_remote_test \
   || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
+
+echo "----- run: dbpa_local_test -----" && \
+./build/dbpa_local_test \
+  || { echo "❌ FAILED: dbpa_local_test"; false; } && echo
 
 echo "----- run: decoding_utils_test -----" && \
 ./build/decoding_utils_test \
