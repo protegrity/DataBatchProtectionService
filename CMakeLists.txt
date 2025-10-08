@@ -4,6 +4,9 @@ project(dbps_server_prj)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Build all targets (including STATIC libs) with position independent code
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Build options
 option(BUILD_TESTS "Build test executables" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -123,6 +126,10 @@ target_include_directories(dbps_local_lib PUBLIC
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
 )
+
+# Ensure PIC on static libs that are linked into shared libraries
+set_target_properties(dbps_common_lib dbps_server_lib dbps_local_lib
+  PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # =============================================================================
 # Main Executables
@@ -254,6 +261,31 @@ if(BUILD_SHARED_LIBS)
     src/common/tcb
   )
 
+  # Create dynamic library for local agent
+  add_library(local_agent_shared SHARED
+    src/common/dbps_local_shared_lib_wrapper.cpp
+  )
+
+  # Set library properties for local client
+  set_target_properties(local_agent_shared PROPERTIES
+    VERSION 1.0.0
+    SOVERSION 1
+    OUTPUT_NAME "dbpsLocalAgent"
+  )
+
+  # Link dependencies
+  target_link_libraries(local_agent_shared
+    PRIVATE dbps_local_lib
+  )
+
+  # Include directories for the local library
+  target_include_directories(local_agent_shared PUBLIC
+    ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+    ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+    src/common
+    src/server
+    src/common/tcb
+  )
 endif()
 
 # =============================================================================
@@ -269,6 +301,13 @@ add_custom_target(libraries
     dbps_remote_lib
     dbps_local_lib
   COMMENT "Building all libraries"
+)
+
+add_custom_target(shared_libraries
+  DEPENDS 
+    remote_agent_shared
+    local_agent_shared
+  COMMENT "Building all shared libraries"
 )
 
 # Main executables target
@@ -296,8 +335,6 @@ if(BUILD_TESTS)
   )
 endif()
 
-# Shared libraries are regular targets; no extra custom wrappers needed
-
 # All target (everything)
 add_custom_target(all_targets
   DEPENDS 
@@ -313,5 +350,5 @@ endif()
 
 # Add client shared library to all_targets if enabled
 if(BUILD_SHARED_LIBS)
-  add_dependencies(all_targets remote_agent_shared)
+  add_dependencies(all_targets shared_libraries)
 endif()
