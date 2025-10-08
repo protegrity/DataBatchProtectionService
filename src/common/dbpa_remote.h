@@ -109,8 +109,17 @@ protected:
     std::optional<std::string> initialized_;
     std::string server_url_;
     std::string user_id_;
+    std::string k_connection_config_key_ = "connection_config_file_path";
 
 private:
+    // Helper methods for configuration parsing
+
+    // Server URL extract from connection_config file which is expected to contain a valid
+    // JSON struct such as {"server_url": "http://localhost:8080"}
+    std::optional<std::string> ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const;
+    std::optional<std::string> ExtractUserId(const std::string& app_context) const;
+    std::optional<Format::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const;
+    
     // Client instance
     std::unique_ptr<DBPSApiClient> api_client_;
 };
