@@ -2,7 +2,7 @@
 #include "dbpa_remote.h"
 #include "dbpa_interface.h"
 
-//TODO: should this be in a specific namespace?
+using dbps::external::DataBatchProtectionAgentInterface;
 
 // Export function for creating new instances of DBPARemotefrom shared library
 extern "C" {
@@ -11,4 +11,3 @@ extern "C" {
         return new dbps::external::RemoteDataBatchProtectionAgent();
     }
 } // extern "C"
-

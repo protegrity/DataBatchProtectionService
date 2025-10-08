@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Build options
 option(BUILD_TESTS "Build test executables" ON)
-option(BUILD_CLIENT_LIB "Build client shared library" ON)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 # =============================================================================
 # Dependencies
@@ -221,9 +221,9 @@ endif()
 # Shared Library (Client Library)
 # =============================================================================
 
-if(BUILD_CLIENT_LIB)
+if(BUILD_SHARED_LIBS)
   # Create dynamic library with core components
-  add_library(dbps_client_shared SHARED
+  add_library(remote_agent_shared SHARED
     src/common/dbps_remote_shared_lib_wrapper.cpp
     src/common/dbpa_remote.cpp
     src/client/dbps_api_client.cpp
@@ -232,28 +232,28 @@ if(BUILD_CLIENT_LIB)
   )
 
   # Set library properties
-  set_target_properties(dbps_client_shared PROPERTIES
+  set_target_properties(remote_agent_shared PROPERTIES
     VERSION 1.0.0
     SOVERSION 1
-    OUTPUT_NAME "dbpsClient"
+    OUTPUT_NAME "dbpsRemoteAgent"
   )
 
-
   # Link dependencies
-  target_link_libraries(dbps_client_shared 
+  target_link_libraries(remote_agent_shared 
     dbps_remote_lib
     dbps_client_lib
     dbps_common_lib
   )
 
   # Include directories for the library
-  target_include_directories(dbps_client_shared PUBLIC
+  target_include_directories(remote_agent_shared PUBLIC
     ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
     ${CMAKE_BINARY_DIR}/_deps/httplib-src
     src/common
     src/common/tcb
   )
+
 endif()
 
 # =============================================================================
@@ -296,13 +296,7 @@ if(BUILD_TESTS)
   )
 endif()
 
-# Client shared library target
-if(BUILD_CLIENT_LIB)
-  add_custom_target(client_shared
-    DEPENDS dbps_client_shared
-    COMMENT "Building client shared library"
-  )
-endif()
+# Shared libraries are regular targets; no extra custom wrappers needed
 
 # All target (everything)
 add_custom_target(all_targets
@@ -318,6 +312,6 @@ if(BUILD_TESTS)
 endif()
 
 # Add client shared library to all_targets if enabled
-if(BUILD_CLIENT_LIB)
-  add_dependencies(all_targets client_shared)
+if(BUILD_SHARED_LIBS)
+  add_dependencies(all_targets remote_agent_shared)
 endif()
