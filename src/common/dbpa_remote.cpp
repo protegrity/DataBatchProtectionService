@@ -337,23 +337,23 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
   const std::map<std::string, std::string>& connection_config) const {
     const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::ExtractServerUrl() - ";
-    auto config_file_it = connection_config.find("connection_config_file_path");
+    auto config_file_it = connection_config.find(k_connection_config_key_);
     if (config_file_it == connection_config.end()) {
         std::cerr << error_trace 
-                  << "connection_config does not provide connection_config_file_path" << std::endl;
+                  << "connection_config does not provide " << k_connection_config_key_ << std::endl;
         return std::nullopt;
     }
     
     auto config_file_path = config_file_it->second;
     if (!std::filesystem::exists(config_file_path)) {
-        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] does not exist" << std::endl;
         return std::nullopt;
     }
 
     std::ifstream config_file(config_file_path);
     if (!config_file.is_open()) {
-        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] could not be opened" << std::endl;
         return std::nullopt;
     }
@@ -363,7 +363,7 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
     config_file.close();
 
     if (config_file_contents.empty()) {
-        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] is empty" << std::endl;
         return std::nullopt;
     }
@@ -376,11 +376,11 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
                 return server_url;
             }
         }
-        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] does not contain a valid server_url" << std::endl;
         return std::nullopt;
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << error_trace << "connection_config_file_path [" << config_file_path 
+        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] is not a valid JSON file: " << e.what() << std::endl;
         return std::nullopt;
     }
