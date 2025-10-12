@@ -2,6 +2,7 @@
 #include "enum_utils.h"
 #include "decoding_utils.h"
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <optional>
@@ -33,8 +34,6 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     user_id_(user_id),
     application_context_(application_context) {}
 
-// Main processing methods
-// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -47,33 +46,83 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         error_message_ = "plaintext cannot be null or empty";
         return false;
     }
-    
-    // Integration point for data element based encryptors.
-    // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
-    // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
-    //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
-    bool is_compressed = compression_ != CompressionCodec::UNCOMPRESSED;
-    bool is_plain = format_ == Format::PLAIN;
-    if (is_compressed) {
-        std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
-                  << plaintext.size() << " bytes" << std::endl;
-    }
-    if (!is_plain) {
-        std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
-                  << plaintext.size() << " bytes" << std::endl;
-    }    
-    if (!is_compressed && is_plain) {
-        // Calculate the number of leading bytes to strip based on the encoding attributes
-        int leading_bytes_to_strip = CalculateLevelBytesLength(plaintext, encoding_attributes_converted_);
 
-        // Only show detailed decode output if both UNCOMPRESSED and PLAIN
-        std::string debug_decoded = PrintPlainDecoded(plaintext, datatype_, datatype_length_, leading_bytes_to_strip);
-        if (debug_decoded.length() > 1000) {
-            std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
-                      << debug_decoded.substr(0, 1000) << "..." << std::endl;
-        } else {
-            std::cout << "Encrypt value - Decoded plaintext data:\n" << debug_decoded << std::endl;
+    try {
+        auto level_and_value_bytes = DecompressAndSplit(plaintext);
+        auto typed_list = ParseValueBytesIntoTypedList(level_and_value_bytes.value_bytes);
+        auto encrypted_bytes = EncryptTypedList(typed_list, level_and_value_bytes.level_bytes);
+        encrypted_result_ = Compress(encrypted_bytes);
+    } catch (const DBPSUnsupportedException& e) {
+        // If any stage is as of yet unsupported, default to simple XOR encryption.
+        encrypted_result_ = EncryptData(plaintext);
+        if (encrypted_result_.empty()) {
+            error_stage_ = "encryption";
+            error_message_ = "Failed to encrypt data";
+            return false;
         }
+        return true;
+    } catch (const InvalidInputException& e) {
+        // Throw the exception so it can be caught by the caller.
+        throw;
+    }
+    return true;
+}
+
+// Main processing methods
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+/*bool OldConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
+    // Validate all parameters and key_id
+    if (!ValidateParameters()) {
+        return false;
+    }
+    
+    // Check that plaintext is not null and not empty
+    if (plaintext.empty()) {
+        error_stage_ = "validation";
+        error_message_ = "plaintext cannot be null or empty";
+        return false;
+    }
+    
+    try {
+        // Integration point for data element based encryptors.
+        // - Currently, the function simply prints the decoded plaintext data (for uncompressed data and PLAIN format)
+        // - However, a full pledged "data element" encryptor can hook to this method and instead of printing the decoded data,
+        //   it can encrypt the data element itself, replacing the naive XOR encryption step below.
+        bool is_compressed = compression_ != CompressionCodec::UNCOMPRESSED;
+        bool is_plain = format_ == Format::PLAIN;
+        if (is_compressed) {
+            std::cout << "Encrypt value - Data is compressed (" << to_string(compression_) << "), skipping detailed decode output. Raw size: " 
+                    << plaintext.size() << " bytes" << std::endl;
+        }
+        if (!is_plain) {
+            std::cout << "Encrypt value - Data format is not PLAIN (" << to_string(format_) << "), skipping detailed decode output. Raw size: " 
+                    << plaintext.size() << " bytes" << std::endl;
+        }    
+        if (!is_compressed && is_plain) {
+            // Calculate the number of leading bytes to strip based on the encoding attributes
+            int leading_bytes_to_strip = CalculateLevelBytesLength(plaintext, encoding_attributes_converted_);
+
+            // Only show detailed decode output if both UNCOMPRESSED and PLAIN
+            std::string debug_decoded = PrintPlainDecoded(plaintext, datatype_, datatype_length_, leading_bytes_to_strip);
+            if (debug_decoded.length() > 1000) {
+                std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
+                        << debug_decoded.substr(0, 1000) << "..." << std::endl;
+            } else {
+                std::cout << "Encrypt value - Decoded plaintext data:\n" << debug_decoded << std::endl;
+            }
+        }
+    } catch (const DBPSUnsupportedException& e) {
+        // If any stage is as of yet unsupported, default to simple XOR encryption.
+        encrypted_result_ = EncryptData(plaintext);
+        if (encrypted_result_.empty()) {
+            error_stage_ = "encryption";
+            error_message_ = "Failed to encrypt data";
+            return false;
+        }
+        return true;
+    } catch (const std::exception& e) {
+        // Throw the exception so it can be caught by the caller.
+        throw;
     }
     
     // Simple XOR encryption
@@ -85,6 +134,272 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     }
     
     return true;
+}*/
+
+LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
+    const std::vector<uint8_t>& plaintext) {
+    LevelAndValueBytes result;
+
+    std::string page_type = encoding_attributes_["page_type"];
+    // Page v1 is fully compressed, so we need to decompress first.
+    if (page_type == "DATA_PAGE_V1") {
+        auto decompressed_bytes = Decompress(plaintext);
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            decompressed_bytes, encoding_attributes_converted_);
+        return Split(decompressed_bytes, leading_bytes_to_strip);
+    }
+
+    // Page v2 is only compressed in the value bytes, the level bytes are always uncompressed.
+    // So first split, then uncompress.
+    if (page_type == "DATA_PAGE_V2") {
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            plaintext, encoding_attributes_converted_);
+        auto split_bytes = Split(plaintext, leading_bytes_to_strip);
+        result.level_bytes = split_bytes.level_bytes;
+
+        // Page V2 has an additional is_compressed bit.
+        bool page_v2_is_compressed = std::get<bool>(
+            encoding_attributes_converted_["page_v2_is_compressed"]);
+        if (page_v2_is_compressed) {
+            result.value_bytes = Decompress(split_bytes.value_bytes);
+        } else {
+            result.value_bytes = split_bytes.value_bytes;
+        }
+        return result;
+    }
+
+    if (page_type == "DICTIONARY_PAGE") {
+        result.value_bytes = plaintext;
+        result.level_bytes = std::vector<uint8_t>();
+        return result;
+    }
+    
+    throw InvalidInputException("Unsupported page type: " + page_type);
+}
+
+std::vector<uint8_t> DataBatchEncryptionSequencer::Compress(const std::vector<uint8_t>& bytes) {
+    if (compression_ == CompressionCodec::UNCOMPRESSED) {
+        return bytes;
+    }
+    // Note for future implementations: If compression fails because of invalid or corrupt input,
+    // then throw an InvalidInputException.
+    throw DBPSUnsupportedException(
+        "Unsupported compression codec: " + std::string(to_string(compression_)));
+}
+
+std::vector<uint8_t> DataBatchEncryptionSequencer::Decompress(const std::vector<uint8_t>& bytes) {
+    if (compression_ == CompressionCodec::UNCOMPRESSED) {
+        return bytes;
+    }
+    // Note for future implementations: If decompression fails because of invalid or corrupt input,
+    // then throw an InvalidInputException.
+    throw DBPSUnsupportedException(
+        "Unsupported compression codec: " + std::string(to_string(compression_)));
+}
+
+LevelAndValueBytes DataBatchEncryptionSequencer::Split(
+    const std::vector<uint8_t>& bytes, int index) {
+    LevelAndValueBytes result;
+
+    if (index < 0 || index > static_cast<int>(bytes.size())) {
+        throw InvalidInputException("Invalid index for splitting bytes: " + std::to_string(index));
+    }
+    result.level_bytes = std::vector<uint8_t>(bytes.begin(), bytes.begin() + index);
+    result.value_bytes = std::vector<uint8_t>(bytes.begin() + index, bytes.end());
+
+    return result;
+}
+
+template<typename T>
+std::vector<T> DecodeFixedSizeType(const uint8_t* raw_data, size_t raw_size, const char* name) {
+    if ((raw_size % sizeof(T)) != 0) {
+        throw InvalidInputException(std::string("Invalid data size for ") + name + " decoding");
+    }
+    std::vector<T> result;
+    const T* v = reinterpret_cast<const T*>(raw_data);
+    size_t count = raw_size / sizeof(T);
+    result.assign(v, v + count);
+    return result;
+}
+
+template<typename T>
+const char* GetTypeName() {
+    if constexpr (std::is_same_v<T, std::vector<int32_t>>) return "INT32";
+    else if constexpr (std::is_same_v<T, std::vector<int64_t>>) return "INT64";
+    else if constexpr (std::is_same_v<T, std::vector<float>>) return "FLOAT";
+    else if constexpr (std::is_same_v<T, std::vector<double>>) return "DOUBLE";
+    else if constexpr (std::is_same_v<T, std::vector<std::array<uint32_t, 3>>>) return "INT96";
+    else if constexpr (std::is_same_v<T, std::vector<std::string>>) 
+      return "string (BYTE_ARRAY/FIXED_LEN_BYTE_ARRAY)";
+    else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) return "UNDEFINED (raw bytes)";
+    else if constexpr (std::is_same_v<T, std::monostate>) return "empty/error";
+    else return "unknown";
+}
+
+std::string PrintTypedList(const TypedListValues& list) {
+    std::ostringstream out;
+    
+    std::visit([&out](auto&& values) {
+        using T = std::decay_t<decltype(values)>;
+        
+        if constexpr (std::is_same_v<T, std::monostate>) {
+            out << "Empty/error state\n";
+        }
+        else if constexpr (std::is_same_v<T, std::vector<std::array<uint32_t, 3>>>) {
+            // Special case for INT96 - [lo, mid, hi] format
+            out << "Decoded INT96 values ([lo, mid, hi] 32-bit words):\n";
+            for (size_t i = 0; i < values.size(); ++i) {
+                out << "  [" << i << "] [" << values[i][0] << ", " 
+                    << values[i][1] << ", " << values[i][2] << "]\n";
+            }
+        }
+        else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
+            // Special case for UNDEFINED - raw bytes as hex
+            out << "Decoded UNDEFINED type (raw bytes):\n";
+            out << "  Hex: ";
+            for (size_t i = 0; i < values.size(); ++i) {
+                out << std::hex << std::setw(2) << std::setfill('0') 
+                    << static_cast<int>(values[i]);
+                if (i < values.size() - 1) out << " ";
+            }
+            out << std::dec << "\n";  // Reset to decimal
+            
+            // Also show as string if printable
+            out << "  String: \"";
+            for (uint8_t byte : values) {
+                if (byte >= 32 && byte < 127) {
+                    out << static_cast<char>(byte);
+                } else {
+                    out << ".";
+                }
+            }
+            out << "\"\n";
+        }
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            // String values with quotes
+            out << "Decoded " << GetTypeName<T>() << " values:\n";
+            for (size_t i = 0; i < values.size(); ++i) {
+                out << "  [" << i << "] \"" << values[i] << "\"\n";
+            }
+        }
+        else {
+            // Generic case for numeric types (int32, int64, float, double)
+            out << "Decoded " << GetTypeName<T>() << " values:\n";
+            for (size_t i = 0; i < values.size(); ++i) {
+                out << "  [" << i << "] " << values[i] << "\n";
+            }
+        }
+    }, list);
+    
+    return out.str();
+}
+
+TypedListValues DataBatchEncryptionSequencer::ParseValueBytesIntoTypedList(
+    const std::vector<uint8_t>& bytes) {
+    if (format_ == Format::PLAIN) {
+        // NOTE!! The following code assumer little-endianness. Can we do that?
+        switch (datatype_) {
+            case Type::INT32: {
+                return DecodeFixedSizeType<int32_t>(bytes.data(), bytes.size(), "INT32");
+            }
+            case Type::INT64: {
+                return DecodeFixedSizeType<int64_t>(bytes.data(), bytes.size(), "INT64");
+            }
+            case Type::FLOAT: {
+                return DecodeFixedSizeType<float>(bytes.data(), bytes.size(), "FLOAT");
+            }
+            case Type::DOUBLE: {
+                return DecodeFixedSizeType<double>(bytes.data(), bytes.size(), "DOUBLE");
+            }
+            case Type::INT96: {
+                if ((bytes.size() % 12) != 0) {
+                    throw InvalidInputException("Invalid data size for INT96 decoding");
+                }
+                std::vector<std::array<uint32_t, 3>> result;
+                const uint8_t* p = bytes.data();
+                const uint8_t* last_byte = bytes.data() + bytes.size();
+                while (p + 12 <= last_byte) {
+                    std::array<uint32_t, 3> value;
+                    std::memcpy(&value[0], p + 0, 4);
+                    std::memcpy(&value[1], p + 4, 4);
+                    std::memcpy(&value[2], p + 8, 4);
+                    result.push_back(value);
+                    p += 12;
+                }
+                return result;
+            }
+            case Type::BYTE_ARRAY: {
+                std::vector<std::string> result;
+                const uint8_t* p = bytes.data();
+                const uint8_t* last_byte = bytes.data() + bytes.size();
+                while (p + 4 <= last_byte) {
+                    uint32_t len;
+                    std::memcpy(&len, p, sizeof(len));
+                    p += 4;
+                    if (p + len > last_byte) {
+                        std::cout << "Invalid BYTE_ARRAY encoding: length exceeds data bounds" << std::endl;
+                        std::cout << "p: " << p << std::endl;
+                        std::cout << "last_byte: " << last_byte << std::endl;
+                        std::cout << "len: " << len << std::endl;
+                        std::cout << "bytes.size(): " << bytes.size() << std::endl;
+                        throw InvalidInputException(
+                            "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
+                    }
+                    const char* s = reinterpret_cast<const char*>(p);
+                    result.emplace_back(s, len);
+                    p += len;
+                }
+                if (p != last_byte) {
+                    throw InvalidInputException(
+                        "Invalid BYTE_ARRAY encoding: unexpected trailing bytes");
+                }
+                return result;
+            }
+            case Type::FIXED_LEN_BYTE_ARRAY: {
+                if (!datatype_length_.has_value() || datatype_length_.value() <= 0) {
+                    throw InvalidInputException(
+                        "FIXED_LEN_BYTE_ARRAY requires positive datatype_length");
+                }
+                int fixed_length = datatype_length_.value();
+                if ((bytes.size() % fixed_length) != 0) {
+                    throw InvalidInputException(
+                        "Invalid data size for FIXED_LEN_BYTE_ARRAY decoding");
+                }
+                std::vector<std::string> result;
+                size_t element_count = bytes.size() / fixed_length;
+                for (size_t i = 0; i < element_count; ++i) {
+                    const char* element_start = reinterpret_cast<const char*>(
+                        bytes.data() + i * fixed_length);
+                    result.emplace_back(element_start, fixed_length);
+                }
+                return result;
+            }
+            case Type::UNDEFINED: {
+                std::vector<uint8_t> result;
+                const char* s = reinterpret_cast<const char*>(bytes.data());
+                result.assign(s, s + bytes.size());
+                return result;
+            }
+            default: {
+                throw DBPSUnsupportedException(
+                    "Unsupported datatype: " + std::string(to_string(datatype_)));
+            }
+        }
+    } else {
+        throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format_)));
+    }
+}
+
+std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptTypedList(
+    const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes) {
+    auto print_result = PrintTypedList(typed_list);
+    if (print_result.length() > 1000) {
+        std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
+                << print_result.substr(0, 1000) << "..." << std::endl;
+    } else {
+        std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result << std::endl;
+    }
+    throw DBPSUnsupportedException("EncryptTypedList not implemented");
 }
 
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
