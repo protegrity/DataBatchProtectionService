@@ -34,6 +34,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     user_id_(user_id),
     application_context_(application_context) {}
 
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -53,7 +54,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         auto encrypted_bytes = EncryptTypedList(typed_list, level_and_value_bytes.level_bytes);
         encrypted_result_ = Compress(encrypted_bytes);
     } catch (const DBPSUnsupportedException& e) {
-        // If any stage is as of yet unsupported, default to simple XOR encryption.
+        // If any stage is as of yet unsupported, default to whole payload 
+        // (as opposed to per-value) XOR encryption
         encrypted_result_ = EncryptData(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
@@ -69,12 +71,14 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
 }
 
 // Main processing methods
+
 LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     const std::vector<uint8_t>& plaintext) {
     LevelAndValueBytes result;
 
     std::string page_type = encoding_attributes_["page_type"];
     // Page v1 is fully compressed, so we need to decompress first.
+    // Note: This is true only if compression is enabled.
     if (page_type == "DATA_PAGE_V1") {
         auto decompressed_bytes = Decompress(plaintext);
         int leading_bytes_to_strip = CalculateLevelBytesLength(
@@ -102,6 +106,7 @@ LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     }
 
     if (page_type == "DICTIONARY_PAGE") {
+        // TODO: Check whether dictionary pages can be compressed.
         result.value_bytes = plaintext;
         result.level_bytes = std::vector<uint8_t>();
         return result;
@@ -229,97 +234,90 @@ std::string PrintTypedList(const TypedListValues& list) {
 
 TypedListValues DataBatchEncryptionSequencer::ParseValueBytesIntoTypedList(
     const std::vector<uint8_t>& bytes) {
-    if (format_ == Format::PLAIN) {
-        // NOTE!! The following code assumer little-endianness. Can we do that?
-        switch (datatype_) {
-            case Type::INT32: {
-                return DecodeFixedSizeType<int32_t>(bytes.data(), bytes.size(), "INT32");
-            }
-            case Type::INT64: {
-                return DecodeFixedSizeType<int64_t>(bytes.data(), bytes.size(), "INT64");
-            }
-            case Type::FLOAT: {
-                return DecodeFixedSizeType<float>(bytes.data(), bytes.size(), "FLOAT");
-            }
-            case Type::DOUBLE: {
-                return DecodeFixedSizeType<double>(bytes.data(), bytes.size(), "DOUBLE");
-            }
-            case Type::INT96: {
-                if ((bytes.size() % 12) != 0) {
-                    throw InvalidInputException("Invalid data size for INT96 decoding");
-                }
-                std::vector<std::array<uint32_t, 3>> result;
-                const uint8_t* p = bytes.data();
-                const uint8_t* last_byte = bytes.data() + bytes.size();
-                while (p + 12 <= last_byte) {
-                    std::array<uint32_t, 3> value;
-                    std::memcpy(&value[0], p + 0, 4);
-                    std::memcpy(&value[1], p + 4, 4);
-                    std::memcpy(&value[2], p + 8, 4);
-                    result.push_back(value);
-                    p += 12;
-                }
-                return result;
-            }
-            case Type::BYTE_ARRAY: {
-                std::vector<std::string> result;
-                const uint8_t* p = bytes.data();
-                const uint8_t* last_byte = bytes.data() + bytes.size();
-                while (p + 4 <= last_byte) {
-                    uint32_t len;
-                    std::memcpy(&len, p, sizeof(len));
-                    p += 4;
-                    if (p + len > last_byte) {
-                        std::cout << "Invalid BYTE_ARRAY encoding: length exceeds data bounds" << std::endl;
-                        std::cout << "p: " << p << std::endl;
-                        std::cout << "last_byte: " << last_byte << std::endl;
-                        std::cout << "len: " << len << std::endl;
-                        std::cout << "bytes.size(): " << bytes.size() << std::endl;
-                        throw InvalidInputException(
-                            "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
-                    }
-                    const char* s = reinterpret_cast<const char*>(p);
-                    result.emplace_back(s, len);
-                    p += len;
-                }
-                if (p != last_byte) {
-                    throw InvalidInputException(
-                        "Invalid BYTE_ARRAY encoding: unexpected trailing bytes");
-                }
-                return result;
-            }
-            case Type::FIXED_LEN_BYTE_ARRAY: {
-                if (!datatype_length_.has_value() || datatype_length_.value() <= 0) {
-                    throw InvalidInputException(
-                        "FIXED_LEN_BYTE_ARRAY requires positive datatype_length");
-                }
-                int fixed_length = datatype_length_.value();
-                if ((bytes.size() % fixed_length) != 0) {
-                    throw InvalidInputException(
-                        "Invalid data size for FIXED_LEN_BYTE_ARRAY decoding");
-                }
-                std::vector<std::string> result;
-                size_t element_count = bytes.size() / fixed_length;
-                for (size_t i = 0; i < element_count; ++i) {
-                    const char* element_start = reinterpret_cast<const char*>(
-                        bytes.data() + i * fixed_length);
-                    result.emplace_back(element_start, fixed_length);
-                }
-                return result;
-            }
-            case Type::UNDEFINED: {
-                std::vector<uint8_t> result;
-                const char* s = reinterpret_cast<const char*>(bytes.data());
-                result.assign(s, s + bytes.size());
-                return result;
-            }
-            default: {
-                throw DBPSUnsupportedException(
-                    "Unsupported datatype: " + std::string(to_string(datatype_)));
-            }
-        }
-    } else {
+    if (format_ != Format::PLAIN) {
         throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format_)));
+    }
+    switch (datatype_) {
+        case Type::INT32: {
+            return DecodeFixedSizeType<int32_t>(bytes.data(), bytes.size(), "INT32");
+        }
+        case Type::INT64: {
+            return DecodeFixedSizeType<int64_t>(bytes.data(), bytes.size(), "INT64");
+        }
+        case Type::FLOAT: {
+            return DecodeFixedSizeType<float>(bytes.data(), bytes.size(), "FLOAT");
+        }
+        case Type::DOUBLE: {
+            return DecodeFixedSizeType<double>(bytes.data(), bytes.size(), "DOUBLE");
+        }
+        case Type::INT96: {
+            if ((bytes.size() % 12) != 0) {
+                throw InvalidInputException("Invalid data size for INT96 decoding");
+            }
+            std::vector<std::array<uint32_t, 3>> result;
+            const uint8_t* p = bytes.data();
+            const uint8_t* last_byte = bytes.data() + bytes.size();
+            while (p + 12 <= last_byte) {
+                std::array<uint32_t, 3> value;
+                std::memcpy(&value[0], p + 0, 4);
+                std::memcpy(&value[1], p + 4, 4);
+                std::memcpy(&value[2], p + 8, 4);
+                result.push_back(value);
+                p += 12;
+            }
+            return result;
+        }
+        case Type::BYTE_ARRAY: {
+            std::vector<std::string> result;
+            const uint8_t* p = bytes.data();
+            const uint8_t* last_byte = bytes.data() + bytes.size();
+            while (p + 4 <= last_byte) {
+                uint32_t len;
+                std::memcpy(&len, p, sizeof(len));
+                p += 4;
+                if (p + len > last_byte) {
+                    throw InvalidInputException(
+                        "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
+                }
+                const char* s = reinterpret_cast<const char*>(p);
+                result.emplace_back(s, len);
+                p += len;
+            }
+            if (p != last_byte) {
+                throw InvalidInputException(
+                    "Invalid BYTE_ARRAY encoding: unexpected trailing bytes");
+            }
+            return result;
+        }
+        case Type::FIXED_LEN_BYTE_ARRAY: {
+            if (!datatype_length_.has_value() || datatype_length_.value() <= 0) {
+                throw InvalidInputException(
+                    "FIXED_LEN_BYTE_ARRAY requires positive datatype_length");
+            }
+            int fixed_length = datatype_length_.value();
+            if ((bytes.size() % fixed_length) != 0) {
+                throw InvalidInputException(
+                    "Invalid data size for FIXED_LEN_BYTE_ARRAY decoding");
+            }
+            std::vector<std::string> result;
+            size_t element_count = bytes.size() / fixed_length;
+            for (size_t i = 0; i < element_count; ++i) {
+                const char* element_start = reinterpret_cast<const char*>(
+                    bytes.data() + i * fixed_length);
+                result.emplace_back(element_start, fixed_length);
+            }
+            return result;
+        }
+        case Type::UNDEFINED: {
+            std::vector<uint8_t> result;
+            const char* s = reinterpret_cast<const char*>(bytes.data());
+            result.assign(s, s + bytes.size());
+            return result;
+        }
+        default: {
+            throw DBPSUnsupportedException(
+                "Unsupported datatype: " + std::string(to_string(datatype_)));
+        }
     }
 }
 
