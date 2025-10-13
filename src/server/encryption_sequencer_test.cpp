@@ -9,16 +9,41 @@
 using namespace dbps::external;
 
 // TODO: Move this to a common test utility file.
-// Helper function to convert string to binary data
-std::vector<uint8_t> StringToBytes(const std::string& str) {
-    return std::vector<uint8_t>(str.begin(), str.end());
+std::vector<uint8_t> EncodeStringByteArray(const std::vector<std::string>& strings) {
+    std::vector<uint8_t> result;
+    for (const auto& str : strings) {
+        uint32_t len = str.size();
+        // Add 4-byte length prefix (little-endian)
+        result.push_back(len & 0xFF);
+        result.push_back((len >> 8) & 0xFF);
+        result.push_back((len >> 16) & 0xFF);
+        result.push_back((len >> 24) & 0xFF);
+        // Add string data
+        result.insert(result.end(), str.begin(), str.end());
+    }
+    return result;
+}
+
+std::vector<uint8_t> EncodePlainByteArray(const std::vector<uint8_t>& payload) {
+    std::vector<uint8_t> out;
+    uint32_t len = static_cast<uint32_t>(payload.size());
+    out.push_back(static_cast<uint8_t>( len & 0xFF));
+    out.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
+    out.push_back(static_cast<uint8_t>((len >> 16) & 0xFF));
+    out.push_back(static_cast<uint8_t>((len >> 24) & 0xFF));
+    out.insert(out.end(), payload.begin(), payload.end());
+    return out;
 }
 
 // Test data constants - pure binary data
-const std::vector<uint8_t> HELLO_WORLD_DATA = StringToBytes("Hello, World!");
-const std::vector<uint8_t> BINARY_DATA = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
-const std::vector<uint8_t> SINGLE_CHAR_DATA = StringToBytes("A");
+const std::vector<uint8_t> HELLO_WORLD_DATA = EncodeStringByteArray({"Hello, World!"});
+const std::vector<uint8_t> BINARY_DATA = EncodePlainByteArray({0x00, 0x01, 0x02, 0x03, 0x04, 0x05});
+const std::vector<uint8_t> SINGLE_CHAR_DATA = EncodeStringByteArray({"A"});
 const std::vector<uint8_t> EMPTY_DATA = {};
+const std::vector<uint8_t> FIXED_LEN_BYTE_ARRAY_DATA = {
+    'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',
+    'Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f'
+};
 
 // Test class that inherits from DataBatchEncryptionSequencer to access protected members
 class TestDataBatchEncryptionSequencer : public DataBatchEncryptionSequencer {
@@ -484,10 +509,10 @@ bool TestFixedLenByteArrayValidation() {
     if (!testValidationFailure(std::nullopt, "FIXED_LEN_BYTE_ARRAY datatype requires datatype_length parameter")) return false;
     if (!testValidationFailure(-1, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive")) return false;
     if (!testValidationFailure(0, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive")) return false;
-    
+
     // Test valid case (should pass parameter validation)
     DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Format::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}");
-    bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+    bool result = sequencer.ConvertAndEncrypt(FIXED_LEN_BYTE_ARRAY_DATA);
     
     if (!result && sequencer.error_stage_ == "parameter_validation") {
         std::cout << "ERROR: Valid datatype_length should pass parameter validation" << std::endl;
