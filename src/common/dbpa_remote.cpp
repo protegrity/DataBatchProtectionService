@@ -1,6 +1,7 @@
 #include "dbpa_remote.h"
 #include "../client/dbps_api_client.h"
-#include "../client/httplib_client.h"
+#include "../client/httplib_pool_registry.h"
+#include "../client/httplib_pooled_client.h"
 #include "enum_utils.h"
 #include <iostream>
 
@@ -369,7 +370,7 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
     auto config_json_opt = LoadConnectionConfigFile(connection_config_);
     auto server_url_opt = config_json_opt ? ExtractServerUrl(*config_json_opt) : std::nullopt;
     if (!server_url_opt || server_url_opt->empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - No server_url provided in connection_config." << std::endl;
         initialized_ = "Agent not properly initialized - server_url missing";
         throw DBPSException("No server_url provided in connection_config");
     }
@@ -377,10 +378,28 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating pooled HTTP client for server: " << server_url_ << std::endl;
     
-    //TODO: pass additional params here.
-    //auto http_client = HttplibPooledClient::Acquire(server_url_);
-    std::shared_ptr<HttpClientInterface> http_client = std::make_shared<HttplibClient>(server_url_);
+    //TODO: ensure that these parameters are configurable (likely via Init())
+    //https://github.com/protegrity/arrow/issues/182
+    HttplibPoolRegistry::PoolConfig pool_config = {
+        .max_pool_size = 20,
+        .borrow_timeout = std::chrono::milliseconds(100),
+        .max_idle_time = std::chrono::milliseconds(60000),
+        .connect_timeout = std::chrono::seconds(5),
+        .read_timeout = std::chrono::seconds(20),
+        .write_timeout = std::chrono::seconds(20)
+    };
 
+    // set the pool config for the given server_url_
+    HttplibPoolRegistry::Instance().SetPoolConfig(server_url_, pool_config);
+
+    // get the client for the given server_url_
+    std::shared_ptr<HttpClientInterface> http_client = HttplibPooledClient::Acquire(server_url_);
+    if (!http_client) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - Failed to acquire HTTP client for server: " << server_url_ << std::endl;
+        initialized_ = "Agent not properly initialized - failed to acquire HTTP client";
+        throw DBPSException("Failed to acquire HTTP client for server: " + server_url_);
+    }
+    
     return http_client;
 }
 

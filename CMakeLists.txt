@@ -90,6 +90,8 @@ target_include_directories(dbps_server_lib PUBLIC
 add_library(dbps_client_lib STATIC 
   src/client/dbps_api_client.cpp
   src/client/httplib_client.cpp
+  src/client/httplib_pool_registry.cpp
+  src/client/httplib_pooled_client.cpp
 )
 target_link_libraries(dbps_client_lib PUBLIC dbps_common_lib)
 target_include_directories(dbps_client_lib PUBLIC
@@ -203,6 +205,22 @@ if(BUILD_TESTS)
   )
   target_include_directories(dbps_api_client_test PRIVATE
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  )
+
+  # Pool registry tests
+  add_executable(httplib_pool_registry_test src/client/httplib_pool_registry_test.cpp)
+  target_link_libraries(httplib_pool_registry_test 
+    dbps_client_lib
+    dbps_common_lib
+    gtest_main
+  )
+
+  # Pooled client tests
+  add_executable(httplib_pooled_client_test src/client/httplib_pooled_client_test.cpp)
+  target_link_libraries(httplib_pooled_client_test 
+    dbps_client_lib
+    dbps_common_lib
+    gtest_main
   )
 
   # Remote DBPA tests
@@ -331,6 +349,8 @@ if(BUILD_TESTS)
       dbps_api_client_test
       dbpa_remote_test
       dbpa_local_test
+      httplib_pool_registry_test
+      httplib_pooled_client_test
     COMMENT "Building all tests"
   )
 endif()
