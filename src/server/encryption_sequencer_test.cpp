@@ -9,6 +9,9 @@
 using namespace dbps::external;
 
 // TODO: Move this to a common test utility file.
+// Methods that will pad byte arrays of strings (or pure bytes) with preceding
+// bytes that specify the array length. Needed because this is how Parquet
+// formats their data.
 std::vector<uint8_t> EncodeStringByteArray(const std::vector<std::string>& strings) {
     std::vector<uint8_t> result;
     for (const auto& str : strings) {
