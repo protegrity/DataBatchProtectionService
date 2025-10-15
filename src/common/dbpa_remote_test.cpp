@@ -14,6 +14,9 @@ using namespace dbps::external;
 // Test class that inherits from RemoteDataBatchProtectionAgent to access protected members
 class TestableRemoteDataBatchProtectionAgent : public RemoteDataBatchProtectionAgent {
 public:
+    // Default constructor - no HTTP client provided
+    TestableRemoteDataBatchProtectionAgent() = default;
+    
     // Constructor that takes HTTP client
     TestableRemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client) 
         : RemoteDataBatchProtectionAgent(std::move(http_client)) {}
@@ -115,7 +118,7 @@ protected:
     }
 
     void TestConnectionConfigFailures(const std::map<std::string, std::string>& connection_config) {
-        auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
+        auto agent = TestableRemoteDataBatchProtectionAgent();
         
         std::string app_context = "{\"user_id\": \"test_user\"}";
         
@@ -148,36 +151,41 @@ protected:
 };
 
 // Test basic initialization with valid configuration
-TEST_F(RemoteDataBatchProtectionAgentTest, BasicInitialization) {
-    mock_client_->health_response = MockHttpClient::MockResponse(200, "OK", "");
-    
-    auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
-    
+TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthCheck) {
+    // Use default constructor to ensure config is loaded from file and HTTP client is created internally
+    auto agent = TestableRemoteDataBatchProtectionAgent();
+
+    // Create a (temp) config file with a localhost URL to avoid external network
     auto connection_config = GetConnectionConfig(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
-    
-    // init() should not throw an exception for valid configuration
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
-    
+
+    // init() should throw because health check will fail (we're using a real client with no server)
+    // but it must parse config and extract values first
+    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key",
+                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED),
+                 DBPSException);
+
     // Test that initialization variables are properly set
     EXPECT_EQ(agent.get_column_name(), "test_column");
     EXPECT_EQ(agent.get_column_key_id(), "test_key");
     EXPECT_EQ(agent.get_datatype(), Type::BYTE_ARRAY);
     EXPECT_EQ(agent.get_compression_type(), CompressionCodec::UNCOMPRESSED);
-    
-    // Test that connection config and app context are accessible
-    EXPECT_TRUE(agent.get_connection_config().find("connection_config_file_path") 
+    EXPECT_EQ(agent.get_app_context(), app_context);
+
+    // Config path should be present and file exists
+    EXPECT_TRUE(agent.get_connection_config().find("connection_config_file_path")
                 != agent.get_connection_config().end());
     EXPECT_TRUE(std::filesystem::exists(
         agent.get_connection_config().at("connection_config_file_path")));
-    EXPECT_EQ(agent.get_app_context(), app_context);
-    
-    // Test that RemoteDataBatchProtectionAgent specific variables are set
+
+    // Values extracted before health check
     EXPECT_EQ(agent.get_server_url(), "http://localhost:8080");
     EXPECT_EQ(agent.get_user_id(), "test_user");
-    EXPECT_EQ(agent.get_initialized(), "");
+
+    // Initialized status should indicate health check failure
+    ASSERT_TRUE(agent.get_initialized().has_value());
+    EXPECT_NE(agent.get_initialized()->find("healthz"), std::string::npos);
 }
 
 // Test decryption without initialization
@@ -211,7 +219,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, BadJsonConfigFile) {
 
 // Test initialization with missing user ID
 TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
-    auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
+    auto agent = TestableRemoteDataBatchProtectionAgent();
 
     auto connection_config = GetConnectionConfig(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");

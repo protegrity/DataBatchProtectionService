@@ -11,6 +11,7 @@
 #include "enums.h"
 #include "dbpa_interface.h"
 #include "../client/dbps_api_client.h"
+#include <nlohmann/json.hpp>
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
@@ -114,9 +115,15 @@ protected:
 private:
     // Helper methods for configuration parsing
 
-    // Server URL extract from connection_config file which is expected to contain a valid
-    // JSON struct such as {"server_url": "http://localhost:8080"}
-    std::optional<std::string> ExtractServerUrl(const std::map<std::string, std::string>& connection_config) const;
+    // Load and parse the connection config file specified in connection_config
+    std::optional<nlohmann::json> LoadConnectionConfigFile(const std::map<std::string, std::string>& connection_config) const;
+
+    // Instantiate a new HTTP client using the connection config file
+    std::shared_ptr<HttpClientInterface> InstantiateHttpClient();
+
+    // Extract server_url from parsed JSON config such as {"server_url": "http://localhost:8080"}
+    std::optional<std::string> ExtractServerUrl(const nlohmann::json& config_json) const;
+
     std::optional<std::string> ExtractUserId(const std::string& app_context) const;
     std::optional<Format::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const;
     

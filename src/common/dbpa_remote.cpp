@@ -3,7 +3,6 @@
 #include "../client/httplib_client.h"
 #include "enum_utils.h"
 #include <iostream>
-#include <nlohmann/json.hpp>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -157,16 +156,6 @@ void RemoteDataBatchProtectionAgent::init(
             compression_type
         );
 
-        // Either with the injected HTTP client or not, the server_url should be there.
-        auto server_url_opt = ExtractServerUrl(connection_config_);
-        if (!server_url_opt || server_url_opt->empty()) {
-            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
-            initialized_ = "Agent not properly initialized - server_url missing";
-            throw DBPSException("No server_url provided in connection_config");
-        }
-        server_url_ = *server_url_opt;
-        std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
-
         // check for app_context not empty (as user_id will be extracted from it)
         if (app_context_.empty()) { 
             std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - app_context is empty" << std::endl;
@@ -185,10 +174,10 @@ void RemoteDataBatchProtectionAgent::init(
         std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - user_id extracted: [" << user_id_ << "]" << std::endl;
         
         // Create API_client if not already created.
-        // The API client constructor does not attemp a HTTPconnection with the server. The first Get/Post calls creates the HTTP connection.
+        // The API client constructor does not attempt a HTTP connection with the server. The first Get/Post call creates the HTTP connection.
         if (!api_client_) {
-            std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating API client for server: " << server_url_ << std::endl;
-            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            // given that there is no API client, instantiate a new one with a new HTTP client.
+            auto http_client = InstantiateHttpClient(); //uses connection_config_
             api_client_ = std::make_unique<DBPSApiClient>(http_client);
         } else {
             std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Using existing API client" << std::endl;
@@ -334,16 +323,14 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     return std::make_unique<RemoteDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
 }
 
-std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
-  const std::map<std::string, std::string>& connection_config) const {
-    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::ExtractServerUrl() - ";
+std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConnectionConfigFile(const std::map<std::string, std::string>& connection_config) const {
+    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::LoadConnectionConfigFile() - ";
     auto config_file_it = connection_config.find(k_connection_config_key_);
     if (config_file_it == connection_config.end()) {
         std::cerr << error_trace 
                   << "connection_config does not provide " << k_connection_config_key_ << std::endl;
         return std::nullopt;
     }
-    
     auto config_file_path = config_file_it->second;
     if (!std::filesystem::exists(config_file_path)) {
         std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
@@ -370,20 +357,41 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(
 
     try {
         auto json = nlohmann::json::parse(config_file_contents);
-        if (json.contains("server_url") && json["server_url"].is_string()) {
-            std::string server_url = json["server_url"];
-            if (!server_url.empty()) {
-                return server_url;
-            }
-        }
-        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
-                  << "] does not contain a valid server_url" << std::endl;
-        return std::nullopt;
+        return json;
     } catch (const nlohmann::json::exception& e) {
         std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
                   << "] is not a valid JSON file: " << e.what() << std::endl;
         return std::nullopt;
     }
+}
+
+std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::InstantiateHttpClient() {
+    auto config_json_opt = LoadConnectionConfigFile(connection_config_);
+    auto server_url_opt = config_json_opt ? ExtractServerUrl(*config_json_opt) : std::nullopt;
+    if (!server_url_opt || server_url_opt->empty()) {
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::init() - No server_url provided in connection_config." << std::endl;
+        initialized_ = "Agent not properly initialized - server_url missing";
+        throw DBPSException("No server_url provided in connection_config");
+    }
+    server_url_ = *server_url_opt;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating pooled HTTP client for server: " << server_url_ << std::endl;
+    
+    //TODO: pass additional params here.
+    //auto http_client = HttplibPooledClient::Acquire(server_url_);
+    std::shared_ptr<HttpClientInterface> http_client = std::make_shared<HttplibClient>(server_url_);
+
+    return http_client;
+}
+
+std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(const nlohmann::json& config_json) const {
+    if (config_json.contains("server_url") && config_json["server_url"].is_string()) {
+        std::string server_url = config_json["server_url"];
+        if (!server_url.empty()) {
+            return server_url;
+        }
+    }
+    return std::nullopt;
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
