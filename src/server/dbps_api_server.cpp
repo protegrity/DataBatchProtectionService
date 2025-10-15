@@ -70,9 +70,13 @@ int main() {
             "{}"
         );
         
-        bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
-        if (!encrypt_result) {
-            return CreateErrorResponse("Encryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
+        try {
+            bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
+            if (!encrypt_result) {
+                return CreateErrorResponse("Encryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
+            }
+        } catch (const InvalidInputException& e) {
+            return CreateErrorResponse("Invalid input for encryption: " + std::string(e.what()));
         }
         
         response.encrypted_value_ = sequencer.encrypted_result_;
@@ -132,9 +136,13 @@ int main() {
             "{}"
         );
         
-        bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);
-        if (!decrypt_result) {
-            return CreateErrorResponse("Decryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
+        try {
+            bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);
+            if (!decrypt_result) {
+                return CreateErrorResponse("Decryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
+            }
+        } catch (const std::exception& e) {
+            return CreateErrorResponse("Decryption failed: " + std::string(e.what()));
         }
         
         response.decrypted_value_ = sequencer.decrypted_result_;
