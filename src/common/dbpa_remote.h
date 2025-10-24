@@ -11,6 +11,7 @@
 #include "enums.h"
 #include "dbpa_interface.h"
 #include "../client/dbps_api_client.h"
+#include "../client/httplib_pool_registry.h"
 #include <nlohmann/json.hpp>
 
 #ifndef DBPS_EXPORT
@@ -111,6 +112,10 @@ protected:
     std::string server_url_;
     std::string user_id_;
     std::string k_connection_config_key_ = "connection_config_file_path";
+
+    // Extract pool config from connection_config
+    // assumes all values in connection_config are optional, and will use default values if any not present.
+    HttplibPoolRegistry::PoolConfig ExtractPoolConfig(const nlohmann::json& config_json);
 
 private:
     // Helper methods for configuration parsing

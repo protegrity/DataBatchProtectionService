@@ -150,6 +150,12 @@ protected:
     std::vector<std::string> tmp_test_data_dir_;
 };
 
+// Expose ExtractPoolConfig via the test subclass
+class ExtractPoolConfigExposer : public TestableRemoteDataBatchProtectionAgent {
+public:
+    using TestableRemoteDataBatchProtectionAgent::ExtractPoolConfig;
+};
+
 // Test basic initialization with valid configuration
 TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthCheck) {
     // Use default constructor to ensure config is loaded from file and HTTP client is created internally
@@ -186,6 +192,84 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
     // Initialized status should indicate health check failure
     ASSERT_TRUE(agent.get_initialized().has_value());
     EXPECT_NE(agent.get_initialized()->find("healthz"), std::string::npos);
+}
+
+// Verify default pool configuration values are applied when not provided
+TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigDefaultsAreApplied) {
+    ExtractPoolConfigExposer agent;
+    const nlohmann::json json = nlohmann::json::parse("{\"server_url\": \"http://localhost:8080\"}");
+    auto cfg = agent.ExtractPoolConfig(json);
+    EXPECT_EQ(cfg.max_pool_size, HttplibPoolRegistry::kDefaultMaxPoolSize);
+    EXPECT_EQ(cfg.borrow_timeout.count(), HttplibPoolRegistry::kDefaultBorrowTimeout_ms.count());
+    EXPECT_EQ(cfg.max_idle_time.count(), HttplibPoolRegistry::kDefaultMaxIdleTime_ms.count());
+    EXPECT_EQ(cfg.connect_timeout.count(), HttplibPoolRegistry::kDefaultConnectTimeout_s.count());
+    EXPECT_EQ(cfg.read_timeout.count(), HttplibPoolRegistry::kDefaultReadTimeout_s.count());
+    EXPECT_EQ(cfg.write_timeout.count(), HttplibPoolRegistry::kDefaultWriteTimeout_s.count());
+}
+
+// Verify custom pool configuration values from JSON are applied
+TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigCustomValuesAreApplied) {
+    ExtractPoolConfigExposer agent;
+    const std::string json_str =
+        "{\n"
+        "  \"server_url\": \"http://localhost:8080\",\n"
+        "  \"connection_pool.max_pool_size\": 13,\n"
+        "  \"connection_pool.borrow_timeout_milliseconds\": 250,\n"
+        "  \"connection_pool.max_idle_time_milliseconds\": 45000,\n"
+        "  \"connection_pool.connect_timeout_seconds\": 9,\n"
+        "  \"connection_pool.read_timeout_seconds\": 44,\n"
+        "  \"connection_pool.write_timeout_seconds\": 33\n"
+        "}";
+    const nlohmann::json json = nlohmann::json::parse(json_str);
+    auto cfg = agent.ExtractPoolConfig(json);
+    EXPECT_EQ(cfg.max_pool_size, 13u);
+    EXPECT_EQ(cfg.borrow_timeout.count(), 250);
+    EXPECT_EQ(cfg.max_idle_time.count(), 45000);
+    EXPECT_EQ(cfg.connect_timeout.count(), 9);
+    EXPECT_EQ(cfg.read_timeout.count(), 44);
+    EXPECT_EQ(cfg.write_timeout.count(), 33);
+}
+
+// Verify a mix of provided and missing values results in custom + defaults accordingly
+TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMixedDefaultsAndCustom) {
+    ExtractPoolConfigExposer agent;
+    const std::string json_str =
+        "{\n"
+        "  \"server_url\": \"http://localhost:8080\",\n"
+        "  \"connection_pool.max_pool_size\": 5,\n"
+        "  \"connection_pool.read_timeout_seconds\": 7\n"
+        "}";
+    const nlohmann::json json = nlohmann::json::parse(json_str);
+
+    auto cfg = agent.ExtractPoolConfig(json);
+
+    // Provided values
+    EXPECT_EQ(cfg.max_pool_size, 5u);
+    EXPECT_EQ(cfg.read_timeout.count(), 7);
+
+    // Defaults for missing values
+    EXPECT_EQ(cfg.borrow_timeout.count(), HttplibPoolRegistry::kDefaultBorrowTimeout_ms.count());
+    EXPECT_EQ(cfg.max_idle_time.count(), HttplibPoolRegistry::kDefaultMaxIdleTime_ms.count());
+    EXPECT_EQ(cfg.connect_timeout.count(), HttplibPoolRegistry::kDefaultConnectTimeout_s.count());
+    EXPECT_EQ(cfg.write_timeout.count(), HttplibPoolRegistry::kDefaultWriteTimeout_s.count());
+}
+
+// Verify malformed (wrong-typed) values throw
+TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMalformedValuesThrow) {
+    ExtractPoolConfigExposer agent;
+    const std::string json_str =
+        "{\n"
+        "  \"server_url\": \"http://localhost:8080\",\n"
+        "  \"connection_pool.max_pool_size\": \"oops\",\n"
+        "  \"connection_pool.borrow_timeout_milliseconds\": \"abc\",\n"
+        "  \"connection_pool.max_idle_time_milliseconds\": true,\n"
+        "  \"connection_pool.connect_timeout_seconds\": {},\n"
+        "  \"connection_pool.read_timeout_seconds\": [],\n"
+        "  \"connection_pool.write_timeout_seconds\": null\n"
+        "}";
+    const nlohmann::json json = nlohmann::json::parse(json_str);
+
+    EXPECT_THROW(agent.ExtractPoolConfig(json), DBPSException);
 }
 
 // Test decryption without initialization

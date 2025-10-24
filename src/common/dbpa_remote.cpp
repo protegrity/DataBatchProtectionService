@@ -378,16 +378,7 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Creating pooled HTTP client for server: " << server_url_ << std::endl;
     
-    //TODO: ensure that these parameters are configurable (likely via Init())
-    //https://github.com/protegrity/arrow/issues/182
-    HttplibPoolRegistry::PoolConfig pool_config = {
-        .max_pool_size = 20,
-        .borrow_timeout = std::chrono::milliseconds(100),
-        .max_idle_time = std::chrono::milliseconds(60000),
-        .connect_timeout = std::chrono::seconds(5),
-        .read_timeout = std::chrono::seconds(20),
-        .write_timeout = std::chrono::seconds(20)
-    };
+    HttplibPoolRegistry::PoolConfig pool_config = ExtractPoolConfig(*config_json_opt);
 
     // set the pool config for the given server_url_
     HttplibPoolRegistry::Instance().SetPoolConfig(server_url_, pool_config);
@@ -411,6 +402,64 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(cons
         }
     }
     return std::nullopt;
+}
+
+//Extract pool config from connection_config. Expected format is a set of key-values pairs which are top level in the file
+// there is no nesting
+HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfig(const nlohmann::json& config_json) {
+    HttplibPoolRegistry::PoolConfig pool_config;
+
+    // Validate known keys: if present, must be integer; otherwise, use defaults
+    auto get_int_or_default = [&](const char* key, long long default_value) -> long long {
+        if (!config_json.contains(key)) {
+            return default_value;
+        }
+        const auto& val = config_json.at(key);
+        bool is_number_integer = val.is_number_integer() || val.is_number_unsigned();
+        if (!is_number_integer) {
+            std::ostringstream oss;
+            oss << "ERROR: RemoteDataBatchProtectionAgent - "
+                << "Invalid non-integer value for key [" << key << "]."
+                << "Value: [" << val.get<std::string>() << "]";
+            throw DBPSException(oss.str());
+        }
+
+        if (val.get<long long>() < 0) {
+            std::ostringstream oss;
+            oss << "ERROR: RemoteDataBatchProtectionAgent - "
+                << "Invalid value for key [" << key << "] " 
+                << "Value: [" << val.get<std::string>() << "] must be >= 0";
+            throw DBPSException(oss.str());
+        }
+
+        return val.get<long long>();
+    };
+
+    pool_config.max_pool_size = static_cast<std::size_t>(
+        get_int_or_default("connection_pool.max_pool_size", HttplibPoolRegistry::kDefaultMaxPoolSize));
+    pool_config.borrow_timeout = std::chrono::milliseconds(
+        get_int_or_default("connection_pool.borrow_timeout_milliseconds", HttplibPoolRegistry::kDefaultBorrowTimeout_ms.count()));
+    pool_config.max_idle_time = std::chrono::milliseconds(
+        get_int_or_default("connection_pool.max_idle_time_milliseconds", HttplibPoolRegistry::kDefaultMaxIdleTime_ms.count()));
+    pool_config.connect_timeout = std::chrono::seconds(
+        get_int_or_default("connection_pool.connect_timeout_seconds", HttplibPoolRegistry::kDefaultConnectTimeout_s.count()));
+    pool_config.read_timeout = std::chrono::seconds(
+        get_int_or_default("connection_pool.read_timeout_seconds", HttplibPoolRegistry::kDefaultReadTimeout_s.count()));
+    pool_config.write_timeout = std::chrono::seconds(
+        get_int_or_default("connection_pool.write_timeout_seconds", HttplibPoolRegistry::kDefaultWriteTimeout_s.count()));
+
+    //TODO: find a better way to log this.
+    // Log the configured pool values for observability
+    std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - HTTP pool config {"
+    << " max_pool_size=" << pool_config.max_pool_size
+    << ", borrow_timeout_ms=" << pool_config.borrow_timeout.count()
+    << ", max_idle_time_ms=" << pool_config.max_idle_time.count()
+    << ", connect_timeout_s=" << pool_config.connect_timeout.count()
+    << ", read_timeout_s=" << pool_config.read_timeout.count()
+    << ", write_timeout_s=" << pool_config.write_timeout.count()
+    << " }" << std::endl;
+
+    return pool_config;
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
