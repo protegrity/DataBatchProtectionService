@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <cstring>
+#include <optional>
 #include <cxxopts.hpp>
 
 // Include the necessary headers from the project
@@ -66,7 +67,8 @@ public:
                 "demo_key_001",                // column_key_id
                 Type::UNDEFINED,               // datatype
                 std::nullopt,                  // datatype_length (not needed for UNDEFINED)
-                CompressionCodec::UNCOMPRESSED // compression_type
+                CompressionCodec::UNCOMPRESSED, // compression_type
+                std::nullopt
             );
             
             std::cout << "OK: Main DBPA agent initialized successfully" << std::endl;
@@ -92,7 +94,8 @@ public:
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
                 std::nullopt,                  // datatype_length (not needed for FLOAT)
-                CompressionCodec::UNCOMPRESSED // compression_type
+                CompressionCodec::UNCOMPRESSED, // compression_type
+                std::nullopt
             );
             
             std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
@@ -118,7 +121,8 @@ public:
                 "demo_fixed_len_key_001",      // column_key_id
                 Type::FIXED_LEN_BYTE_ARRAY,   // datatype
                 8,                            // datatype_length (8 bytes per element)
-                CompressionCodec::UNCOMPRESSED // compression_type
+                CompressionCodec::UNCOMPRESSED, // compression_type
+                std::nullopt
             );
             
             std::cout << "OK: Fixed-length DBPA agent initialized successfully" << std::endl;

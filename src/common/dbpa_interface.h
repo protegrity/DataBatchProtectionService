@@ -46,6 +46,11 @@ public:
     // Success flag; false indicates an error.
     virtual bool success() const = 0;
 
+    //TODO: revisit the default implementation.
+    virtual const std::optional<std::map<std::string, std::string>> encryption_metadata() const {
+        return std::nullopt;
+    }
+
     // Error details (valid when success() == false).
     virtual const std::string& error_message() const = 0;
     virtual const std::map<std::string, std::string>& error_fields() const = 0;
@@ -84,7 +89,8 @@ public:
         std::string column_key_id,
         Type::type datatype,
         std::optional<int> datatype_length,
-        CompressionCodec::type compression_type)
+        CompressionCodec::type compression_type,
+        std::optional<std::map<std::string, std::string>> column_encryption_metadata)
     {
         column_name_ = std::move(column_name);
         connection_config_ = std::move(connection_config);
@@ -93,6 +99,7 @@ public:
         datatype_ = datatype;
         datatype_length_ = datatype_length;
         compression_type_ = compression_type;
+        column_encryption_metadata_ = std::move(column_encryption_metadata);
     }
 
     /*
@@ -113,12 +120,17 @@ public:
         span<const uint8_t> ciphertext,
         std::map<std::string, std::string> encoding_attributes) = 0;
 
+    virtual const std::optional<std::map<std::string, std::string>> EncryptionMetadata() const {
+        return column_encryption_metadata_;
+    }
+
     virtual ~DataBatchProtectionAgentInterface() = default;
 
 protected:
     std::string column_name_;
     std::map<std::string, std::string> connection_config_;
     std::string app_context_;  // includes user_id
+    std::optional<std::map<std::string, std::string>> column_encryption_metadata_;
 
     std::string column_key_id_;
     Type::type datatype_;

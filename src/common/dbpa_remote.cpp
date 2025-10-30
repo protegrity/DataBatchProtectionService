@@ -140,7 +140,8 @@ void RemoteDataBatchProtectionAgent::init(
     std::string column_key_id,
     Type::type datatype,
     std::optional<int> datatype_length,
-    CompressionCodec::type compression_type) {
+    CompressionCodec::type compression_type,
+    std::optional<std::map<std::string, std::string>> column_encryption_metadata) {
 
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Starting initialization for column: " << column_name << std::endl;
     initialized_ = "Agent not properly initialized - incomplete"; 
@@ -154,7 +155,8 @@ void RemoteDataBatchProtectionAgent::init(
             std::move(column_key_id),
             datatype,
             datatype_length,
-            compression_type
+            compression_type,
+            std::move(column_encryption_metadata)
         );
 
         // check for app_context not empty (as user_id will be extracted from it)

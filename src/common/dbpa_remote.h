@@ -93,7 +93,8 @@ public:
         std::string column_key_id,
         Type::type datatype,
         std::optional<int> datatype_length,
-        CompressionCodec::type compression_type) override;
+        CompressionCodec::type compression_type,
+        std::optional<std::map<std::string, std::string>> column_encryption_metadata) override;
     
     std::unique_ptr<EncryptionResult> Encrypt(
         span<const uint8_t> plaintext,

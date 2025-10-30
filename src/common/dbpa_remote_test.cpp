@@ -124,7 +124,7 @@ protected:
         
         // init() should throw DBPSException for missing server URL
         EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), 
+                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                      DBPSException);
         
         // Test that the initialized_ state reflects the failure
@@ -169,7 +169,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
     // init() should throw because health check will fail (we're using a real client with no server)
     // but it must parse config and extract values first
     EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key",
-                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED),
+                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt),
                  DBPSException);
 
     // Test that initialization variables are properly set
@@ -311,7 +311,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
     
     // init() should throw DBPSException for missing user ID
     EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), 
+                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                  DBPSException);
     
     // Test that the initialized_ state reflects the failure
@@ -345,7 +345,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, HealthCheckFailure) {
     
     // init() should throw DBPSException for health check failure
     EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), 
+                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                  DBPSException);
     
     // Test that the initialized_ state reflects the failure
@@ -389,7 +389,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulEncryption) {
     
     // init() should not throw an exception for valid configuration
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
@@ -431,7 +431,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
     
     // init() should not throw an exception for valid configuration
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
@@ -501,7 +501,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
         
         // init() should not throw an exception for valid configuration
         EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                                   Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                                   Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
         
         std::vector<uint8_t> test_data = {1, 2, 3, 4};
         std::map<std::string, std::string> encoding_attributes = {
@@ -544,7 +544,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, EncryptionFieldMismatch) {
     
     // init() should not throw an exception for valid configuration
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {

@@ -21,7 +21,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
     std::string app_context = R"({"user_id": "test_user"})";
     
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
@@ -40,7 +40,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     std::string app_context = R"({"user_id": "test_user"})";
     
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
@@ -89,7 +89,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, MissingUserId) {
     std::string app_context = R"({"role": "admin"})";
     
     EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED), DBPSException);
+                            Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), DBPSException);
 }
 
 // Test missing page_encoding in encoding_attributes
@@ -100,7 +100,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, MissingPageEncoding) {
     std::string app_context = R"({"user_id": "test_user"})";
     
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED));
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_type", "DICTIONARY_PAGE"}};
