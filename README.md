@@ -74,61 +74,12 @@ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
 
 The project includes unit tests for the JSON request parsing classes. To run the tests:
 
-### Build-n-run tests (Compact version)
-```
-# First, run docker container with source files mounted
-# Then, inside the container, run:
-cmake -B build -S . -G Ninja && cmake --build build --target json_request_test  && ./build/json_request_test
-cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test && ./build/enum_utils_test
-cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test && ./build/encryption_sequencer_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test && ./build/dbpa_interface_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_utils_test && ./build/dbpa_utils_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test && ./build/dbps_api_client_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test && ./build/dbpa_remote_test
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_local_test && ./build/dbpa_local_test
-cmake -B build -S . -G Ninja && cmake --build build --target decoding_utils_test && ./build/decoding_utils_test
-```
-
 ### Build the tests
 ```
 # First, run docker container with source files mounted
 # Then, inside the container, run:
 
-echo "----- build: json_request_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target json_request_test \
-  || { echo "❌ FAILED: json_request_test"; false; } && echo
-
-echo "----- build: enum_utils_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target enum_utils_test \
-  || { echo "❌ FAILED: enum_utils_test"; false; } && echo
-
-echo "----- build: encryption_sequencer_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target encryption_sequencer_test \
-  || { echo "❌ FAILED: encryption_sequencer_test"; false; } && echo
-
-echo "----- build: dbpa_interface_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_interface_test \
-  || { echo "❌ FAILED: dbpa_interface_test"; false; } && echo
-
-echo "----- build: dbpa_utils_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_utils_test \
-  || { echo "❌ FAILED: dbpa_utils_test"; false; } && echo
-
-echo "----- build: dbps_api_client_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_client_test \
-  || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
-
-echo "----- build: dbpa_remote_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_test \
-  || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
-
-echo "----- build: dbpa_local_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_local_test \
-  || { echo "❌ FAILED: dbpa_local_test"; false; } && echo
-
-echo "----- build: decoding_utils_test -----" && \
-cmake -B build -S . -G Ninja && cmake --build build --target decoding_utils_test \
-  || { echo "❌ FAILED: decoding_utils_test"; false; } && echo
+cmake --build build --target tests
 ```
 
 ### Run the tests
@@ -171,6 +122,14 @@ echo "----- run: dbpa_local_test -----" && \
 echo "----- run: decoding_utils_test -----" && \
 ./build/decoding_utils_test \
   || { echo "❌ FAILED: decoding_utils_test"; false; } && echo
+
+echo "----- run: httplib_pool_registry_test -----" && \
+./build/httplib_pool_registry_test \
+  || { echo "❌ FAILED: httplib_pool_registry_test"; false; } && echo
+
+echo "----- run: httplib_pooled_client_test -----" && \
+./build/httplib_pooled_client_test \
+  || { echo "❌ FAILED: httplib_pooled_client_test"; false; } && echo
 ```
 
 ## Running DBPA remote testing app
