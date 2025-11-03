@@ -214,10 +214,10 @@ std::string PrintTypedList(const TypedListValues& list) {
             out << "\"\n";
         }
         else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
-            // String values with quotes
+            // String values with quotes and the length of the string.
             out << "Decoded " << GetTypeName<T>() << " values:\n";
             for (size_t i = 0; i < values.size(); ++i) {
-                out << "  [" << i << "] \"" << values[i] << "\"\n";
+                out << "  [" << i << "] \"" << values[i] << "\" (length: " << values[i].size() << ")\n";
             }
         }
         else {
@@ -321,15 +321,35 @@ TypedListValues DataBatchEncryptionSequencer::ParseValueBytesIntoTypedList(
     }
 }
 
+// This is the primary integration point for Protegrity to encrypt individual items from a typed list.
+// 
+// Also the context rich encryptor can use these additional parameters: column_name, user_id, key_id, application_context.
+//
+// The current implementation prints out the list of items in the typed list and throws the DBPSUnsupportedException
+// so that the default encryption method is used.
+//
+// Both the level_bytes AND elements need to be encrypted and combined as a single encrypted vector of bytes.
+//
 std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptTypedList(
     const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes) {
+   
+    // Printout the typed list.
     auto print_result = PrintTypedList(typed_list);
     if (print_result.length() > 1000) {
         std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
-                << print_result.substr(0, 1000) << "..." << std::endl;
+                << print_result.substr(0, 1000) << "...";
     } else {
-        std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result << std::endl;
+        std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result;
     }
+
+    // Printout the additional context parameters.
+    std::cout << "Context parameters:\n"
+        << "  column_name: " << column_name_ << "\n"
+        << "  user_id: " << user_id_ << "\n"
+        << "  key_id: " << key_id_ << "\n"
+        << "  application_context: " << application_context_  << "\n"
+        << std::endl;
+
     throw DBPSUnsupportedException("EncryptTypedList not implemented");
 }
 
