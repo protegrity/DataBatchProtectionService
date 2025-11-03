@@ -1,0 +1,613 @@
+openapi: 3.0.3
+info:
+  title: Encryption API
+  version: 1.0.0
+
+# Global security so every operation requires JWT
+security:
+  - bearer_auth: []
+
+paths:
+  /encrypt:
+    post:
+      summary: Encrypts a column data_batch using a specified key and data type
+      operationId: encryptBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - column_reference
+                - data_batch
+                - data_batch_encrypted
+                - encryption
+                - access
+              properties:
+                column_reference:
+                  $ref: '#/components/schemas/column_reference'
+                data_batch:
+                  $ref: '#/components/schemas/data_batch_with_value'
+                data_batch_encrypted:
+                  $ref: '#/components/schemas/data_batch_encrypted_no_value'
+                encryption:
+                  $ref: '#/components/schemas/encryption'
+                access:
+                  $ref: '#/components/schemas/access_request'
+                application_context:
+                  $ref: '#/components/schemas/application_context'
+                debug:
+                  $ref: '#/components/schemas/debug_info'
+            examples:
+              standard:
+                summary: Encrypt a base64-encoded byte array of emails
+                description: >
+                  `data_batch.value` is a Base64 string representing raw bytes of two lines:
+                  user1@example.com\nuser2@example.com
+                  The debug block includes a UUID and a pretty-printed helper for development.
+                value:
+                  column_reference:
+                    name: email
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: PLAIN
+                    value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                  encryption:
+                    key_id: EMAIL_KEY_001
+                  access:
+                    user_id: user123
+                  application_context:
+                    column_schema:
+                      database: customerdb
+                      schema: public
+                      schema_version: v1
+                      table: users
+                    location:
+                      country: US
+                      region: CA
+                      lat: 37.7749
+                      lon: -122.4194
+                  debug:
+                    pretty_printed_value: "user1@example.com\nuser2@example.com"
+                    reference_id: 550e8400-e29b-41d4-a716-446655440000
+              ints_csv_utf8:
+                summary: Encrypt UNDEFINED of INT32 IDs (BASE64 encoded)
+                description: |
+                  Three INT32 values provided as a UNDEFINED string, BASE64 encoded.
+                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
+                  Encrypted output will be returned in `data_batch_encrypted.value`.
+                value:
+                  column_reference:
+                    name: CustomerID
+                  data_batch:
+                    datatype_info:
+                      datatype: INT32
+                    value: "MzM0NCw1NTY2LDc3ODg="
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: UNDEFINED
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                  encryption:
+                    key_id: NumericID001
+                  access:
+                    user_id: GRM_009
+                  application_context:
+                    column_schema:
+                      database: public
+                      schema: Federation
+                      table: Customers
+                    location:
+                      country: US
+                      region: CA
+                      lat: 37.7749
+                      lon: -122.4194
+      responses:
+        '200':
+          description: Successful encryption
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data_batch_encrypted
+                  - access
+                properties:
+                  data_batch_encrypted:
+                    $ref: '#/components/schemas/data_batch_encrypted_with_value'
+                  access:
+                    $ref: '#/components/schemas/access_response'
+                  debug:
+                    $ref: '#/components/schemas/debug_info'
+              examples:
+                success:
+                  summary: Encrypted payload
+                  value:
+                    data_batch_encrypted:
+                      value_format:
+                        compression: ZSTD
+                      value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
+                    access:
+                      user_id: user123
+                      role: EmailReader
+                      access_control: granted
+                    debug:
+                      reference_id: 550e8400-e29b-41d4-a716-446655440000
+                ints_csv_utf8_success:
+                  summary: Encrypted INT32 UNDEFINED IDs
+                  description: |
+                    Encrypted output for the INT32 UNDEFINED "3344,5566,7788".
+                    `data_batch_encrypted.value` contains the Base64-encoded ciphertext.
+                  value:
+                    data_batch_encrypted:
+                      value_format:
+                        compression: ZSTD
+                      value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                    access:
+                      user_id: GRM_009
+                      role: IDReader
+                      access_control: granted
+                    debug:
+                      reference_id: 123e4567-e89b-12d3-a456-426614174000
+        '401':
+          description: Unauthorized request due to failed access control
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access
+                  - error_string
+                properties:
+                  access:
+                    $ref: '#/components/schemas/access_response'
+                  error_string:
+                    type: string
+                    description: Description of the access control or encryption failure
+                  error_code:
+                    type: string
+                    description: Code of the access control or encryption failure
+              examples:
+                unauthorized:
+                  summary: Access denied
+                  value:
+                    access:
+                      user_id: user123
+                      role: EmailReader
+                      access_control: denied
+                    error_string: User does not have permission to encrypt this column
+
+  /decrypt:
+    post:
+      summary: Decrypts a previously encrypted value using the provided metadata
+      operationId: decryptBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - column_reference
+                - data_batch_encrypted
+                - data_batch
+                - encryption
+                - access
+              properties:
+                column_reference:
+                  $ref: '#/components/schemas/column_reference'
+                data_batch_encrypted:
+                  $ref: '#/components/schemas/data_batch_encrypted_with_value'
+                data_batch:
+                  $ref: '#/components/schemas/data_batch_no_value'
+                encryption:
+                  $ref: '#/components/schemas/encryption'
+                access:
+                  $ref: '#/components/schemas/access_request'
+                application_context:
+                  $ref: '#/components/schemas/application_context'
+                debug:
+                  $ref: '#/components/schemas/debug_info'
+            examples:
+              standard:
+                summary: Decrypt the encrypted Base64 blob back to a base64-encoded byte array of emails
+                value:
+                  column_reference:
+                    name: email
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                    value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: PLAIN
+                  encryption:
+                    key_id: EMAIL_KEY_001
+                  access:
+                    user_id: user123
+                  application_context:
+                    column_schema:
+                      database: customerdb
+                      schema: public
+                      schema_version: v1
+                      table: users
+                    location:
+                      country: US
+                      region: CA
+                      lat: 37.7749
+                      lon: -122.4194
+                  debug:
+                    reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
+              ints_csv_utf8:
+                summary: Decrypt UNDEFINED of INT32 IDs (BASE64 encoded)
+                description: |
+                  Takes an encrypted Base64 blob and decrypts it back into the BASE64 encoded UNDEFINED.
+                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
+                value:
+                  column_reference:
+                    name: CustomerID
+                  data_batch_encrypted:
+                    value_format:
+                      compression: ZSTD
+                    value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                  data_batch:
+                    datatype_info:
+                      datatype: INT32
+                    value_format:
+                      compression: UNCOMPRESSED
+                      format: UNDEFINED
+                  encryption:
+                    key_id: NumericID001
+                  access:
+                    user_id: GRM_009
+                  application_context:
+                    column_schema:
+                      database: public
+                      schema: Federation
+                      table: Customers
+                  debug:
+                    reference_id: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        '200':
+          description: Successful decryption
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data_batch
+                  - access
+                properties:
+                  data_batch:
+                    $ref: '#/components/schemas/data_batch_with_value'
+                  access:
+                    $ref: '#/components/schemas/access_response'
+                  debug:
+                    $ref: '#/components/schemas/debug_info'
+              examples:
+                success:
+                  summary: Decrypted back to base64 raw bytes (two lines of emails)
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: BYTE_ARRAY
+                      value_format:
+                        compression: UNCOMPRESSED
+                        format: PLAIN
+                      value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
+                    access:
+                      user_id: user123
+                      role: EmailReader
+                      access_control: granted
+                    debug:
+                      pretty_printed_value: "user1@example.com\nuser2@example.com"
+                      reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
+                ints_csv_utf8_success:
+                  summary: Decrypted INT32 UNDEFINED IDs
+                  description: |
+                    Decrypted back into the BASE64 encoded UNDEFINED string.
+                    Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: INT32
+                      value_format:
+                        compression: UNCOMPRESSED
+                        format: UNDEFINED
+                      value: "MzM0NCw1NTY2LDc3ODg="
+                    access:
+                      user_id: GRM_009
+                      role: IDReader
+                      access_control: granted
+                    debug:
+                      reference_id: 123e4567-e89b-12d3-a456-426614174000
+        '401':
+          description: Unauthorized request due to failed access control
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access
+                  - error_string
+                properties:
+                  access:
+                    $ref: '#/components/schemas/access_response'
+                  error_string:
+                    type: string
+                    description: Description of the access control or decryption failure
+                  error_code:
+                    type: string
+                    description: Code of the access control or decryption failure
+              examples:
+                unauthorized:
+                  summary: Access denied
+                  value:
+                    access:
+                      user_id: user123
+                      role: EmailReader
+                      access_control: denied
+                    error_string: User does not have permission to decrypt this column
+
+components:
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    application_context:
+      type: object
+      description: Metadata about the application context of the request
+      properties:
+        column_schema:
+          type: object
+          description: Reference to a database column schema
+          properties:
+            database:
+              type: string
+              description: Database name containing the DB schemas and tables.
+            schema:
+              type: string
+              description: >
+                Namespace inside the database which contains the tables.
+                In databases without explicit schema definition, this is usually "public".
+            schema_version:
+              type: string
+              description: Optional version identifier for the schema.
+            table:
+              type: string
+              description: Table name of the source column
+        location:
+          type: object
+          description: Optional geographic information associated with the request
+          properties:
+            country:
+              type: string
+              example: US
+            region:
+              type: string
+              example: CA
+            lat:
+              type: number
+              format: float
+              example: 37.7749
+            lon:
+              type: number
+              format: float
+              example: -122.4194
+
+    column_reference:
+      type: object
+      description: Column name reference only
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Column name in the source table
+
+    encryption:
+      type: object
+      description: Encryption parameters
+      required:
+        - key_id
+      properties:
+        key_id:
+          type: string
+          description: >
+            Identifier of the key to use. Required for all encryption algorithms.
+
+    compression:
+      type: string
+      enum:
+        - UNCOMPRESSED
+        - SNAPPY
+        - GZIP
+        - BROTLI
+        - ZSTD
+        - LZ4
+        - LZ4_FRAME
+        - LZO
+        - BZ2
+        - LZ4_HADOOP
+      description: Compression format
+
+    serialization_format:
+      type: string
+      enum:
+        - PLAIN
+        - PLAIN_DICTIONARY
+        - RLE
+        - BIT_PACKED
+        - DELTA_BINARY_PACKED
+        - DELTA_LENGTH_BYTE_ARRAY
+        - DELTA_BYTE_ARRAY
+        - RLE_DICTIONARY
+        - BYTE_STREAM_SPLIT
+        - UNDEFINED
+        - UNKNOWN
+      description: Format used for serializing the data
+
+    value_format:
+      type: object
+      description: Details on how the data was serialized for plaintext values.
+      required:
+        - compression
+        - format
+      properties:
+        compression:
+          $ref: '#/components/schemas/compression'
+        format:
+          $ref: '#/components/schemas/serialization_format'
+
+    value_format_encrypted:
+      type: object
+      description: >
+        Details on how the data was serialized for encrypted values. Format is assumed to be binary and encoded as base64.
+      required:
+        - compression
+      properties:
+        compression:
+          $ref: '#/components/schemas/compression'
+
+    access_request:
+      type: object
+      description: Access control metadata related to the encryption or decryption request
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: >
+            User identifier associated with the request. The request is sent "on behalf of" the user.
+            The user id refers to an internal ID on the encryption service for which ACLs are checked.
+
+    access_response:
+      type: object
+      description: Access control metadata related to the encryption or decryption response.
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: >
+            User identifier associated with the response. The user id refers to an internal ID on the
+            encryption service for which ACLs are checked.
+        role:
+          type: string
+          example: EmailReader
+          description: Role that was applied during access evaluation
+        access_control:
+          type: string
+          enum:
+            - granted
+            - denied
+          example: granted
+          description: Result of the access control check
+
+    debug_info:
+      type: object
+      description: Optional debug settings for development or troubleshooting
+      properties:
+        pretty_printed_value:
+          type: string
+          description: Optional human-readable version of the value
+        reference_id:
+          type: string
+          description: >
+            Optional identifier to correlate API call with requests and responses.
+            An app calling the API may already have a reference_id from the calling stack
+            and it can be used here, for example the session_id from a caller JWT.
+
+    datatype_info:
+      type: object
+      description: Data type information for the values being encrypted or decrypted
+      required:
+        - datatype
+      properties:
+        datatype:
+          type: string
+          description: Generic data type for the values being encrypted or decrypted
+          enum:
+            - BOOLEAN
+            - INT32
+            - INT64
+            - INT96
+            - FLOAT
+            - DOUBLE
+            - BYTE_ARRAY
+            - FIXED_LEN_BYTE_ARRAY
+            - UNDEFINED
+        length:
+          type: integer
+          description: Optional length specification for fixed-length data types (e.g., FIXED_LEN_BYTE_ARRAY)
+          minimum: 0
+
+    data_batch_base:
+      type: object
+      description: Base shape for plain (unencrypted) data batch metadata.
+      required:
+        - datatype_info
+        - value_format
+      properties:
+        datatype_info:
+          $ref: '#/components/schemas/datatype_info'
+        value_format:
+          $ref: '#/components/schemas/value_format'
+
+    data_batch_no_value:
+      description: '`value` is not present since it is used for requests.'
+      allOf:
+        - $ref: '#/components/schemas/data_batch_base'
+
+    data_batch_with_value:
+      description: >
+        '`value` is present; used in /encrypt requests (plaintext input) and in
+        /decrypt responses (decrypted output).'
+      allOf:
+        - $ref: '#/components/schemas/data_batch_base'
+        - type: object
+          required:
+            - value
+          properties:
+            value:
+              type: string
+              description: The data to encrypt or the result of decryption
+
+    data_batch_encrypted_base:
+      type: object
+      required:
+        - value_format
+      properties:
+        value_format:
+          $ref: '#/components/schemas/value_format_encrypted'
+
+    data_batch_encrypted_no_value:
+      description: '`value` is not present since it is used for requests.'
+      allOf:
+        - $ref: '#/components/schemas/data_batch_encrypted_base'
+
+    data_batch_encrypted_with_value:
+      description: '`value` is present since it is used for responses.'
+      allOf:
+        - $ref: '#/components/schemas/data_batch_encrypted_base'
+        - type: object
+          required:
+            - value
+          properties:
+            value:
+              type: string
+              description: The encrypted value
