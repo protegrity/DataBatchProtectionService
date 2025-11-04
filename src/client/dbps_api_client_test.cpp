@@ -8,21 +8,10 @@
 #include "http_client_interface.h"
 #include "../common/enums.h"
 #include <nlohmann/json.hpp>
+#include <gtest/gtest.h>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-
-// Simple test framework (matching existing project style)
-#define TEST(name) void test_##name()
-#define ASSERT(condition) assert(condition)
-#define ASSERT_EQ(expected, actual) assert((expected) == (actual))
-#define ASSERT_TRUE(condition) assert(condition)
-#define ASSERT_FALSE(condition) assert(!(condition))
-
-// Test utilities
-void PrintTestResult(const std::string& test_name, bool passed) {
-    std::cout << (passed ? "PASS" : "FAIL") << ": " << test_name << std::endl;
-}
 
 // TODO: Move this to a common test utility file.
 // Helper function to convert string to binary data
@@ -112,7 +101,7 @@ public:
 };
 
 // Test functions for ApiResponse base class
-TEST(ApiResponseSuccessWithValidResponse) {
+TEST(DBPSApiClient, ApiResponseSuccessWithValidResponse) {
     TestableEncryptApiResponse response;
     
     // Set up a valid response state
@@ -132,7 +121,7 @@ TEST(ApiResponseSuccessWithValidResponse) {
     ASSERT_TRUE(response.Success());
 }
 
-TEST(ApiResponseSuccessWithInvalidHttpStatus) {
+TEST(DBPSApiClient, ApiResponseSuccessWithInvalidHttpStatus) {
     TestableEncryptApiResponse response;
     
     // Set up response with invalid HTTP status
@@ -152,7 +141,7 @@ TEST(ApiResponseSuccessWithInvalidHttpStatus) {
     ASSERT_FALSE(response.Success());
 }
 
-TEST(ApiResponseSuccessWithApiClientError) {
+TEST(DBPSApiClient, ApiResponseSuccessWithApiClientError) {
     TestableEncryptApiResponse response;
     
     // Set up response with API client error
@@ -174,7 +163,7 @@ TEST(ApiResponseSuccessWithApiClientError) {
 }
 
 // Test functions for EncryptApiResponse
-TEST(EncryptApiResponseGetResponseCiphertextWithValidData) {
+TEST(DBPSApiClient, EncryptApiResponseGetResponseCiphertextWithValidData) {
     TestableEncryptApiResponse response;
     
     // Create a valid EncryptJsonResponse with binary data
@@ -198,7 +187,7 @@ TEST(EncryptApiResponseGetResponseCiphertextWithValidData) {
     ASSERT_EQ("test@example.com", decoded_string);
 }
 
-TEST(EncryptApiResponseGetResponseCiphertextWithNoData) {
+TEST(DBPSApiClient, EncryptApiResponseGetResponseCiphertextWithNoData) {
     TestableEncryptApiResponse response;
     
     // Don't set any JSON response, so decoded_ciphertext_ should be empty
@@ -211,7 +200,7 @@ TEST(EncryptApiResponseGetResponseCiphertextWithNoData) {
 }
 
 // Test functions for DecryptApiResponse
-TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
+TEST(DBPSApiClient, DecryptApiResponseGetResponsePlaintextWithValidData) {
     TestableDecryptApiResponse response;
     
     // Create a valid DecryptJsonResponse with binary data
@@ -237,7 +226,7 @@ TEST(DecryptApiResponseGetResponsePlaintextWithValidData) {
     ASSERT_EQ("test@example.com", decoded_string);
 }
 
-TEST(DecryptApiResponseGetResponsePlaintextWithNoData) {
+TEST(DBPSApiClient, DecryptApiResponseGetResponsePlaintextWithNoData) {
     TestableDecryptApiResponse response;
     
     // Don't set any JSON response, so decoded_plaintext_ should be empty
@@ -249,7 +238,7 @@ TEST(DecryptApiResponseGetResponsePlaintextWithNoData) {
     ASSERT_TRUE(plaintext.empty());
 }
 
-TEST(EncryptWithValidData) {
+TEST(DBPSApiClient, EncryptWithValidData) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -334,7 +323,7 @@ TEST(EncryptWithValidData) {
     ASSERT_TRUE(json_response.IsValid());
 }
 
-TEST(DecryptWithValidData) {
+TEST(DBPSApiClient, DecryptWithValidData) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -423,7 +412,7 @@ TEST(DecryptWithValidData) {
     ASSERT_TRUE(json_response.IsValid());
 }
 
-TEST(EncryptWithInvalidData) {
+TEST(DBPSApiClient, EncryptWithInvalidData) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -452,7 +441,7 @@ TEST(EncryptWithInvalidData) {
     ASSERT_FALSE(response1.Success());
 }
 
-TEST(DecryptWithInvalidData) {
+TEST(DBPSApiClient, DecryptWithInvalidData) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -481,7 +470,7 @@ TEST(DecryptWithInvalidData) {
     ASSERT_FALSE(response1.Success());
 }
 
-TEST(EncryptWithInvalidJsonResponse) {
+TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -544,7 +533,7 @@ TEST(EncryptWithInvalidJsonResponse) {
     ASSERT_FALSE(response.Success());
 }
 
-TEST(DecryptWithInvalidJsonResponse) {
+TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -607,7 +596,7 @@ TEST(DecryptWithInvalidJsonResponse) {
     ASSERT_FALSE(response.Success());
 }
 
-TEST(EncryptWithEncodingAttributes) {
+TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
     // Create mock HTTP client
     auto mock_client = std::make_unique<MockHttpClient>();
     
@@ -693,135 +682,4 @@ TEST(EncryptWithEncodingAttributes) {
     // Verify we can access the response attributes
     auto& json_response = response.GetResponseAttributes();
     ASSERT_TRUE(json_response.IsValid());
-}
-
-int main() {
-    std::cout << "Running DBPS API Client tests..." << std::endl;
-    std::cout << "==================================" << std::endl;
-    
-    bool all_tests_passed = true;
-    
-    // ApiResponse base class tests
-    try {
-        test_ApiResponseSuccessWithValidResponse();
-        PrintTestResult("ApiResponse success with valid response", true);
-    } catch (...) {
-        PrintTestResult("ApiResponse success with valid response", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_ApiResponseSuccessWithInvalidHttpStatus();
-        PrintTestResult("ApiResponse success with invalid HTTP status", true);
-    } catch (...) {
-        PrintTestResult("ApiResponse success with invalid HTTP status", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_ApiResponseSuccessWithApiClientError();
-        PrintTestResult("ApiResponse success with API client error", true);
-    } catch (...) {
-        PrintTestResult("ApiResponse success with API client error", false);
-        all_tests_passed = false;
-    }
-    
-    // EncryptApiResponse tests
-    try {
-        test_EncryptApiResponseGetResponseCiphertextWithValidData();
-        PrintTestResult("EncryptApiResponse get response ciphertext with valid data", true);
-    } catch (...) {
-        PrintTestResult("EncryptApiResponse get response ciphertext with valid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptApiResponseGetResponseCiphertextWithNoData();
-        PrintTestResult("EncryptApiResponse get response ciphertext with no data", true);
-    } catch (...) {
-        PrintTestResult("EncryptApiResponse get response ciphertext with no data", false);
-        all_tests_passed = false;
-    }
-    
-    // DecryptApiResponse tests
-    try {
-        test_DecryptApiResponseGetResponsePlaintextWithValidData();
-        PrintTestResult("DecryptApiResponse get response plaintext with valid data", true);
-    } catch (...) {
-        PrintTestResult("DecryptApiResponse get response plaintext with valid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_DecryptApiResponseGetResponsePlaintextWithNoData();
-        PrintTestResult("DecryptApiResponse get response plaintext with no data", true);
-    } catch (...) {
-        PrintTestResult("DecryptApiResponse get response plaintext with no data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptWithValidData();
-        PrintTestResult("Encrypt with valid data", true);
-    } catch (...) {
-        PrintTestResult("Encrypt with valid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_DecryptWithValidData();
-        PrintTestResult("Decrypt with valid data", true);
-    } catch (...) {
-        PrintTestResult("Decrypt with valid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptWithInvalidData();
-        PrintTestResult("Encrypt with invalid data", true);
-    } catch (...) {
-        PrintTestResult("Encrypt with invalid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_DecryptWithInvalidData();
-        PrintTestResult("Decrypt with invalid data", true);
-    } catch (...) {
-        PrintTestResult("Decrypt with invalid data", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptWithInvalidJsonResponse();
-        PrintTestResult("Encrypt with invalid JSON response", true);
-    } catch (...) {
-        PrintTestResult("Encrypt with invalid JSON response", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_DecryptWithInvalidJsonResponse();
-        PrintTestResult("Decrypt with invalid JSON response", true);
-    } catch (...) {
-        PrintTestResult("Decrypt with invalid JSON response", false);
-        all_tests_passed = false;
-    }
-    
-    try {
-        test_EncryptWithEncodingAttributes();
-        PrintTestResult("Encrypt with encoding attributes", true);
-    } catch (...) {
-        PrintTestResult("Encrypt with encoding attributes", false);
-        all_tests_passed = false;
-    }
-    
-    std::cout << "==================================" << std::endl;
-    if (all_tests_passed) {
-        std::cout << "All tests passed!" << std::endl;
-        return 0;
-    } else {
-        std::cout << "Some tests failed!" << std::endl;
-        return 1;
-    }
 }

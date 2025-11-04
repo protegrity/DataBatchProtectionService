@@ -1,21 +1,9 @@
 #include "dbpa_interface.h"
 #include <iostream>
+#include <gtest/gtest.h>
 #include <vector>
 #include <memory>
 #include <map>
-
-// Simple test framework
-#define TEST(name) void test_##name()
-#define ASSERT_EQ(expected, actual) \
-    if ((expected) != (actual)) { \
-        std::cerr << "FAILED: " << __FUNCTION__ << " - " << #expected << " != " << #actual << std::endl; \
-        exit(1); \
-    }
-#define ASSERT_TRUE(condition) \
-    if (!(condition)) { \
-        std::cerr << "FAILED: " << __FUNCTION__ << " - " << #condition << " is false" << std::endl; \
-        exit(1); \
-    }
 
 using namespace dbps::external;
 
@@ -80,7 +68,7 @@ public:
 };
 
 // Basic tests
-TEST(BasicEncryption) {
+TEST(DBPAInterface, BasicEncryption) {
     std::vector<uint8_t> data = {1, 2, 3};
     MockEncryptionResult result(data);
     
@@ -89,7 +77,7 @@ TEST(BasicEncryption) {
     ASSERT_EQ(1, result.ciphertext()[0]);
 }
 
-TEST(BasicDecryption) {
+TEST(DBPAInterface, BasicDecryption) {
     std::vector<uint8_t> data = {4, 5, 6};
     MockDecryptionResult result(data);
     
@@ -98,7 +86,7 @@ TEST(BasicDecryption) {
     ASSERT_EQ(4, result.plaintext()[0]);
 }
 
-TEST(AgentEncryptDecrypt) {
+TEST(DBPAInterface, AgentEncryptDecrypt) {
     MockAgent agent;
     std::vector<uint8_t> original = {10, 20, 30};
     
@@ -111,15 +99,4 @@ TEST(AgentEncryptDecrypt) {
     
     ASSERT_EQ(original.size(), decrypted->size());
     ASSERT_EQ(10, decrypted->plaintext()[0]);
-}
-
-int main() {
-    std::cout << "Running simple dpba_interface tests..." << std::endl;
-    
-    test_BasicEncryption();
-    test_BasicDecryption();
-    test_AgentEncryptDecrypt();
-    
-    std::cout << "All tests passed!" << std::endl;
-    return 0;
 }

@@ -1,33 +1,14 @@
 #include "enum_utils.h"
 #include <iostream>
-#include <cassert>
+#include <gtest/gtest.h>
 #include <set>
 #include <algorithm>
-
-// Simple test framework
-#define TEST(name) void test_##name()
-#define ASSERT_EQ(expected, actual) \
-    if ((expected) != (actual)) { \
-        std::cerr << "FAILED: " << __FUNCTION__ << " - " << #expected << " != " << #actual << std::endl; \
-        std::cerr << "Expected: " << (expected) << ", Got: " << (actual) << std::endl; \
-        exit(1); \
-    }
-#define ASSERT_TRUE(condition) \
-    if (!(condition)) { \
-        std::cerr << "FAILED: " << __FUNCTION__ << " - " << #condition << " is false" << std::endl; \
-        exit(1); \
-    }
-#define ASSERT_FALSE(condition) \
-    if ((condition)) { \
-        std::cerr << "FAILED: " << __FUNCTION__ << " - " << #condition << " is true" << std::endl; \
-        exit(1); \
-    }
 
 using namespace dbps::enum_utils;
 using namespace dbps::external;
 
 // Test Type enum conversions
-TEST(TypeToStringConversion) {
+TEST(EnumUtils, TypeToStringConversion) {
     ASSERT_EQ("BOOLEAN", std::string(to_string(Type::BOOLEAN)));
     ASSERT_EQ("INT32", std::string(to_string(Type::INT32)));
     ASSERT_EQ("INT64", std::string(to_string(Type::INT64)));
@@ -39,7 +20,7 @@ TEST(TypeToStringConversion) {
     ASSERT_EQ("UNDEFINED", std::string(to_string(Type::UNDEFINED)));
 }
 
-TEST(TypeFromStringConversion) {
+TEST(EnumUtils, TypeFromStringConversion) {
     auto result = to_datatype_enum("BOOLEAN");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::BOOLEAN, result.value());
@@ -77,7 +58,7 @@ TEST(TypeFromStringConversion) {
     ASSERT_EQ(Type::UNDEFINED, result.value());
 }
 
-TEST(TypeInvalidFromString) {
+TEST(EnumUtils, TypeInvalidFromString) {
     auto result = to_datatype_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
@@ -95,7 +76,7 @@ TEST(TypeInvalidFromString) {
 }
 
 // Test CompressionCodec enum conversions
-TEST(CompressionCodecToStringConversion) {
+TEST(EnumUtils, CompressionCodecToStringConversion) {
     ASSERT_EQ("UNCOMPRESSED", std::string(to_string(CompressionCodec::UNCOMPRESSED)));
     ASSERT_EQ("SNAPPY", std::string(to_string(CompressionCodec::SNAPPY)));
     ASSERT_EQ("GZIP", std::string(to_string(CompressionCodec::GZIP)));
@@ -108,7 +89,7 @@ TEST(CompressionCodecToStringConversion) {
     ASSERT_EQ("LZ4_HADOOP", std::string(to_string(CompressionCodec::LZ4_HADOOP)));
 }
 
-TEST(CompressionCodecFromStringConversion) {
+TEST(EnumUtils, CompressionCodecFromStringConversion) {
     auto result = to_compression_enum("UNCOMPRESSED");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, result.value());
@@ -150,7 +131,7 @@ TEST(CompressionCodecFromStringConversion) {
     ASSERT_EQ(CompressionCodec::LZ4_HADOOP, result.value());
 }
 
-TEST(CompressionCodecInvalidFromString) {
+TEST(EnumUtils, CompressionCodecInvalidFromString) {
     auto result = to_compression_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
@@ -168,7 +149,7 @@ TEST(CompressionCodecInvalidFromString) {
 }
 
 // Test Format enum conversions
-TEST(FormatToStringConversion) {
+TEST(EnumUtils, FormatToStringConversion) {
     ASSERT_EQ("PLAIN", std::string(to_string(Format::PLAIN)));
     ASSERT_EQ("PLAIN_DICTIONARY", std::string(to_string(Format::PLAIN_DICTIONARY)));
     ASSERT_EQ("RLE", std::string(to_string(Format::RLE)));
@@ -182,7 +163,7 @@ TEST(FormatToStringConversion) {
     ASSERT_EQ("UNKNOWN", std::string(to_string(Format::UNKNOWN)));
 }
 
-TEST(FormatFromStringConversion) {
+TEST(EnumUtils, FormatFromStringConversion) {
     auto result = to_format_enum("PLAIN");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Format::PLAIN, result.value());
@@ -228,7 +209,7 @@ TEST(FormatFromStringConversion) {
     ASSERT_EQ(Format::UNKNOWN, result.value());
 }
 
-TEST(FormatInvalidFromString) {
+TEST(EnumUtils, FormatInvalidFromString) {
     auto result = to_format_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
@@ -245,7 +226,7 @@ TEST(FormatInvalidFromString) {
 
 
 // Test round-trip conversions
-TEST(RoundTripTypeConversion) {
+TEST(EnumUtils, RoundTripTypeConversion) {
     // Test all Type enum values
     Type::type types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
@@ -260,7 +241,7 @@ TEST(RoundTripTypeConversion) {
     }
 }
 
-TEST(RoundTripCompressionCodecConversion) {
+TEST(EnumUtils, RoundTripCompressionCodecConversion) {
     // Test all CompressionCodec enum values
     CompressionCodec::type codecs[] = {
         CompressionCodec::UNCOMPRESSED, CompressionCodec::SNAPPY, CompressionCodec::GZIP,
@@ -277,7 +258,7 @@ TEST(RoundTripCompressionCodecConversion) {
     }
 }
 
-TEST(RoundTripFormatConversion) {
+TEST(EnumUtils, RoundTripFormatConversion) {
     // Test all Format enum values
     Format::type formats[] = {
         Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
@@ -293,13 +274,13 @@ TEST(RoundTripFormatConversion) {
 
 
 // Test edge cases
-TEST(EmptyStringHandling) {
+TEST(EnumUtils, EmptyStringHandling) {
     ASSERT_FALSE(to_datatype_enum("").has_value());
     ASSERT_FALSE(to_compression_enum("").has_value());
     ASSERT_FALSE(to_format_enum("").has_value());
 }
 
-TEST(WhitespaceHandling) {
+TEST(EnumUtils, WhitespaceHandling) {
     ASSERT_FALSE(to_datatype_enum(" BYTE_ARRAY").has_value());
     ASSERT_FALSE(to_datatype_enum("BYTE_ARRAY ").has_value());
     ASSERT_FALSE(to_datatype_enum(" BYTE_ARRAY ").has_value());
@@ -309,7 +290,7 @@ TEST(WhitespaceHandling) {
     ASSERT_FALSE(to_compression_enum(" GZIP ").has_value());
 }
 
-TEST(CaseSensitivity) {
+TEST(EnumUtils, CaseSensitivity) {
     // Test that conversions are case-sensitive
     ASSERT_FALSE(to_datatype_enum("byte_array").has_value());
     ASSERT_FALSE(to_datatype_enum("Byte_Array").has_value());
@@ -320,7 +301,7 @@ TEST(CaseSensitivity) {
     ASSERT_FALSE(to_compression_enum("GZIp").has_value());
 }
 
-TEST(StringViewCompatibility) {
+TEST(EnumUtils, StringViewCompatibility) {
     // Test that string_view works correctly
     std::string_view type_str = "BYTE_ARRAY";
     auto result = to_datatype_enum(type_str);
@@ -334,7 +315,7 @@ TEST(StringViewCompatibility) {
 }
 
 // Test runtime evaluation
-TEST(RuntimeEvaluation) {
+TEST(EnumUtils, RuntimeEvaluation) {
     // Test runtime evaluation of the functions
     auto type_str = to_string(Type::BYTE_ARRAY);
     auto codec_str = to_string(CompressionCodec::BZ2);
@@ -346,7 +327,7 @@ TEST(RuntimeEvaluation) {
 }
 
 // Protection tests: ensure enum_utils stays in sync with enum definitions
-TEST(TypeEnumCompleteness) {
+TEST(EnumUtils, TypeEnumCompleteness) {
     // Define all known Type enum values
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
@@ -364,7 +345,7 @@ TEST(TypeEnumCompleteness) {
     }
 }
 
-TEST(CompressionCodecEnumCompleteness) {
+TEST(EnumUtils, CompressionCodecEnumCompleteness) {
     // Define all known CompressionCodec enum values
     CompressionCodec::type all_codecs[] = {
         CompressionCodec::UNCOMPRESSED, CompressionCodec::SNAPPY, CompressionCodec::GZIP,
@@ -384,7 +365,7 @@ TEST(CompressionCodecEnumCompleteness) {
     }
 }
 
-TEST(FormatEnumCompleteness) {
+TEST(EnumUtils, FormatEnumCompleteness) {
     // Define all known Format enum values
     Format::type all_formats[] = {
         Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
@@ -401,7 +382,7 @@ TEST(FormatEnumCompleteness) {
     }
 }
 
-TEST(StringUniqueness) {
+TEST(EnumUtils, StringUniqueness) {
     // Test that all string representations are unique
     std::set<std::string> type_strings;
     std::set<std::string> codec_strings;
@@ -439,7 +420,7 @@ TEST(StringUniqueness) {
     
 }
 
-TEST(CrossEnumStringCollision) {
+TEST(EnumUtils, CrossEnumStringCollision) {
     // Test that strings from different enums are collected correctly
     // Note: Some enums may intentionally share the same string representation
     std::set<std::string> all_strings;
@@ -478,46 +459,4 @@ TEST(CrossEnumStringCollision) {
     // (Type::UNDEFINED and Format::UNDEFINED both map to "UNDEFINED")
     // So we expect 29 unique strings
     ASSERT_EQ(29, all_strings.size());
-}
-
-int main() {
-    std::cout << "Running Enum Utils Tests..." << std::endl;
-    
-    // Type enum tests
-    test_TypeToStringConversion();
-    test_TypeFromStringConversion();
-    test_TypeInvalidFromString();
-    
-    // CompressionCodec enum tests
-    test_CompressionCodecToStringConversion();
-    test_CompressionCodecFromStringConversion();
-    test_CompressionCodecInvalidFromString();
-    
-    // Format enum tests
-    test_FormatToStringConversion();
-    test_FormatFromStringConversion();
-    test_FormatInvalidFromString();
-    
-    
-    // Round-trip tests
-    test_RoundTripTypeConversion();
-    test_RoundTripCompressionCodecConversion();
-    test_RoundTripFormatConversion();
-    
-    // Edge case tests
-    test_EmptyStringHandling();
-    test_WhitespaceHandling();
-    test_CaseSensitivity();
-    test_StringViewCompatibility();
-    test_RuntimeEvaluation();
-    
-    // Protection tests
-    test_TypeEnumCompleteness();
-    test_CompressionCodecEnumCompleteness();
-    test_FormatEnumCompleteness();
-    test_StringUniqueness();
-    test_CrossEnumStringCollision();
-    
-    std::cout << "All enum utils tests passed!" << std::endl;
-    return 0;
 }

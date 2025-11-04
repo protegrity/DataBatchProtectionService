@@ -32,7 +32,6 @@ or with no cache
 $ docker build --no-cache -t dbps_server .
 ```
 
-
 This compiles the dbps_api_server binary and builds the image using the Dockerfile.
 
 ## Running the server locally from the docker image
@@ -50,7 +49,7 @@ Build the image once:
 $ docker build --no-cache -t dbps_server .
 ```
 
-Run docker container with source files mounted:
+Run docker container with source files mounted and open up a shell:
 ```
 $ docker run -it --rm  -v $(pwd):/app  -p 18080:18080  dbps_server /bin/bash
 ```
@@ -60,87 +59,42 @@ Make changes to source files as needed.
 Then build and run manually from inside the docker container bash
 ```
 # Build server
-cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
+$ cmake -B build -S . -G Ninja && cmake --build build --target dbps_api_server
 
 # then run it interactively
-./build/dbps_api_server
+$ ./build/dbps_api_server
 
 # .. or in the background with a logfile output
-./build/dbps_api_server > dbps_api_server_RUN.log 2>&1 &
+$ ./build/dbps_api_server > dbps_api_server_RUN.log 2>&1 &
 ```
 
 ## Running Unittests
 
-The project includes unit tests for the JSON request parsing classes. To run the tests:
+The project includes unit tests. To run the tests:
 
-### Build the tests
+### Build and running the tests
 ```
-# First, run docker container with source files mounted
-# Then, inside the container, run:
+# First, open up a shell within the docker container with source files mounted (instructions above)
+# Second, inside the container, build the tests
 
-cmake --build build --target tests
-```
+$ cd /app
+$ cmake --build build --target tests
 
-### Run the tests
-```
-# First, run docker container with source files mounted
-# Then, inside the container, run:
-
-echo "----- run: json_request_test -----" && \
-./build/json_request_test \
-  || { echo "❌ FAILED: json_request_test"; false; } && echo
-
-echo "----- run: enum_utils_test -----" && \
-./build/enum_utils_test \
-  || { echo "❌ FAILED: enum_utils_test"; false; } && echo
-
-echo "----- run: encryption_sequencer_test -----" && \
-./build/encryption_sequencer_test \
-  || { echo "❌ FAILED: encryption_sequencer_test"; false; } && echo
-
-echo "----- run: dbpa_interface_test -----" && \
-./build/dbpa_interface_test \
-  || { echo "❌ FAILED: dbpa_interface_test"; false; } && echo
-
-echo "----- run: dbpa_utils_test -----" && \
-./build/dbpa_utils_test \
-  || { echo "❌ FAILED: dbpa_utils_test"; false; } && echo
-
-echo "----- run: dbps_api_client_test -----" && \
-./build/dbps_api_client_test \
-  || { echo "❌ FAILED: dbps_api_client_test"; false; } && echo
-
-echo "----- run: dbpa_remote_test -----" && \
-./build/dbpa_remote_test \
-  || { echo "❌ FAILED: dbpa_remote_test"; false; } && echo
-
-echo "----- run: dbpa_local_test -----" && \
-./build/dbpa_local_test \
-  || { echo "❌ FAILED: dbpa_local_test"; false; } && echo
-
-echo "----- run: decoding_utils_test -----" && \
-./build/decoding_utils_test \
-  || { echo "❌ FAILED: decoding_utils_test"; false; } && echo
-
-echo "----- run: httplib_pool_registry_test -----" && \
-./build/httplib_pool_registry_test \
-  || { echo "❌ FAILED: httplib_pool_registry_test"; false; } && echo
-
-echo "----- run: httplib_pooled_client_test -----" && \
-./build/httplib_pooled_client_test \
-  || { echo "❌ FAILED: httplib_pooled_client_test"; false; } && echo
+# Third, run the tests (the -j parameter indicates parallelism)
+$ ctest --test-dir build -j 8
 ```
 
 ## Running DBPA remote testing app
 ```
-# First, run docker container with source files mounted
+# First, run docker container with source files mounted (instructions above)
 # Then, inside the container...
 
 # Build the application
-cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_testapp
+$ cd /app
+$ cmake -B build -S . -G Ninja && cmake --build build --target dbpa_remote_testapp
 
 # Run the application
-./build/dbpa_remote_testapp
-./build/dbpa_remote_testapp --server_url=http://18.222.202.51:45001
-./build/dbpa_remote_testapp --help
+$ ./build/dbpa_remote_testapp
+$ ./build/dbpa_remote_testapp --server_url=http://18.222.202.51:45001
+$ ./build/dbpa_remote_testapp --help
 ```

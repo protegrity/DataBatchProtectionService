@@ -11,6 +11,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_TESTS "Build test executables" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
+# Enable CTest and GoogleTest integration
+enable_testing()
+include(CTest)
+
 # =============================================================================
 # Dependencies
 # =============================================================================
@@ -58,7 +62,20 @@ FetchContent_Declare(
   GIT_TAG v1.14.0
 )
 
-FetchContent_MakeAvailable(crow cppcodec httplib nlohmann_json cxxopts googletest)
+# Fetch dependencies
+
+# Disable dependency tests for cppcodec
+# Dependency tests are picked up by GTest/CTest. 
+# This disabling is needed as not all of the cppcodec tests pass, and we want to avoid 
+# generating noise in the tests where the noise is caused by the third-party tests.
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(cppcodec)
+set(BUILD_TESTING ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(crow httplib nlohmann_json cxxopts googletest)
+
+# Make GoogleTest helper macros available (gtest_discover_tests)
+include(GoogleTest)
 
 # =============================================================================
 # Library Definitions
@@ -165,30 +182,43 @@ target_include_directories(dbpa_remote_testapp PRIVATE
 if(BUILD_TESTS)
   # JSON request tests
   add_executable(json_request_test src/common/json_request_test.cpp)
-  target_link_libraries(json_request_test dbps_common_lib)
+  target_link_libraries(json_request_test
+    dbps_common_lib
+    gtest_main
+  )
   target_include_directories(json_request_test PRIVATE
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   )
 
   # Enum utils tests
   add_executable(enum_utils_test src/common/enum_utils_test.cpp)
-  target_link_libraries(enum_utils_test dbps_common_lib)
+  target_link_libraries(enum_utils_test
+    dbps_common_lib
+    gtest_main
+  )
 
   # Encryption sequencer tests
   add_executable(encryption_sequencer_test src/server/encryption_sequencer_test.cpp)
   target_link_libraries(encryption_sequencer_test 
     dbps_server_lib
     dbps_common_lib
+    gtest_main
   )
 
   # Decoding utils tests
   add_executable(decoding_utils_test src/server/decoding_utils_test.cpp)
-  target_link_libraries(decoding_utils_test dbps_common_lib)
+  target_link_libraries(decoding_utils_test
+    dbps_common_lib
+    gtest_main
+  )
   target_include_directories(decoding_utils_test PRIVATE src/server)
 
   # DBPA interface tests
   add_executable(dbpa_interface_test src/common/dbpa_interface_test.cpp)
-  target_link_libraries(dbpa_interface_test dbps_common_lib)
+  target_link_libraries(dbpa_interface_test
+    dbps_common_lib
+    gtest_main
+  )
 
   # DBPA utils tests
   add_executable(dbpa_utils_test src/common/dbpa_utils_test.cpp)
@@ -202,6 +232,7 @@ if(BUILD_TESTS)
   target_link_libraries(dbps_api_client_test 
     dbps_client_lib
     dbps_common_lib
+    gtest_main
   )
   target_include_directories(dbps_api_client_test PRIVATE
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
@@ -353,6 +384,19 @@ if(BUILD_TESTS)
       httplib_pooled_client_test
     COMMENT "Building all tests"
   )
+
+  # Register tests with CTest via GoogleTest discovery
+  gtest_discover_tests(json_request_test)
+  gtest_discover_tests(enum_utils_test)
+  gtest_discover_tests(encryption_sequencer_test)
+  gtest_discover_tests(decoding_utils_test)
+  gtest_discover_tests(dbpa_interface_test)
+  gtest_discover_tests(dbpa_utils_test)
+  gtest_discover_tests(dbps_api_client_test)
+  gtest_discover_tests(dbpa_remote_test)
+  gtest_discover_tests(dbpa_local_test)
+  gtest_discover_tests(httplib_pool_registry_test)
+  gtest_discover_tests(httplib_pooled_client_test)
 endif()
 
 # All target (everything)
