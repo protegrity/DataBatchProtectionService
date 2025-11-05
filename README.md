@@ -7,7 +7,6 @@
 - [Running the server locally from the docker image](#running-the-server-locally-from-the-docker-image)
 - [For development](#for-development)
 - [Running Unittests](#running-unittests)
-  - [Build-n-run tests (Compact version)](#build-n-run-tests-compact-version)
   - [Build the tests](#build-the-tests)
   - [Run the tests](#run-the-tests)
 - [Running DBPA remote testing app](#running-dbpa-remote-testing-app)
