@@ -29,6 +29,7 @@ public:
     std::optional<CompressionCodec::type> encrypted_compression_;
     std::string key_id_;
     std::string user_id_;
+    std::string application_context_;
     std::string reference_id_;
     
     /**

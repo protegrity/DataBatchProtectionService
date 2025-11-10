@@ -244,7 +244,8 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         encoding_attributes,
         compression_type_,
         column_key_id_,
-        user_id_
+        user_id_,
+        app_context_
     );
 
     // Validate that response fields match request fields
@@ -299,7 +300,8 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         encoding_attributes,
         compression_type_,
         column_key_id_,
-        user_id_
+        user_id_,
+        app_context_
     );
 
     // Validate that response fields match request fields
