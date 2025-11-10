@@ -14,7 +14,7 @@
 
 ## API server
 
-[View API Swagger file](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/protegrity/DataBatchProtectionService/dev_phase2/src/common/swagger.yaml)
+[View API Swagger file](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/protegrity/DataBatchProtectionService/main/src/common/swagger.yaml)
 
 ## Development Dockerfile
 - `Dockerfile` is configured for development. Although Docker is mostly used for production deployments, it can also provide a stable environment during development.
