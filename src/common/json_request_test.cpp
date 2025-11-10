@@ -91,6 +91,7 @@ const std::string VALID_ENCRYPT_JSON = R"({
     "access": {
         "user_id": "user456"
     },
+    "application_context": "{\"user_id\": \"user456\"}",
     "debug": {
         "reference_id": "ref789",
         "pretty_printed_value": "test@example.com"
@@ -122,6 +123,7 @@ const std::string VALID_DECRYPT_JSON = R"({
     "access": {
         "user_id": "user456"
     },
+    "application_context": "{\"user_id\": \"user456\"}",
     "debug": {
         "reference_id": "ref789",
         "pretty_printed_value": "ENCRYPTED_test@example.com"
@@ -288,6 +290,7 @@ TEST(JsonRequest, EncryptJsonRequestMissingValue) {
         "access": {
             "user_id": "user456"
         },
+        "application_context": "{\"user_id\": \"user456\"}",
         "debug": {
             "reference_id": "ref789",
             "encrypted_value_plaintext": "ENCRYPTED_test@example.com"
@@ -362,6 +365,7 @@ TEST(JsonRequest, DecryptJsonRequestMissingEncryptedValue) {
         "access": {
             "user_id": "user456"
         },
+        "application_context": "{\"user_id\": \"user456\"}",
         "debug": {
             "reference_id": "ref789",
             "encrypted_value_plaintext": "ENCRYPTED_test@example.com"
@@ -463,6 +467,7 @@ TEST(JsonRequest, EncryptJsonRequestWithEncodingAttributes) {
         "access": {
             "user_id": "user456"
         },
+        "application_context": "{\"user_id\": \"user456\"}",
         "debug": {
             "reference_id": "ref789"
         }
@@ -503,6 +508,7 @@ TEST(JsonRequest, EncryptJsonRequestToJsonWithEncodingAttributes) {
     request.key_id_ = "key123";
     request.user_id_ = "user456";
     request.reference_id_ = "ref789";
+    request.application_context_ = "{\"user_id\": \"user456\"}";
     request.value_ = StringToBinary("test@example.com");
     
     // Add encoding_attributes
@@ -804,6 +810,7 @@ TEST(JsonRequest, DatatypeLengthParsing) {
         "access": {
             "user_id": "test_user"
         },
+        "application_context": "{\"user_id\": \"test_user\"}",
         "debug": {
             "reference_id": "test_ref_123"
         }
@@ -831,6 +838,7 @@ TEST(JsonRequest, DatatypeLengthSerialization) {
     TestableEncryptJsonRequest request;
     request.user_id_ = "test_user";
     request.reference_id_ = "test_ref_123";
+    request.application_context_ = "{\"user_id\": \"test_user\"}";
     request.datatype_ = Type::FIXED_LEN_BYTE_ARRAY;
     request.datatype_length_ = 16;
     request.compression_ = CompressionCodec::UNCOMPRESSED;
@@ -859,6 +867,7 @@ TEST(JsonRequest, JsonRequestInvalidDatatypeLength) {
         "data_batch_encrypted": {"value_format": {"compression": "GZIP"}},
         "encryption": {"key_id": "key123"},
         "access": {"user_id": "user456"},
+        "application_context": "{\"user_id\": \"user456\"}",
         "debug": {"reference_id": "ref789"}
     })";
     

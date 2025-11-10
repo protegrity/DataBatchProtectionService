@@ -66,8 +66,7 @@ int main() {
             request.encrypted_compression_.value(),
             request.key_id_,
             request.user_id_,
-            // TODO(Issue #129): Add application context from request when ready.
-            "{}"
+            request.application_context_
         );
         
         try {
@@ -132,8 +131,7 @@ int main() {
             request.encrypted_compression_.value(),
             request.key_id_,
             request.user_id_,
-            // TODO(Issue #129): Add application context from request when ready.
-            "{}"
+            request.application_context_
         );
         
         try {

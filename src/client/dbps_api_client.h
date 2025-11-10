@@ -152,6 +152,7 @@ public:
      * @param encrypted_compression Compression algorithm to be used to compress the encrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used (not the key itself)
      * @param user_id Identifier for the user requesting the encryption
+     * @param application_context JSON string contains additional context from the client application
      * 
      * @return The encryption API response object containing comprehensive information about the call
      * 
@@ -167,7 +168,8 @@ public:
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
-        const std::string& user_id
+        const std::string& user_id,
+        const std::string& application_context
     );
     
     /**
@@ -182,6 +184,7 @@ public:
      * @param encrypted_compression Compression algorithm to be used to compress the decrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used for decryption (not the key itself)
      * @param user_id Identifier for the user requesting the decryption
+     * @param application_context JSON string contains additional context from the client application
      * 
      * @return The decryption API response object containing comprehensive information about the call
      * 
@@ -197,7 +200,8 @@ public:
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
-        const std::string& user_id
+        const std::string& user_id,
+        const std::string& application_context
     );
 
 private:

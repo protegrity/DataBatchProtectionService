@@ -260,6 +260,7 @@ TEST(DBPSApiClient, EncryptWithValidData) {
         },
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
+        "application_context": "{\"user_id\": \"test_user_456\"}",
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -300,7 +301,8 @@ TEST(DBPSApiClient, EncryptWithValidData) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response
@@ -345,6 +347,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
         },
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
+        "application_context": "{\"user_id\": \"test_user_456\"}",
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -389,7 +392,8 @@ TEST(DBPSApiClient, DecryptWithValidData) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response
@@ -434,7 +438,8 @@ TEST(DBPSApiClient, EncryptWithInvalidData) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response indicates failure
@@ -463,7 +468,8 @@ TEST(DBPSApiClient, DecryptWithInvalidData) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response indicates failure
@@ -492,6 +498,7 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
         },
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
+        "application_context": "{\"user_id\": \"test_user_456\"}",
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -526,7 +533,8 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response indicates failure
@@ -555,6 +563,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
         },
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
+        "application_context": "{\"user_id\": \"test_user_456\"}",
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -589,7 +598,8 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response indicates failure
@@ -623,6 +633,7 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
         },
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
+        "application_context": "{\"user_id\": \"test_user_456\"}",
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -669,7 +680,8 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
         encoding_attributes,        // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
-        "test_user_456"             // user_id
+        "test_user_456",            // user_id
+        "{\"user_id\": \"test_user_456\"}" // application_context
     );
     
     // Verify the response

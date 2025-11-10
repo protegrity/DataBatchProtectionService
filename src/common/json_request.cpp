@@ -148,6 +148,9 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"access", "user_id"})) {
         user_id_ = *parsed_value;
     }
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"application_context"})) {
+        application_context_ = *parsed_value;
+    }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"debug", "reference_id"})) {
         reference_id_ = *parsed_value;
     }
@@ -180,6 +183,7 @@ bool JsonRequest::IsValid() const {
            encrypted_compression_.has_value() && 
            !key_id_.empty() && 
            !user_id_.empty() && 
+           !application_context_.empty() && 
            !reference_id_.empty() &&
            datatype_length_valid;
 }
@@ -194,6 +198,7 @@ std::string JsonRequest::GetValidationError() const {
     if (!encrypted_compression_.has_value()) missing_fields.push_back("data_batch_encrypted.value_format.compression");
     if (key_id_.empty()) missing_fields.push_back("encryption.key_id");
     if (user_id_.empty()) missing_fields.push_back("access.user_id");
+    if (application_context_.empty()) missing_fields.push_back("application_context");
     if (reference_id_.empty()) missing_fields.push_back("debug.reference_id");
     
     // Check for invalid datatype_length
@@ -303,6 +308,7 @@ std::string EncryptJsonRequest::ToJsonString() const {
     crow::json::wvalue access;
     access["user_id"] = user_id_;
     json["access"] = std::move(access);
+    json["application_context"] = application_context_;
     
     // Build debug
     crow::json::wvalue debug;
@@ -401,6 +407,7 @@ std::string DecryptJsonRequest::ToJsonString() const {
     crow::json::wvalue access;
     access["user_id"] = user_id_;
     json["access"] = std::move(access);
+    json["application_context"] = application_context_;
     
     // Build debug
     crow::json::wvalue debug;
