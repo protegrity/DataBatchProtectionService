@@ -47,13 +47,6 @@ int main() {
         // Create response using our JsonResponse class
         EncryptJsonResponse response;
         
-        // Set common fields
-        response.user_id_ = request.user_id_;
-        response.role_ = "EmailReader";  // This would be determined by access control logic
-        response.access_control_ = "granted";
-        response.reference_id_ = request.reference_id_;
-        response.encrypted_compression_ = request.encrypted_compression_;
-        
         // Use DataBatchEncryptionSequencer for actual encryption
         // It is safe to use value() because the request is validated above.
         DataBatchEncryptionSequencer sequencer(
@@ -78,7 +71,16 @@ int main() {
             return CreateErrorResponse("Invalid input for encryption: " + std::string(e.what()));
         }
         
+        // Set encrypted value
         response.encrypted_value_ = sequencer.encrypted_result_;
+        
+        // Set common fields of response
+        // TODO: Add role and access control logic based on context-aware access control logic during encryption.
+        response.user_id_ = request.user_id_;
+        response.role_ = "EmailReader";  // This would be determined by access control logic
+        response.access_control_ = "granted";
+        response.reference_id_ = request.reference_id_;
+        response.encrypted_compression_ = request.encrypted_compression_;
         
         // Generate JSON response using our class
         std::string response_json = response.ToJson();
@@ -107,7 +109,8 @@ int main() {
         // Create response using our JsonResponse class
         DecryptJsonResponse response;
         
-        // Set common fields
+        // Set common fields of response
+        // TODO: Add role and access control logic based on context-aware access control logic during decryption.
         response.user_id_ = request.user_id_;
         response.role_ = "EmailReader";  // This would be determined by access control logic
         response.access_control_ = "granted";
