@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.5)
 project(dbps_server_prj)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -31,7 +31,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   cppcodec
   GIT_REPOSITORY https://github.com/tplgy/cppcodec.git
-  GIT_TAG v0.2
+  GIT_TAG 8019b8b580f8573c33c50372baec7039dfe5a8ce # points to the head of main as of 11/11/2025
 )
 
 # httplib is a header-only HTTP client library
