@@ -134,6 +134,8 @@ protected:
     // Extract pool config from connection_config
     // assumes all values in connection_config are optional, and will use default values if any not present.
     HttplibPoolRegistry::PoolConfig ExtractPoolConfig(const nlohmann::json& config_json);
+    // Extract number of worker threads for pooled client; defaults to 0 (auto)
+    std::size_t ExtractNumWorkerThreads(const nlohmann::json& config_json) const;
 
 private:
     // Helper methods for configuration parsing

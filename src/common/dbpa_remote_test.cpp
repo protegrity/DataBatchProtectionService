@@ -171,6 +171,7 @@ protected:
 class ExtractPoolConfigExposer : public TestableRemoteDataBatchProtectionAgent {
 public:
     using TestableRemoteDataBatchProtectionAgent::ExtractPoolConfig;
+    using TestableRemoteDataBatchProtectionAgent::ExtractNumWorkerThreads;
 };
 
 // Test basic initialization with valid configuration
@@ -287,6 +288,29 @@ TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMalformedValuesThrow) {
     const nlohmann::json json = nlohmann::json::parse(json_str);
 
     EXPECT_THROW(agent.ExtractPoolConfig(json), DBPSException);
+}
+
+// Verify num_worker_threads extraction (default/custom/malformed)
+TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsDefaultIsZero) {
+    ExtractPoolConfigExposer agent;
+    const nlohmann::json json = nlohmann::json::parse("{\"server_url\": \"http://localhost:8080\"}");
+    auto n = agent.ExtractNumWorkerThreads(json);
+    EXPECT_EQ(n, 0u);
+}
+
+TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsCustomValue) {
+    ExtractPoolConfigExposer agent;
+    const nlohmann::json json = nlohmann::json::parse(
+        "{\"server_url\": \"http://localhost:8080\", \"connection_pool.num_worker_threads\": 7}");
+    auto n = agent.ExtractNumWorkerThreads(json);
+    EXPECT_EQ(n, 7u);
+}
+
+TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsMalformedThrows) {
+    ExtractPoolConfigExposer agent;
+    const nlohmann::json json = nlohmann::json::parse(
+        "{\"server_url\": \"http://localhost:8080\", \"connection_pool.num_worker_threads\": \"threads\"}");
+    EXPECT_THROW(agent.ExtractNumWorkerThreads(json), DBPSException);
 }
 
 // Test decryption without initialization

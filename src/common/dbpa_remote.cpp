@@ -404,8 +404,9 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
     // set the pool config for the given server_url_
     HttplibPoolRegistry::Instance().SetPoolConfig(server_url_, pool_config);
 
-    // get the client for the given server_url_
-    std::shared_ptr<HttpClientInterface> http_client = HttplibPooledClient::Acquire(server_url_);
+    // get the client for the given server_url_ with configured number of worker threads
+    std::size_t num_worker_threads = ExtractNumWorkerThreads(*config_json_opt);
+    std::shared_ptr<HttpClientInterface> http_client = HttplibPooledClient::Acquire(server_url_, num_worker_threads);
     if (!http_client) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - Failed to acquire HTTP client for server: " << server_url_ << std::endl;
         initialized_ = "Agent not properly initialized - failed to acquire HTTP client";
@@ -425,49 +426,51 @@ std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(cons
     return std::nullopt;
 }
 
+// Shared integer extraction helper for configuration values.
+// Validates that, if present, the value is an integer (signed or unsigned) and >= 0.
+// Returns the provided default_value if the key is not present.
+static long long get_int_or_default(const nlohmann::json& config_json, const char* key, long long default_value) {
+    if (!config_json.contains(key)) {
+        return default_value;
+    }
+    const auto& val = config_json.at(key);
+    bool is_number_integer = val.is_number_integer() || val.is_number_unsigned();
+    if (!is_number_integer) {
+        std::ostringstream oss;
+        oss << "ERROR: RemoteDataBatchProtectionAgent - "
+            << "Invalid non-integer value for key [" << key << "]."
+            << "Value: [" << val.get<std::string>() << "]";
+        throw DBPSException(oss.str());
+    }
+
+    if (val.get<long long>() < 0) {
+        std::ostringstream oss;
+        oss << "ERROR: RemoteDataBatchProtectionAgent - "
+            << "Invalid value for key [" << key << "] " 
+            << "Value: [" << val.get<std::string>() << "] must be >= 0";
+        throw DBPSException(oss.str());
+    }
+
+    return val.get<long long>();
+}
+
 //Extract pool config from connection_config. Expected format is a set of key-values pairs which are top level in the file
 // there is no nesting
 HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfig(const nlohmann::json& config_json) {
     HttplibPoolRegistry::PoolConfig pool_config;
 
-    // Validate known keys: if present, must be integer; otherwise, use defaults
-    auto get_int_or_default = [&](const char* key, long long default_value) -> long long {
-        if (!config_json.contains(key)) {
-            return default_value;
-        }
-        const auto& val = config_json.at(key);
-        bool is_number_integer = val.is_number_integer() || val.is_number_unsigned();
-        if (!is_number_integer) {
-            std::ostringstream oss;
-            oss << "ERROR: RemoteDataBatchProtectionAgent - "
-                << "Invalid non-integer value for key [" << key << "]."
-                << "Value: [" << val.get<std::string>() << "]";
-            throw DBPSException(oss.str());
-        }
-
-        if (val.get<long long>() < 0) {
-            std::ostringstream oss;
-            oss << "ERROR: RemoteDataBatchProtectionAgent - "
-                << "Invalid value for key [" << key << "] " 
-                << "Value: [" << val.get<std::string>() << "] must be >= 0";
-            throw DBPSException(oss.str());
-        }
-
-        return val.get<long long>();
-    };
-
     pool_config.max_pool_size = static_cast<std::size_t>(
-        get_int_or_default("connection_pool.max_pool_size", HttplibPoolRegistry::kDefaultMaxPoolSize));
+        get_int_or_default(config_json, "connection_pool.max_pool_size", HttplibPoolRegistry::kDefaultMaxPoolSize));
     pool_config.borrow_timeout = std::chrono::milliseconds(
-        get_int_or_default("connection_pool.borrow_timeout_milliseconds", HttplibPoolRegistry::kDefaultBorrowTimeout_ms.count()));
+        get_int_or_default(config_json, "connection_pool.borrow_timeout_milliseconds", HttplibPoolRegistry::kDefaultBorrowTimeout_ms.count()));
     pool_config.max_idle_time = std::chrono::milliseconds(
-        get_int_or_default("connection_pool.max_idle_time_milliseconds", HttplibPoolRegistry::kDefaultMaxIdleTime_ms.count()));
+        get_int_or_default(config_json, "connection_pool.max_idle_time_milliseconds", HttplibPoolRegistry::kDefaultMaxIdleTime_ms.count()));
     pool_config.connect_timeout = std::chrono::seconds(
-        get_int_or_default("connection_pool.connect_timeout_seconds", HttplibPoolRegistry::kDefaultConnectTimeout_s.count()));
+        get_int_or_default(config_json, "connection_pool.connect_timeout_seconds", HttplibPoolRegistry::kDefaultConnectTimeout_s.count()));
     pool_config.read_timeout = std::chrono::seconds(
-        get_int_or_default("connection_pool.read_timeout_seconds", HttplibPoolRegistry::kDefaultReadTimeout_s.count()));
+        get_int_or_default(config_json, "connection_pool.read_timeout_seconds", HttplibPoolRegistry::kDefaultReadTimeout_s.count()));
     pool_config.write_timeout = std::chrono::seconds(
-        get_int_or_default("connection_pool.write_timeout_seconds", HttplibPoolRegistry::kDefaultWriteTimeout_s.count()));
+        get_int_or_default(config_json, "connection_pool.write_timeout_seconds", HttplibPoolRegistry::kDefaultWriteTimeout_s.count()));
 
     //TODO: find a better way to log this.
     // Log the configured pool values for observability
@@ -481,6 +484,11 @@ HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfi
     << " }" << std::endl;
 
     return pool_config;
+}
+
+std::size_t RemoteDataBatchProtectionAgent::ExtractNumWorkerThreads(const nlohmann::json& config_json) const {
+    return static_cast<std::size_t>(
+        get_int_or_default(config_json, "connection_pool.num_worker_threads", 0));
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
