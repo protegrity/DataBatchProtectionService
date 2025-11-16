@@ -49,6 +49,24 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
     EXPECT_GT(result->size(), 0);
 }
 
+TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryptionCompressedDictionary) {
+    LocalDataBatchProtectionAgent agent;
+    
+    std::map<std::string, std::string> connection_config;
+    std::string app_context = R"({"user_id": "test_user"})";
+    
+    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+                               Type::BYTE_ARRAY, std::nullopt, CompressionCodec::SNAPPY, std::nullopt));
+    
+    std::vector<uint8_t> test_data = {1, 2, 3, 4};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    auto result = agent.Encrypt(test_data, encoding_attributes);
+    
+    ASSERT_NE(result, nullptr);
+    EXPECT_TRUE(result->success());
+    EXPECT_GT(result->size(), 0);
+}
+
 // Test successful initialization and decryption
 TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     LocalDataBatchProtectionAgent agent;
