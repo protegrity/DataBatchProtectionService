@@ -28,7 +28,7 @@
 #include "../common/dbpa_remote.h"
 #include "../client/httplib_client.h"
 #include "../common/enums.h"
-#include "../common/tcb/span.hpp"
+#include "tcb/span.hpp"
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;

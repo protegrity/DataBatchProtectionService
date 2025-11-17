@@ -20,7 +20,7 @@
 #include <cassert>
 #include <vector>
 #include <algorithm>
-#include "../common/tcb/span.hpp"
+#include "tcb/span.hpp"
 #include "dbps_api_client.h"
 #include "http_client_interface.h"
 #include "../common/enums.h"

@@ -25,7 +25,7 @@
 #include "../common/enums.h"
 #include "../common/enum_utils.h"
 #include "../common/json_request.h"
-#include "../common/tcb/span.hpp"
+#include "tcb/span.hpp"
 #include "http_client_interface.h"
 
 using namespace dbps::external;

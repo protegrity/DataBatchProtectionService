@@ -48,6 +48,19 @@ FetchContent_Declare(
   GIT_TAG v3.11.3
 )
 
+# tcb/span - header-only span implementation (match Arrow's approach)
+FetchContent_Declare(
+  tcb_span_upstream
+  GIT_REPOSITORY https://github.com/tcbrindle/span.git
+  GIT_TAG master
+)
+FetchContent_GetProperties(tcb_span_upstream)
+if(NOT tcb_span_upstream_POPULATED)
+  FetchContent_Populate(tcb_span_upstream)
+endif()
+add_library(tcb_span INTERFACE)
+target_include_directories(tcb_span INTERFACE ${tcb_span_upstream_SOURCE_DIR}/include)
+
 # cxxopts is a header-only command line parser
 FetchContent_Declare(
   cxxopts
@@ -88,10 +101,10 @@ add_library(dbps_common_lib STATIC
 )
 target_include_directories(dbps_common_lib PUBLIC
   src/common
-  src/common/tcb
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
 )
+target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 
 # Server components library
 add_library(dbps_server_lib STATIC 
@@ -117,6 +130,7 @@ target_include_directories(dbps_client_lib PUBLIC
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
 )
+target_link_libraries(dbps_client_lib PUBLIC tcb_span)
 
 # Remote DBPA library
 add_library(dbps_remote_lib STATIC 
@@ -307,7 +321,6 @@ if(BUILD_SHARED_LIBS)
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
     ${CMAKE_BINARY_DIR}/_deps/httplib-src
     src/common
-    src/common/tcb
   )
 
   # Create dynamic library for local agent
@@ -333,7 +346,6 @@ if(BUILD_SHARED_LIBS)
     ${CMAKE_BINARY_DIR}/_deps/crow-src/include
     src/common
     src/server
-    src/common/tcb
   )
 endif()
 
