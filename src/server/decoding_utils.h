@@ -25,6 +25,7 @@
 #include <optional>
 #include <map>
 #include <variant>
+#include <cstdint>
 #include "enums.h"
 
 using namespace dbps::external;
