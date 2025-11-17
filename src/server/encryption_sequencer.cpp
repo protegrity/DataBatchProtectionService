@@ -123,11 +123,7 @@ LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     }
 
     if (page_type == "DICTIONARY_PAGE") {
-        if (compression_ == CompressionCodec::UNCOMPRESSED) {
-            result.value_bytes = plaintext;
-        } else {
-            result.value_bytes = Decompress(plaintext);
-        }
+        result.value_bytes = Decompress(plaintext);
         result.level_bytes = std::vector<uint8_t>();
         return result;
     }
