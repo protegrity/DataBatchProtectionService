@@ -109,6 +109,7 @@ target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 # Server components library
 add_library(dbps_server_lib STATIC 
   src/server/encryption_sequencer.cpp
+  src/server/decoding_utils.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib)
 target_include_directories(dbps_server_lib PUBLIC
@@ -222,6 +223,7 @@ if(BUILD_TESTS)
   # Decoding utils tests
   add_executable(decoding_utils_test src/server/decoding_utils_test.cpp)
   target_link_libraries(decoding_utils_test
+    dbps_server_lib
     dbps_common_lib
     gtest_main
   )

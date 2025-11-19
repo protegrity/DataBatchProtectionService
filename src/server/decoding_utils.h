@@ -19,14 +19,29 @@
 
 #include <vector>
 #include <string>
-#include <sstream>
-#include <cstring>
-#include <iostream>
 #include <optional>
 #include <map>
 #include <variant>
 #include <cstdint>
+#include <array>
 #include "enums.h"
+#include "exceptions.h"
+#include "enum_utils.h"
+
+struct LevelAndValueBytes {
+    std::vector<uint8_t> level_bytes;
+    std::vector<uint8_t> value_bytes;
+};
+
+using TypedListValues = std::variant<
+    std::vector<int32_t>,
+    std::vector<int64_t>,
+    std::vector<float>,
+    std::vector<double>,
+    std::vector<std::array<uint32_t, 3>>,     // For INT96
+    std::vector<std::string>,                 // For BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY
+    std::vector<uint8_t>                      // For UNDEFINED
+>;
 
 using namespace dbps::external;
 
@@ -39,74 +54,39 @@ using namespace dbps::external;
  * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
  */
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
-    const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs) {
-    
-    // Helper function to skip V1 RLE level data in raw bytes
-    // Returns number of bytes consumed: [4-byte len] + [level bytes indicated by `len`]
-    auto SkipV1RLELevel = [&raw](size_t& offset) -> int {
-        if (offset + 4 > raw.size()) {
-            // TODO: Throw an exception
-            return -1;
-        }
-        uint32_t len = *reinterpret_cast<const uint32_t*>(raw.data() + offset);
-        if (offset + 4 + len > raw.size()) {
-            // TODO: Throw an exception
-            return -1;
-        }
-        offset += 4 + len;
-        return 4 + len;
-    };
-    
-    // Get page_type from the converted attributes
-    const std::string& page_type = std::get<std::string>(encoding_attribs.at("page_type"));
-    int total_level_bytes = 0;
+    const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs);
 
-    if (page_type == "DATA_PAGE_V2") {
-        // For DATA_PAGE_V2: sum of definition and repetition level byte lengths
-        int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
-        int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
-        total_level_bytes = def_level_length + rep_level_length;
-        std::cout << "CalculateLevelBytesLength DATA_PAGE_V2: total_level_bytes=" << total_level_bytes << std::endl;
-        
-    } else if (page_type == "DATA_PAGE_V1") {
-        // Check that encoding types are RLE (instead of BIT_PACKED which is deprecated)
-        const std::string& rep_encoding = std::get<std::string>(encoding_attribs.at("page_v1_repetition_level_encoding"));
-        const std::string& def_encoding = std::get<std::string>(encoding_attribs.at("page_v1_definition_level_encoding"));
-        if (rep_encoding != "RLE" || def_encoding != "RLE") {
-            // TODO: Throw an exception
-            return -1;
-        }
+/**
+ * Split the input bytes in two parts, determined by the given index.
+ * 
+ * @param bytes The bytes to split
+ * @param index The index at which to split (bytes before index go to level_bytes, bytes from index go to value_bytes)
+ * @return LevelAndValueBytes structure with split bytes
+ * @throws InvalidInputException if index is invalid
+ */
+LevelAndValueBytes Split(const std::vector<uint8_t>& bytes, int index);
 
-        // if max_rep_level > 0, there are repetition levels bytes. Same for definition levels.
-        int32_t max_rep_level = std::get<int32_t>(encoding_attribs.at("data_page_max_repetition_level"));
-        int32_t max_def_level = std::get<int32_t>(encoding_attribs.at("data_page_max_definition_level"));
-        size_t offset = 0;
-        if (max_rep_level > 0) {
-            int bytes_skipped = SkipV1RLELevel(offset);
-            total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: repetition level bytes skipped=" << bytes_skipped << std::endl;
-        }
-        if (max_def_level > 0) {
-            int bytes_skipped = SkipV1RLELevel(offset);
-            total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: definition level bytes skipped=" << bytes_skipped << std::endl;
-        }
+/**
+ * Parse the value bytes into a typed list based on the data type and format.
+ * 
+ * @param bytes The value bytes to parse
+ * @param datatype The data type of the values
+ * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
+ * @param format The format of the data (currently only PLAIN is supported)
+ * @return TypedListValues containing the parsed values
+ * @throws DBPSUnsupportedException if format or datatype is unsupported
+ * @throws InvalidInputException if the data is invalid or malformed
+ */
+TypedListValues ParseValueBytesIntoTypedList(
+    const std::vector<uint8_t>& bytes,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format);
 
-    } else if (page_type == "DICTIONARY_PAGE") {
-        // DICTIONARY_PAGE has no level bytes
-        total_level_bytes = 0;
-
-    } else {
-        // Unknown page type
-        // TODO: Throw an exception
-        return -1;
-    }
-
-    // Validate that the total level bytes before returning.
-    if (total_level_bytes < 0 || total_level_bytes > raw.size()) {
-        // TODO: Throw an exception
-        return -1;
-    }
-    return total_level_bytes;
-
-}
+/**
+ * Print a typed list in a human-readable format.
+ * 
+ * @param list The typed list to print
+ * @return String representation of the typed list
+ */
+std::string PrintTypedList(const TypedListValues& list);
