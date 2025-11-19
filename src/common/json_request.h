@@ -133,6 +133,7 @@ class DecryptJsonRequest : public JsonRequest {
 public:
     // Decrypt-specific required fields
     std::vector<uint8_t> encrypted_value_;
+    std::map<std::string, std::string> encryption_metadata_;
     
     /**
      * Default constructor.
@@ -230,6 +231,7 @@ public:
     // Encrypt-specific required fields
     std::optional<CompressionCodec::type> encrypted_compression_;
     std::vector<uint8_t> encrypted_value_;
+    std::map<std::string, std::string> encryption_metadata_;
     
     /**
      * Default constructor.

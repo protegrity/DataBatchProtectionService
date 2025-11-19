@@ -46,10 +46,8 @@ public:
     // Success flag; false indicates an error.
     virtual bool success() const = 0;
 
-    //TODO: revisit the default implementation.
-    virtual const std::optional<std::map<std::string, std::string>> encryption_metadata() const {
-        return std::nullopt;
-    }
+    // Encryption metadata (valid when success() == true)
+    virtual const std::optional<std::map<std::string, std::string>> encryption_metadata() const = 0;
 
     // Error details (valid when success() == false).
     virtual const std::string& error_message() const = 0;

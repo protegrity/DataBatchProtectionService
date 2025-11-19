@@ -19,6 +19,10 @@ using namespace dbps::enum_utils;
 template <typename T>
 using span = tcb::span<T>;
 
+namespace {
+    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_version", "v0.01"}};
+}
+
 // Demo application class
 class DBPARemoteTestApp {
 private:
@@ -68,7 +72,7 @@ public:
                 Type::UNDEFINED,               // datatype
                 std::nullopt,                  // datatype_length (not needed for UNDEFINED)
                 CompressionCodec::UNCOMPRESSED, // compression_type
-                std::nullopt
+                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
             );
             
             std::cout << "OK: Main DBPA agent initialized successfully" << std::endl;
@@ -95,7 +99,7 @@ public:
                 Type::FLOAT,                   // datatype
                 std::nullopt,                  // datatype_length (not needed for FLOAT)
                 CompressionCodec::UNCOMPRESSED, // compression_type
-                std::nullopt
+                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
             );
             
             std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
@@ -122,7 +126,7 @@ public:
                 Type::FIXED_LEN_BYTE_ARRAY,   // datatype
                 8,                            // datatype_length (8 bytes per element)
                 CompressionCodec::UNCOMPRESSED, // compression_type
-                std::nullopt
+                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
             );
             
             std::cout << "OK: Fixed-length DBPA agent initialized successfully" << std::endl;

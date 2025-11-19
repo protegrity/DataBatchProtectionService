@@ -201,7 +201,8 @@ public:
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
         const std::string& user_id,
-        const std::string& application_context
+        const std::string& application_context,
+        const std::map<std::string, std::string>& encryption_metadata
     );
 
 private:

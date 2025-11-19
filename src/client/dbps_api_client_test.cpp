@@ -348,6 +348,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
         "application_context": "{\"user_id\": \"test_user_456\"}",
+        "encryption_metadata": {},
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -393,7 +394,8 @@ TEST(DBPSApiClient, DecryptWithValidData) {
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456",            // user_id
-        "{\"user_id\": \"test_user_456\"}" // application_context
+        "{\"user_id\": \"test_user_456\"}", // application_context
+        std::map<std::string, std::string>{} // encryption_metadata
     );
     
     // Verify the response
@@ -469,7 +471,8 @@ TEST(DBPSApiClient, DecryptWithInvalidData) {
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456",            // user_id
-        "{\"user_id\": \"test_user_456\"}" // application_context
+        "{\"user_id\": \"test_user_456\"}", // application_context
+        std::map<std::string, std::string>{} // encryption_metadata
     );
     
     // Verify the response indicates failure
@@ -564,6 +567,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
         "encryption": {"key_id": "test_key_123"},
         "access": {"user_id": "test_user_456"},
         "application_context": "{\"user_id\": \"test_user_456\"}",
+        "encryption_metadata": {},
         "debug": {"reference_id": "1755831549871"}
     })";
     
@@ -599,7 +603,8 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
         "test_user_456",            // user_id
-        "{\"user_id\": \"test_user_456\"}" // application_context
+        "{\"user_id\": \"test_user_456\"}", // application_context
+        std::map<std::string, std::string>{} // encryption_metadata
     );
     
     // Verify the response indicates failure

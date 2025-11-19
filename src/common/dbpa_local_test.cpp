@@ -5,6 +5,10 @@
 
 using namespace dbps::external;
 
+namespace {
+    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_version", "v0.01"}};
+}
+
 // Test fixture for LocalDataBatchProtectionAgent tests
 class LocalDataBatchProtectionAgentTest : public ::testing::Test {
 protected:
@@ -40,7 +44,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     std::string app_context = R"({"user_id": "test_user"})";
     
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
+                               Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, VALID_ENCRYPTION_METADATA));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
@@ -49,6 +53,56 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     ASSERT_NE(result, nullptr);
     EXPECT_TRUE(result->success());
     EXPECT_GT(result->size(), 0);
+}
+
+// Test roundtrip encryption/decryption
+TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
+    LocalDataBatchProtectionAgent encrypt_agent;
+    
+    std::map<std::string, std::string> connection_config;
+    std::string app_context = R"({"user_id": "test_user"})";
+    
+    EXPECT_NO_THROW(encrypt_agent.init("test_column", connection_config, app_context, "test_key", 
+                                       Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
+    
+    // Original data to encrypt
+    std::vector<uint8_t> original_data = {1, 2, 3, 4, 5};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    
+    // Encrypt the data
+    auto encrypt_result = encrypt_agent.Encrypt(original_data, encoding_attributes);
+    
+    ASSERT_NE(encrypt_result, nullptr);
+    ASSERT_TRUE(encrypt_result->success());
+    EXPECT_GT(encrypt_result->size(), 0);
+    
+    // Verify encryption_metadata is present in the result
+    auto encryption_metadata = encrypt_result->encryption_metadata();
+    ASSERT_TRUE(encryption_metadata.has_value());
+    ASSERT_EQ(1, encryption_metadata->size());
+    ASSERT_TRUE(encryption_metadata->at("dbps_version").length() > 0); // Non-empty string
+    
+    // Get the ciphertext
+    auto ciphertext_span = encrypt_result->ciphertext();
+    std::vector<uint8_t> ciphertext(ciphertext_span.begin(), ciphertext_span.end());
+    
+    // Create a new agent for decryption with the encryption_metadata from the encryption result
+    LocalDataBatchProtectionAgent decrypt_agent;
+    EXPECT_NO_THROW(decrypt_agent.init("test_column", connection_config, app_context, "test_key", 
+                                       Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, encryption_metadata));
+    
+    // Decrypt the ciphertext
+    auto decrypt_result = decrypt_agent.Decrypt(ciphertext, encoding_attributes);
+    
+    ASSERT_NE(decrypt_result, nullptr);
+    ASSERT_TRUE(decrypt_result->success());
+    
+    // Verify the decrypted data matches the original
+    auto plaintext_span = decrypt_result->plaintext();
+    std::vector<uint8_t> decrypted_data(plaintext_span.begin(), plaintext_span.end());
+    
+    ASSERT_EQ(original_data.size(), decrypted_data.size());
+    EXPECT_EQ(original_data, decrypted_data);
 }
 
 // Test encryption without initialization

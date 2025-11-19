@@ -24,7 +24,7 @@ namespace dbps::external {
 class DBPS_EXPORT LocalEncryptionResult : public EncryptionResult {
 public:
     // Constructor for successful encryption
-    LocalEncryptionResult(std::vector<uint8_t> ciphertext);
+    LocalEncryptionResult(std::vector<uint8_t> ciphertext, const std::map<std::string, std::string>& encryption_metadata = {});
     
     // Constructor for failed encryption
     LocalEncryptionResult(const std::string& error_stage, const std::string& error_message);
@@ -33,6 +33,7 @@ public:
     span<const uint8_t> ciphertext() const override;
     std::size_t size() const override;
     bool success() const override;
+    const std::optional<std::map<std::string, std::string>> encryption_metadata() const override;
     const std::string& error_message() const override;
     const std::map<std::string, std::string>& error_fields() const override;
     
@@ -41,6 +42,7 @@ public:
 private:
     std::vector<uint8_t> ciphertext_;
     bool success_;
+    std::map<std::string, std::string> encryption_metadata_;
     std::string error_message_;
     std::map<std::string, std::string> error_fields_;
 };

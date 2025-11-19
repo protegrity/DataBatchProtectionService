@@ -253,7 +253,8 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     CompressionCodec::type encrypted_compression,
     const std::string& key_id,
     const std::string& user_id,
-    const std::string& application_context
+    const std::string& application_context,
+    const std::map<std::string, std::string>& encryption_metadata
 ) {
     DecryptJsonRequest json_request;
     json_request.column_name_ = column_name;
@@ -266,6 +267,7 @@ DecryptApiResponse DBPSApiClient::Decrypt(
     json_request.key_id_ = key_id;
     json_request.user_id_ = user_id;
     json_request.application_context_ = application_context;
+    json_request.encryption_metadata_ = encryption_metadata;
     json_request.reference_id_ = GenerateReferenceId();
 
     DecryptApiResponse api_response;

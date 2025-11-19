@@ -10,8 +10,10 @@ using namespace dbps::enum_utils;
 
 // LocalEncryptionResult implementation
 
-LocalEncryptionResult::LocalEncryptionResult(std::vector<uint8_t> ciphertext)
-    : ciphertext_(std::move(ciphertext)), success_(true) {
+LocalEncryptionResult::LocalEncryptionResult(std::vector<uint8_t> ciphertext, const std::map<std::string, std::string>& encryption_metadata)
+    : ciphertext_(std::move(ciphertext)),
+      success_(true),
+      encryption_metadata_(encryption_metadata) {
 }
 
 LocalEncryptionResult::LocalEncryptionResult(const std::string& error_stage, const std::string& error_message)
@@ -36,6 +38,10 @@ std::size_t LocalEncryptionResult::size() const {
 
 bool LocalEncryptionResult::success() const {
     return success_;
+}
+
+const std::optional<std::map<std::string, std::string>> LocalEncryptionResult::encryption_metadata() const {
+    return encryption_metadata_.empty() ? std::nullopt : std::optional{encryption_metadata_};
 }
 
 const std::string& LocalEncryptionResult::error_message() const {
@@ -174,7 +180,8 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         compression_type_,
         column_key_id_,
         user_id_,
-        app_context_
+        app_context_,
+        {}
     );
     
     // Convert plaintext span to vector for the sequencer
@@ -188,8 +195,8 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         return std::make_unique<LocalEncryptionResult>(sequencer.error_stage_, sequencer.error_message_);
     }
     
-    // Return successful result with encrypted data
-    return std::make_unique<LocalEncryptionResult>(std::move(sequencer.encrypted_result_));
+    // Return successful result with encrypted data and encryption_metadata
+    return std::make_unique<LocalEncryptionResult>(std::move(sequencer.encrypted_result_), sequencer.encryption_metadata_);
 }
 
 std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
@@ -224,7 +231,8 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         compression_type_,
         column_key_id_,
         user_id_,
-        app_context_
+        app_context_,
+        column_encryption_metadata_.value_or(std::map<std::string, std::string>{})
     );
     
     // Convert ciphertext span to vector for the sequencer

@@ -60,6 +60,9 @@ public:
     // Result storage
     std::vector<uint8_t> encrypted_result_;
     std::vector<uint8_t> decrypted_result_;
+
+    // Encryption metadata
+    std::map<std::string, std::string> encryption_metadata_;
     
     // Error reporting fields
     std::string error_stage_;
@@ -76,7 +79,8 @@ public:
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
         const std::string& user_id,
-        const std::string& application_context
+        const std::string& application_context,
+        const std::map<std::string, std::string>& encryption_metadata
     );
     
     // Default constructor
