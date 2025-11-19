@@ -386,15 +386,13 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     auto it = encryption_metadata_.find(DBPS_VERSION_KEY);
     if (it == encryption_metadata_.end()) {
         std::cerr << "ERROR: EncryptionSequencer - encryption_metadata must contain key '" << DBPS_VERSION_KEY << "'" << std::endl;
-        // ++++ remove the hard error before merging ++++
-        error_stage_ = "convert_and_decrypt";
+        error_stage_ = "decrypt_version_check";
         error_message_ = "encryption_metadata must contain key '" + std::string(DBPS_VERSION_KEY) + "'";
         return false;
     } else if (it->second.find(DBPS_VERSION_VALUE) != 0) {
         std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must start with '" 
                   << DBPS_VERSION_VALUE << "', but got '" << it->second << "'" << std::endl;
-        // ++++ remove the hard error before merging ++++
-        error_stage_ = "convert_and_decrypt";
+        error_stage_ = "decrypt_version_check";
         error_message_ = "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must start with '" + std::string(DBPS_VERSION_VALUE) + "'";
         return false;
     }
