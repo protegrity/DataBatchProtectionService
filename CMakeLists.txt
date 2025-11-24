@@ -79,7 +79,6 @@ FetchContent_Declare(
 FetchContent_Declare(
   jwt-cpp
   GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
-  # ++++ Revise version before merging +++
   GIT_TAG master
 )
 
