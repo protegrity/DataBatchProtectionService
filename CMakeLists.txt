@@ -79,7 +79,8 @@ FetchContent_Declare(
 FetchContent_Declare(
   jwt-cpp
   GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
-  GIT_TAG v0.7.2
+  # ++++ Revise version before merging +++
+  GIT_TAG master
 )
 
 # Fetch dependencies
@@ -116,13 +117,19 @@ target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 # Server components library
 add_library(dbps_server_lib STATIC 
   src/server/encryption_sequencer.cpp
+  src/server/auth_utils.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib)
 target_include_directories(dbps_server_lib PUBLIC
   src/server
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/jwt-cpp-src/include
+  ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
 )
+
+# Find and link OpenSSL (required by jwt-cpp)
+find_package(OpenSSL REQUIRED)
+target_link_libraries(dbps_server_lib PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 
 # Client components library (depends on httplib, nlohmann/json, and cppcodec)
 add_library(dbps_client_lib STATIC 
@@ -234,6 +241,15 @@ if(BUILD_TESTS)
     gtest_main
   )
   target_include_directories(decoding_utils_test PRIVATE src/server)
+
+  # Auth utils tests
+  add_executable(auth_utils_test src/server/auth_utils_test.cpp)
+  target_link_libraries(auth_utils_test
+    dbps_server_lib
+    dbps_common_lib
+    gtest_main
+  )
+  target_include_directories(auth_utils_test PRIVATE src/server)
 
   # DBPA interface tests
   add_executable(dbpa_interface_test src/common/dbpa_interface_test.cpp)
@@ -395,6 +411,7 @@ if(BUILD_TESTS)
       enum_utils_test
       encryption_sequencer_test
       decoding_utils_test
+      auth_utils_test
       dbpa_interface_test
       dbpa_utils_test
       dbps_api_client_test
@@ -410,6 +427,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(enum_utils_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
+  gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)
   gtest_discover_tests(dbpa_utils_test)
   gtest_discover_tests(dbps_api_client_test)

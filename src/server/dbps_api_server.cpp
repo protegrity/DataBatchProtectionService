@@ -17,8 +17,10 @@
 
 #include <crow/app.h>
 #include <string>
+#include <optional>
 #include "json_request.h"
 #include "encryption_sequencer.h"
+#include "auth_utils.h"
 
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
@@ -31,6 +33,17 @@ crow::response CreateErrorResponse(const std::string& error_msg, int status_code
 int main() {
     crow::SimpleApp app;
 
+    // Initialize credential store
+    // TODO: Make credentials file path configurable.
+    ClientCredentialStore credential_store;
+    const std::string credentials_file_path = "credentials.json";  // Default path
+    if (!credential_store.init(credentials_file_path)) {
+        std::cout << "Warning: Failed to load credentials file: " << credentials_file_path << std::endl;
+        std::cout << "Server will continue to run, but credentials will not be validated." << std::endl;
+    } else {
+        std::cout << "Credentials loaded successfully from: " << credentials_file_path << std::endl;
+    }
+
     CROW_ROUTE(app, "/healthz")([] {
         return "OK";
     });
@@ -39,6 +52,41 @@ int main() {
         crow::json::wvalue response;
         response["status"] = "chill";
         response["system_settings"] = "set to thrill!";
+        return crow::response(200, response);
+    });
+
+    // Authentication endpoint - POST /auth
+    CROW_ROUTE(app, "/auth").methods("POST"_method)([&credential_store](const crow::request& req) {
+        // Parse authentication request
+        AuthRequest auth_req = ParseAuthRequest(req.body);
+        
+        // Check if parsing resulted in an error
+        if (auth_req.error_message.has_value()) {
+            return CreateErrorResponse(auth_req.error_message.value(), 400);
+        }
+        
+        // Log the request for debugging
+        std::cout << "=== /auth Request ===" << std::endl;
+        std::cout << "client_id: " << auth_req.client_id << std::endl;
+        std::cout << "====================" << std::endl;
+        
+        // Generate JWT token (validates credentials internally)
+        auto token = credential_store.GenerateJWT(auth_req.client_id, auth_req.api_key);
+        
+        if (!token.has_value()) {
+            return CreateErrorResponse("Invalid credentials", 401);
+        }
+        
+        // Create success response
+        crow::json::wvalue response;
+        response["token"] = token.value();
+        response["token_type"] = "Bearer";
+        response["expires_in"] = 14400;  // 4 hours in seconds
+        
+        std::cout << "=== /auth Response (Success) ===" << std::endl;
+        std::cout << "Token generated for client_id: " << auth_req.client_id << std::endl;
+        std::cout << "=================================" << std::endl;
+        
         return crow::response(200, response);
     });
 
