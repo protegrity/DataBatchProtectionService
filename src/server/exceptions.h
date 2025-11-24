@@ -24,13 +24,28 @@
 #define DBPS_EXPORT
 #endif
 
-class DBPS_EXPORT DBPSUnsupportedException : public std::runtime_error {
+/**
+ * Base class for all DBPS server exceptions.
+ * Provides a common base for catching all DBPS-related exceptions.
+ */
+class DBPS_EXPORT DBPSBaseException : public std::runtime_error {
 public:
-    explicit DBPSUnsupportedException(const std::string& message) : std::runtime_error(message) {}
+    explicit DBPSBaseException(const std::string& message) : std::runtime_error(message) {}
 };
 
-class DBPS_EXPORT InvalidInputException : public std::runtime_error {
+/**
+ * Exception thrown when an operation or feature is not supported.
+ */
+class DBPS_EXPORT DBPSUnsupportedException : public DBPSBaseException {
 public:
-    explicit InvalidInputException(const std::string& message) : std::runtime_error(message) {}
+    explicit DBPSUnsupportedException(const std::string& message) : DBPSBaseException(message) {}
+};
+
+/**
+ * Exception thrown when input data is invalid or malformed.
+ */
+class DBPS_EXPORT InvalidInputException : public DBPSBaseException {
+public:
+    explicit InvalidInputException(const std::string& message) : DBPSBaseException(message) {}
 };
 

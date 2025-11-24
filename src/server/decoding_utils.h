@@ -40,7 +40,7 @@ using TypedListValues = std::variant<
     std::vector<double>,
     std::vector<std::array<uint32_t, 3>>,     // For INT96
     std::vector<std::string>,                 // For BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY
-    std::vector<uint8_t>                      // For UNDEFINED
+    std::vector<uint8_t>                      // For UNDEFINED, a plain untyped byte sequence.
 >;
 
 using namespace dbps::external;

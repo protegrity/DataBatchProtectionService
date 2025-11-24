@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "enums.h"
-#include "exceptions.h"
 #include "decoding_utils.h"
 
 #ifndef DBPS_EXPORT
