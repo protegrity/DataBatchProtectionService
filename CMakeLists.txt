@@ -75,6 +75,13 @@ FetchContent_Declare(
   GIT_TAG v1.14.0
 )
 
+# jwt-cpp is a header-only JWT library
+FetchContent_Declare(
+  jwt-cpp
+  GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
+  GIT_TAG v0.7.2
+)
+
 # Fetch dependencies
 
 # Disable dependency tests for cppcodec
@@ -85,7 +92,7 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cppcodec)
 set(BUILD_TESTING ON CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(crow httplib nlohmann_json cxxopts googletest)
+FetchContent_MakeAvailable(crow httplib nlohmann_json cxxopts googletest jwt-cpp)
 
 # Make GoogleTest helper macros available (gtest_discover_tests)
 include(GoogleTest)
@@ -114,6 +121,7 @@ target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib)
 target_include_directories(dbps_server_lib PUBLIC
   src/server
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
+  ${CMAKE_BINARY_DIR}/_deps/jwt-cpp-src/include
 )
 
 # Client components library (depends on httplib, nlohmann/json, and cppcodec)
