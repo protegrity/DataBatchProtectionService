@@ -198,7 +198,7 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         column_key_id_,
         user_id_,
         app_context_,
-        {}
+        {}  // encryption_metadata, which is empty for the Encryption call.
     );
     
     // Convert plaintext span to vector for the sequencer

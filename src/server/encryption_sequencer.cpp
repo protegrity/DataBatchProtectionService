@@ -29,7 +29,7 @@ using namespace dbps::external;
 using namespace dbps::enum_utils;
 
 namespace {
-    constexpr const char* DBPS_VERSION_KEY = "dbps_version";
+    constexpr const char* DBPS_VERSION_KEY = "dbps_agent_version";
     constexpr const char* DBPS_VERSION_VALUE = "v0.01";
 }
 
@@ -394,7 +394,7 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     
     // TODO: Make server version check a Sequencer error and stop processing.
     //
-    // Check encryption_metadata for dbps_version
+    // Check encryption_metadata for dbps_agent_version
     // 
     // The DBPS server version check during Decrypt is to future-proof against changes on the Encryption process.
     // The Encryption process could change due to updates on the payload decoding, updates on fallback encryption methods, or other changes,
@@ -406,10 +406,10 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         error_message_ = "encryption_metadata must contain key '" + std::string(DBPS_VERSION_KEY) + "'";
         return false;
     } else if (it->second.find(DBPS_VERSION_VALUE) != 0) {
-        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must start with '" 
+        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must match '" 
                   << DBPS_VERSION_VALUE << "', but got '" << it->second << "'" << std::endl;
         error_stage_ = "decrypt_version_check";
-        error_message_ = "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must start with '" + std::string(DBPS_VERSION_VALUE) + "'";
+        error_message_ = "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must match '" + std::string(DBPS_VERSION_VALUE) + "'";
         return false;
     }
     

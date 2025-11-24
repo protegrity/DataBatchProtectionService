@@ -252,7 +252,31 @@ TEST(EncryptionSequencer, InputValidation) {
         EXPECT_FALSE(result) << "Empty key_id test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "validation") << "Wrong error stage for empty key_id";
     }
-    
+
+    // Test 4: Missing encryption_metadata
+    {
+        DataBatchEncryptionSequencer sequencer(
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Format::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
+            {}  // encryption_metadata, setting it to empty map.
+        );
+        bool result = sequencer.ConvertAndDecrypt(HELLO_WORLD_DATA);
+        EXPECT_FALSE(result) << "Missing encryption_metadata test should have failed";
+        EXPECT_EQ(sequencer.error_stage_, "decrypt_version_check") << "Wrong error stage for missing encryption_metadata";
+        EXPECT_TRUE(sequencer.error_message_.find("encryption_metadata must contain key") != std::string::npos) << "Wrong error message for missing encryption_metadata";
+    }
+
+    // Test 5: Incorrect encryption_metadata version
+    {
+        DataBatchEncryptionSequencer sequencer(
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Format::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
+            {{"dbps_agent_version", "v0.09"}}  // encryption_metadata, setting it to incorrect version.
+        );
+        bool result = sequencer.ConvertAndDecrypt(HELLO_WORLD_DATA);
+        EXPECT_FALSE(result) << "Incorrect encryption_metadata version test should have failed";
+        EXPECT_EQ(sequencer.error_stage_, "decrypt_version_check") << "Wrong error stage for incorrect encryption_metadata version";
+        EXPECT_TRUE(sequencer.error_message_.find("must match") != std::string::npos) << "Wrong error message for incorrect encryption_metadata version";
+    }
+
 }
 
 // Test round-trip encryption/decryption
@@ -267,8 +291,8 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         bool encrypt_result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(encrypt_result) << "Round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
-        // Decrypt the encrypted result - need encryption_metadata with dbps_version
-        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_version").length() > 0);
+        // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
+        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
         bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
@@ -286,8 +310,8 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         bool encrypt_result = sequencer.ConvertAndEncrypt(BINARY_DATA);  // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
         ASSERT_TRUE(encrypt_result) << "Binary round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
-        // Decrypt the encrypted result - need encryption_metadata with dbps_version
-        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_version").length() > 0);
+        // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
+        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
         bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Binary round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
@@ -307,8 +331,8 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         bool encrypt_result = sequencer.ConvertAndEncrypt(SINGLE_CHAR_DATA);
         ASSERT_TRUE(encrypt_result) << "Single char round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
-        // Decrypt the encrypted result - need encryption_metadata with dbps_version
-        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_version").length() > 0);
+        // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
+        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
         bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Single char round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
@@ -335,9 +359,9 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         // Key-aware XOR encryption should produce different results for different keys
         EXPECT_NE(sequencer1.encrypted_result_, sequencer2.encrypted_result_);
         
-        // But both should decrypt back to the same original - need encryption_metadata with dbps_version
-        ASSERT_TRUE(sequencer1.encryption_metadata_.size() > 0 && sequencer1.encryption_metadata_.at("dbps_version").length() > 0);
-        ASSERT_TRUE(sequencer2.encryption_metadata_.size() > 0 && sequencer2.encryption_metadata_.at("dbps_version").length() > 0);
+        // But both should decrypt back to the same original - need encryption_metadata with dbps_agent_version
+        ASSERT_TRUE(sequencer1.encryption_metadata_.size() > 0 && sequencer1.encryption_metadata_.at("dbps_agent_version").length() > 0);
+        ASSERT_TRUE(sequencer2.encryption_metadata_.size() > 0 && sequencer2.encryption_metadata_.at("dbps_agent_version").length() > 0);
         bool decrypt1 = sequencer1.ConvertAndDecrypt(sequencer1.encrypted_result_);
         bool decrypt2 = sequencer2.ConvertAndDecrypt(sequencer2.encrypted_result_);
         
@@ -376,8 +400,8 @@ TEST(EncryptionSequencer, ResultStorage) {
         bool encrypt_result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(encrypt_result) << "Result storage decryption test failed during encryption";
         
-        // Then decrypt it - need encryption_metadata with dbps_version
-        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_version").length() > 0);
+        // Then decrypt it - need encryption_metadata with dbps_agent_version
+        ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
         bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Result storage decryption test failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         

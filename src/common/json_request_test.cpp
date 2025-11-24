@@ -142,7 +142,7 @@ const std::string VALID_DECRYPT_JSON = R"({
     },
     "application_context": "{\"user_id\": \"user456\"}",
     "encryption_metadata": {
-        "dbps_version": "v0.01"
+        "dbps_agent_version": "v0.01"
     },
     "debug": {
         "reference_id": "ref789",
@@ -358,7 +358,7 @@ TEST(JsonRequest, DecryptJsonRequestValidParse) {
     
     // Verify encryption_metadata is parsed correctly
     ASSERT_EQ(1, request.encryption_metadata_.size());
-    ASSERT_EQ("v0.01", request.encryption_metadata_.at("dbps_version"));
+    ASSERT_EQ("v0.01", request.encryption_metadata_.at("dbps_agent_version"));
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -600,7 +600,7 @@ const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
         "pretty_printed_value": "ENCRYPTED_test@example.com"
     },
     "encryption_metadata": {
-        "dbps_version": "v0.01"
+        "dbps_agent_version": "v0.01"
     }
 })";
 
@@ -640,7 +640,7 @@ TEST(JsonRequest, EncryptJsonResponseValidParse) {
     
     // Verify encryption_metadata is parsed correctly
     ASSERT_EQ(1, response.encryption_metadata_.size());
-    ASSERT_EQ("v0.01", response.encryption_metadata_.at("dbps_version"));
+    ASSERT_EQ("v0.01", response.encryption_metadata_.at("dbps_agent_version"));
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -749,7 +749,7 @@ TEST(JsonRequest, EncryptJsonResponseToJson) {
     response.reference_id_ = "ref456";
     response.encrypted_compression_ = CompressionCodec::GZIP;
     response.encrypted_value_ = StringToBinary("ENCRYPTED_data");
-    response.encryption_metadata_["dbps_version"] = "v0.01";
+    response.encryption_metadata_["dbps_agent_version"] = "v0.01";
     
     ASSERT_TRUE(response.IsValid());
     
@@ -763,7 +763,7 @@ TEST(JsonRequest, EncryptJsonResponseToJson) {
     
     // Verify encryption_metadata is serialized correctly
     ASSERT_TRUE(json_string.find("encryption_metadata") != std::string::npos);
-    ASSERT_TRUE(json_string.find("dbps_version") != std::string::npos);
+    ASSERT_TRUE(json_string.find("dbps_agent_version") != std::string::npos);
     ASSERT_TRUE(json_string.find("v0.01") != std::string::npos);
 }
 

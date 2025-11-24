@@ -37,7 +37,7 @@ template <typename T>
 using span = tcb::span<T>;
 
 namespace {
-    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_version", "v0.01_unittest"}};
+    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_agent_version", "v0.01_unittest"}};
     const std::string SEQUENCER_ENCRYPTION_METADATA_VERSION = "v0.01";
 }
 
@@ -203,20 +203,20 @@ public:
 
                 // Verify encryption metadata
                 auto encryption_metadata = encrypt_result->encryption_metadata();
-                if (!encryption_metadata || encryption_metadata->find("dbps_version") == encryption_metadata->end()) {
+                if (!encryption_metadata || encryption_metadata->find("dbps_agent_version") == encryption_metadata->end()) {
                     std::cout << "  ERROR: Encryption metadata verification failed" << std::endl;
                     all_succeeded = false;
                     continue;
                 }
-                if (encryption_metadata->at("dbps_version") != SEQUENCER_ENCRYPTION_METADATA_VERSION) {
+                if (encryption_metadata->at("dbps_agent_version") != SEQUENCER_ENCRYPTION_METADATA_VERSION) {
                     std::cout << "  ERROR: Encryption metadata version mismatch" << std::endl;
                     std::cout << "    Expected: " << SEQUENCER_ENCRYPTION_METADATA_VERSION << std::endl;
-                    std::cout << "    Got: " << encryption_metadata->at("dbps_version") << std::endl;
+                    std::cout << "    Got: " << encryption_metadata->at("dbps_agent_version") << std::endl;
                     all_succeeded = false;
                     continue;
                 }
                 std::cout << "  OK: Encryption metadata verified" << std::endl;
-                std::cout << "    dbps_version: " << encryption_metadata->at("dbps_version") << std::endl;
+                std::cout << "    dbps_agent_version: " << encryption_metadata->at("dbps_agent_version") << std::endl;
                 
                 std::cout << "  OK: Encrypted (" << encrypt_result->size() << " bytes)" << std::endl;
                 std::cout << "  OK: Ciphertext size: " << encrypt_result->size() << " bytes" << std::endl;

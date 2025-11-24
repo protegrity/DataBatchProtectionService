@@ -50,6 +50,9 @@ bool RemoteEncryptionResult::success() const {
 const std::optional<std::map<std::string, std::string>> RemoteEncryptionResult::encryption_metadata() const {
     if (!cached_encryption_metadata_.has_value() && response_ && response_->Success()) {
         const auto& response_attrs = response_->GetResponseAttributes();
+        // For the RemoteEncryptionResult, encryption_metadata_ is forwarded from the API response.
+        // The attribute in the API response is also named encryption_metadata.
+        // If the API reponse is empty, the cached value is set to NULL for compatibility with the class interface.
         if (!response_attrs.encryption_metadata_.empty()) {
             cached_encryption_metadata_ = response_attrs.encryption_metadata_;
         } else {

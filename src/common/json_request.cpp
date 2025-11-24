@@ -69,6 +69,7 @@ std::optional<int> SafeParseToInt(const std::string& str) {
 static std::optional<crow::json::rvalue> SafeLoadJsonBody(const std::string& json_string) {
     auto json_body = crow::json::load(json_string);
     if (!json_body || json_body.t() == crow::json::type::Null) {
+        CROW_LOG_ERROR << "Invalid JSON body: " << json_string;
         return std::nullopt;
     }
     return json_body;
