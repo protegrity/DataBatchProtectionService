@@ -23,7 +23,8 @@
 using namespace dbps::external;
 
 namespace {
-    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_agent_version", "v0.01"}};
+    // should rename to DBPS_ENCRYPTION_METADATA 
+    const std::map<std::string, std::string> DBPS_ENCRYPTION_METADATA = {{"dbps_agent_version", "v0.01_unittest"}};
 }
 
 // Test fixture for LocalDataBatchProtectionAgent tests
@@ -85,7 +86,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     std::string app_context = R"({"user_id": "test_user"})";
     
     EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
-                               Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, VALID_ENCRYPTION_METADATA));
+                               Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, DBPS_ENCRYPTION_METADATA));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
