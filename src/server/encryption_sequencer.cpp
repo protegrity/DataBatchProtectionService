@@ -30,6 +30,11 @@
 using namespace dbps::external;
 using namespace dbps::enum_utils;
 
+namespace {
+    constexpr const char* DBPS_VERSION_KEY = "dbps_agent_version";
+    constexpr const char* DBPS_VERSION_VALUE = "v0.01";
+}
+
 // Constructor implementation
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     const std::string& column_name,
@@ -41,7 +46,8 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     CompressionCodec::type encrypted_compression,
     const std::string& key_id,
     const std::string& user_id,
-    const std::string& application_context
+    const std::string& application_context,
+    const std::map<std::string, std::string>& encryption_metadata
 ) : column_name_(column_name),
     datatype_(datatype),
     datatype_length_(datatype_length),
@@ -51,7 +57,8 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     encrypted_compression_(encrypted_compression),
     key_id_(key_id),
     user_id_(user_id),
-    application_context_(application_context) {}
+    application_context_(application_context),
+    encryption_metadata_(encryption_metadata) {}
 
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
@@ -82,11 +89,13 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
             error_message_ = "Failed to encrypt data";
             return false;
         }
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION_VALUE;
         return true;
     } catch (const InvalidInputException& e) {
         // Throw the exception so it can be caught by the caller.
         throw;
     }
+    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION_VALUE;
     return true;
 }
 
@@ -177,6 +186,25 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     if (ciphertext.empty()) {
         error_stage_ = "validation";
         error_message_ = "ciphertext cannot be null or empty";
+        return false;
+    }
+    
+    // Check encryption_metadata for dbps_agent_version
+    // 
+    // The DBPS server version check during Decrypt is to future-proof against changes on the Encryption process.
+    // The Encryption process could change due to updates on the payload decoding, updates on fallback encryption methods, or other changes,
+    // and it is possible that it results on a mismatch with the Decryption implementation. This check helps to catch such mismatches.
+    auto it = encryption_metadata_.find(DBPS_VERSION_KEY);
+    if (it == encryption_metadata_.end()) {
+        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata must contain key '" << DBPS_VERSION_KEY << "'" << std::endl;
+        error_stage_ = "decrypt_version_check";
+        error_message_ = "encryption_metadata must contain key '" + std::string(DBPS_VERSION_KEY) + "'";
+        return false;
+    } else if (it->second.find(DBPS_VERSION_VALUE) != 0) {
+        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must match '" 
+                  << DBPS_VERSION_VALUE << "', but got '" << it->second << "'" << std::endl;
+        error_stage_ = "decrypt_version_check";
+        error_message_ = "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must match '" + std::string(DBPS_VERSION_VALUE) + "'";
         return false;
     }
     
