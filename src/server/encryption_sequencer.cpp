@@ -392,8 +392,6 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         return false;
     }
     
-    // TODO: Make server version check a Sequencer error and stop processing.
-    //
     // Check encryption_metadata for dbps_agent_version
     // 
     // The DBPS server version check during Decrypt is to future-proof against changes on the Encryption process.
