@@ -26,35 +26,11 @@
 #include <vector>
 
 #include "enums.h"
+#include "decoding_utils.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
-
-class DBPS_EXPORT DBPSUnsupportedException : public std::runtime_error {
-public:
-    explicit DBPSUnsupportedException(const std::string& message) : std::runtime_error(message) {}
-};
-
-class DBPS_EXPORT InvalidInputException : public std::runtime_error {
-public:
-    explicit InvalidInputException(const std::string& message) : std::runtime_error(message) {}
-};
-
-struct LevelAndValueBytes {
-    std::vector<uint8_t> level_bytes;
-    std::vector<uint8_t> value_bytes;
-};
-
-using TypedListValues = std::variant<
-    std::vector<int32_t>,
-    std::vector<int64_t>,
-    std::vector<float>,
-    std::vector<double>,
-    std::vector<std::array<uint32_t, 3>>,     // For INT96
-    std::vector<std::string>,                 // For BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY
-    std::vector<uint8_t>                      // For UNDEFINED
->;
 
 using namespace dbps::external;
 
@@ -77,6 +53,9 @@ public:
     // Result storage
     std::vector<uint8_t> encrypted_result_;
     std::vector<uint8_t> decrypted_result_;
+
+    // Encryption metadata
+    std::map<std::string, std::string> encryption_metadata_;
     
     // Error reporting fields
     std::string error_stage_;
@@ -93,7 +72,8 @@ public:
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
         const std::string& user_id,
-        const std::string& application_context
+        const std::string& application_context,
+        const std::map<std::string, std::string>& encryption_metadata
     );
     
     // Default constructor
@@ -143,26 +123,6 @@ protected:
      * Returns the level and value bytes.
      */
     LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
-
-    /**
-     * Compress bytes using the compression codec. 
-     */
-    std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes);
-    
-    /**
-     * Decompress bytes using the compression codec.
-     */
-    std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes);
-    
-    /**
-     * Split the input bytes in two parts, determined by the given index.
-     */
-    LevelAndValueBytes Split(const std::vector<uint8_t>& bytes, int index);
-
-    /**
-     * Parse the value bytes into a typed list of the types defined above.
-     */
-    TypedListValues ParseValueBytesIntoTypedList(const std::vector<uint8_t>& bytes);
 
     /**
      * Data element encryption function that will be the integration point for Protegrity.

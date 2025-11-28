@@ -63,10 +63,10 @@ public:
     // Success flag; false indicates an error.
     virtual bool success() const = 0;
 
-    //TODO: revisit the default implementation.
-    virtual const std::optional<std::map<std::string, std::string>> encryption_metadata() const {
-        return std::nullopt;
-    }
+    // Encryption metadata (valid when success() == true)
+    // Map of string key-value pairs containing any extra parameters used during encryption that are needed for decryption,
+    // for example, the encryption_algorithm_version used.
+    virtual const std::optional<std::map<std::string, std::string>> encryption_metadata() const = 0;
 
     // Error details (valid when success() == false).
     virtual const std::string& error_message() const = 0;
@@ -137,7 +137,12 @@ public:
         span<const uint8_t> ciphertext,
         std::map<std::string, std::string> encoding_attributes) = 0;
 
-    virtual const std::optional<std::map<std::string, std::string>> EncryptionMetadata() const {
+    /* Returns the encryption metadata provided during the class init() call.
+     * The encryption metadata is a map of string key-value pairs and is defined only for Decrypt usage.
+     * This metadata map is the one returned by the EncryptionResult.encryption_metadata() during the Encrypt call and indicates
+     *   any extra parameters used during encryption that are needed for decryption, for example, the encryption_algorithm_version used.
+     */
+        virtual const std::optional<std::map<std::string, std::string>> EncryptionMetadata() const {
         return column_encryption_metadata_;
     }
 

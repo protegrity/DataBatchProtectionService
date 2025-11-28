@@ -47,24 +47,39 @@ bool RemoteEncryptionResult::success() const {
     return response_ && response_->Success();
 }
 
-const std::string& RemoteEncryptionResult::error_message() const {
-    if (cached_error_message_.empty() && response_) {
-        if (!response_->Success()) {
-            cached_error_message_ = response_->ErrorMessage();
+const std::optional<std::map<std::string, std::string>> RemoteEncryptionResult::encryption_metadata() const {
+    if (!parsed_encryption_metadata_.has_value() && response_ && response_->Success()) {
+        const auto& response_attrs = response_->GetResponseAttributes();
+        // For the RemoteEncryptionResult, encryption_metadata_ is forwarded from the API response.
+        // The attribute in the API response is also named encryption_metadata.
+        // If the API reponse is empty, the parsed value is set to NULL for compatibility with the class interface.
+        if (!response_attrs.encryption_metadata_.empty()) {
+            parsed_encryption_metadata_ = response_attrs.encryption_metadata_;
         } else {
-            cached_error_message_ = "Successful encryption";
+            parsed_encryption_metadata_ = std::nullopt;
         }
     }
-    return cached_error_message_;
+    return parsed_encryption_metadata_;
+}
+
+const std::string& RemoteEncryptionResult::error_message() const {
+    if (parsed_error_message_.empty() && response_) {
+        if (!response_->Success()) {
+            parsed_error_message_ = response_->ErrorMessage();
+        } else {
+            parsed_error_message_ = "Successful encryption";
+        }
+    }
+    return parsed_error_message_;
 }
 
 const std::map<std::string, std::string>& RemoteEncryptionResult::error_fields() const {
-    if (cached_error_fields_.empty() && response_) {
+    if (parsed_error_fields_.empty() && response_) {
         if (!response_->Success()) {
-            cached_error_fields_ = response_->ErrorFields();
+            parsed_error_fields_ = response_->ErrorFields();
         }
     }
-    return cached_error_fields_;
+    return parsed_error_fields_;
 }
 
 RemoteDecryptionResult::RemoteDecryptionResult(std::unique_ptr<DecryptApiResponse> response)
@@ -90,23 +105,23 @@ bool RemoteDecryptionResult::success() const {
 }
 
 const std::string& RemoteDecryptionResult::error_message() const {
-    if (cached_error_message_.empty() && response_) {
+    if (parsed_error_message_.empty() && response_) {
         if (!response_->Success()) {
-            cached_error_message_ = response_->ErrorMessage();
+            parsed_error_message_ = response_->ErrorMessage();
         } else {
-            cached_error_message_ = "Successful decryption";
+            parsed_error_message_ = "Successful decryption";
         }
     }
-    return cached_error_message_;
+    return parsed_error_message_;
 }
 
 const std::map<std::string, std::string>& RemoteDecryptionResult::error_fields() const {
-    if (cached_error_fields_.empty() && response_) {
+    if (parsed_error_fields_.empty() && response_) {
         if (!response_->Success()) {
-            cached_error_fields_ = response_->ErrorFields();
+            parsed_error_fields_ = response_->ErrorFields();
         }
     }
-    return cached_error_fields_;
+    return parsed_error_fields_;
 }
 
 // Helper functions for validating that fields of the request <> response match.
@@ -318,7 +333,9 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         compression_type_,
         column_key_id_,
         user_id_,
-        app_context_
+        app_context_,
+        // For the Decrypt use case, column_encryption_metadata_ will be set on the constructor, however adding a default empty map for type safety.
+        column_encryption_metadata_.value_or(std::map<std::string, std::string>{})
     );
 
     // Validate that response fields match request fields

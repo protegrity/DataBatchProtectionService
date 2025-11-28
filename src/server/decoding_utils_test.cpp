@@ -16,6 +16,7 @@
 // under the License.
 
 #include "decoding_utils.h"
+#include "exceptions.h"
 #include <vector>
 #include <string>
 #include <cstring>
@@ -97,7 +98,7 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_WithLevels) {
 TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_InvalidEncoding) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
 
-    // Test DATA_PAGE_V1 with non-RLE encoding (should fail)
+    // Test DATA_PAGE_V1 with non-RLE encoding (should throw exception)
     std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
         {"page_type", std::string("DATA_PAGE_V1")},
         {"data_page_num_values", int32_t(100)},
@@ -106,25 +107,23 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_InvalidEncoding) {
         {"page_v1_repetition_level_encoding", std::string("BIT_PACKED")},  // Not RLE
         {"page_v1_definition_level_encoding", std::string("RLE")}
     };
-    int result = CalculateLevelBytesLength(raw, attribs);
-    EXPECT_EQ(-1, result); // Should fail due to invalid encoding type
+    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
 TEST(DecodingUtils, CalculateLevelBytesLength_UnknownPageType) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03};
 
-    // Test unknown page type
+    // Test unknown page type (should throw exception)
     std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
         {"page_type", std::string("UNKNOWN_PAGE_TYPE")}
     };
-    int result = CalculateLevelBytesLength(raw, attribs);
-    EXPECT_EQ(-1, result);
+    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), DBPSUnsupportedException);
 }
 
 TEST(DecodingUtils, CalculateLevelBytesLength_InvalidTotalSize) {
     std::vector<uint8_t> raw = {0x01, 0x02};
 
-    // Test DATA_PAGE_V2 with byte lengths exceeding raw data size
+    // Test DATA_PAGE_V2 with byte lengths exceeding raw data size (should throw exception)
     std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
         {"page_type", std::string("DATA_PAGE_V2")},
         {"data_page_num_values", int32_t(100)},
@@ -135,14 +134,13 @@ TEST(DecodingUtils, CalculateLevelBytesLength_InvalidTotalSize) {
         {"page_v2_num_nulls", int32_t(0)},
         {"page_v2_is_compressed", false}
     };
-    int result = CalculateLevelBytesLength(raw, attribs);
-    EXPECT_EQ(-1, result);
+    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
 TEST(DecodingUtils, CalculateLevelBytesLength_NegativeTotalSize) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
 
-    // Test DATA_PAGE_V2 with negative byte lengths
+    // Test DATA_PAGE_V2 with negative byte lengths (should throw exception)
     std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
         {"page_type", std::string("DATA_PAGE_V2")},
         {"data_page_num_values", int32_t(100)},
@@ -153,8 +151,113 @@ TEST(DecodingUtils, CalculateLevelBytesLength_NegativeTotalSize) {
         {"page_v2_num_nulls", int32_t(0)},
         {"page_v2_is_compressed", false}
     };
-    int result = CalculateLevelBytesLength(raw, attribs);
-    EXPECT_EQ(-1, result); // Total (4 bytes) is negative due to -5
+    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
-// (Removed legacy wrappers; tests are native GTest cases above)
+TEST(DecodingUtils, Split_Normal) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    LevelAndValueBytes result = Split(bytes, 3);
+    
+    EXPECT_EQ(3, result.level_bytes.size());
+    EXPECT_EQ(3, result.value_bytes.size());
+    EXPECT_EQ(std::vector<uint8_t>({0x01, 0x02, 0x03}), result.level_bytes);
+    EXPECT_EQ(std::vector<uint8_t>({0x04, 0x05, 0x06}), result.value_bytes);
+}
+
+TEST(DecodingUtils, Split_AtBeginning) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    LevelAndValueBytes result = Split(bytes, 0);
+    
+    EXPECT_EQ(0, result.level_bytes.size());
+    EXPECT_EQ(3, result.value_bytes.size());
+    EXPECT_EQ(bytes, result.value_bytes);
+}
+
+TEST(DecodingUtils, Split_AtEnd) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    LevelAndValueBytes result = Split(bytes, 3);
+    
+    EXPECT_EQ(3, result.level_bytes.size());
+    EXPECT_EQ(0, result.value_bytes.size());
+    EXPECT_EQ(bytes, result.level_bytes);
+}
+
+TEST(DecodingUtils, Split_InvalidIndex_Negative) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    EXPECT_THROW(Split(bytes, -1), InvalidInputException);
+}
+
+TEST(DecodingUtils, Split_InvalidIndex_TooLarge) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    EXPECT_THROW(Split(bytes, 4), InvalidInputException);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT32) {
+    std::vector<int32_t> values = {100, 200, 300};
+    std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
+                               reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
+    
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN);
+    
+    auto* int32_values = std::get_if<std::vector<int32_t>>(&result);
+    ASSERT_NE(nullptr, int32_values);
+    EXPECT_EQ(values, *int32_values);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT64) {
+    std::vector<int64_t> values = {1000, 2000};
+    std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
+                               reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int64_t));
+    
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT64, std::nullopt, Format::PLAIN);
+    
+    auto* int64_values = std::get_if<std::vector<int64_t>>(&result);
+    ASSERT_NE(nullptr, int64_values);
+    EXPECT_EQ(values, *int64_values);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
+    std::vector<uint8_t> bytes;
+    // First string: "hello" (length 5)
+    uint32_t len1 = 5;
+    bytes.insert(bytes.end(), reinterpret_cast<const uint8_t*>(&len1), 
+                 reinterpret_cast<const uint8_t*>(&len1) + sizeof(len1));
+    bytes.insert(bytes.end(), {'h', 'e', 'l', 'l', 'o'});
+    // Second string: "world" (length 5)
+    uint32_t len2 = 5;
+    bytes.insert(bytes.end(), reinterpret_cast<const uint8_t*>(&len2), 
+                 reinterpret_cast<const uint8_t*>(&len2) + sizeof(len2));
+    bytes.insert(bytes.end(), {'w', 'o', 'r', 'l', 'd'});
+    
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    
+    auto* string_values = std::get_if<std::vector<std::string>>(&result);
+    ASSERT_NE(nullptr, string_values);
+    EXPECT_EQ(2, string_values->size());
+    EXPECT_EQ("hello", (*string_values)[0]);
+    EXPECT_EQ("world", (*string_values)[1]);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
+    std::vector<uint8_t> bytes = {'a', 'b', 'c', 'x', 'y', 'z'}; // Two 3-byte strings
+    
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN);
+    
+    auto* string_values = std::get_if<std::vector<std::string>>(&result);
+    ASSERT_NE(nullptr, string_values);
+    EXPECT_EQ(2, string_values->size());
+    EXPECT_EQ("abc", (*string_values)[0]);
+    EXPECT_EQ("xyz", (*string_values)[1]);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_UnsupportedFormat) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::RLE), 
+                 DBPSUnsupportedException);
+}
+
+TEST(DecodingUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // 3 bytes, not divisible by sizeof(int32_t)
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN), 
+                 InvalidInputException);
+}

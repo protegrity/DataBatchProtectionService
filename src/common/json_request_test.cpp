@@ -141,6 +141,9 @@ const std::string VALID_DECRYPT_JSON = R"({
         "user_id": "user456"
     },
     "application_context": "{\"user_id\": \"user456\"}",
+    "encryption_metadata": {
+        "dbps_agent_version": "v0.01"
+    },
     "debug": {
         "reference_id": "ref789",
         "pretty_printed_value": "ENCRYPTED_test@example.com"
@@ -352,6 +355,10 @@ TEST(JsonRequest, DecryptJsonRequestValidParse) {
     
     // Check decrypt-specific fields
     ASSERT_EQ(StringToBinary("ENCRYPTED_test@example.com"), request.encrypted_value_);
+    
+    // Verify encryption_metadata is parsed correctly
+    ASSERT_EQ(1, request.encryption_metadata_.size());
+    ASSERT_EQ("v0.01", request.encryption_metadata_.at("dbps_agent_version"));
     
     ASSERT_TRUE(request.IsValid());
     ASSERT_EQ("", request.GetValidationError());
@@ -570,6 +577,9 @@ TEST(JsonRequest, DecryptJsonRequestToJson) {
     ASSERT_TRUE(json_string.find("ref789") != std::string::npos);
     ASSERT_TRUE(json_string.find("key123") != std::string::npos);
     ASSERT_TRUE(json_string.find("user456") != std::string::npos);
+    
+    // Verify encryption_metadata is included in the JSON output
+    ASSERT_TRUE(json_string.find("encryption_metadata") != std::string::npos);
 }
 
 // Test data for JsonResponse parsing
@@ -588,6 +598,9 @@ const std::string VALID_ENCRYPT_RESPONSE_JSON = R"({
     "debug": {
         "reference_id": "ref789",
         "pretty_printed_value": "ENCRYPTED_test@example.com"
+    },
+    "encryption_metadata": {
+        "dbps_agent_version": "v0.01"
     }
 })";
 
@@ -624,6 +637,10 @@ TEST(JsonRequest, EncryptJsonResponseValidParse) {
     ASSERT_EQ("ref789", response.reference_id_);
     ASSERT_EQ(CompressionCodec::GZIP, response.encrypted_compression_.value());
     ASSERT_EQ(StringToBinary("ENCRYPTED_test@example.com"), response.encrypted_value_);
+    
+    // Verify encryption_metadata is parsed correctly
+    ASSERT_EQ(1, response.encryption_metadata_.size());
+    ASSERT_EQ("v0.01", response.encryption_metadata_.at("dbps_agent_version"));
     
     ASSERT_TRUE(response.IsValid());
     ASSERT_EQ("", response.GetValidationError());
@@ -732,6 +749,7 @@ TEST(JsonRequest, EncryptJsonResponseToJson) {
     response.reference_id_ = "ref456";
     response.encrypted_compression_ = CompressionCodec::GZIP;
     response.encrypted_value_ = StringToBinary("ENCRYPTED_data");
+    response.encryption_metadata_["dbps_agent_version"] = "v0.01";
     
     ASSERT_TRUE(response.IsValid());
     
@@ -742,6 +760,11 @@ TEST(JsonRequest, EncryptJsonResponseToJson) {
     ASSERT_TRUE(json_string.find("ref456") != std::string::npos);
     ASSERT_TRUE(json_string.find("RU5DUllQVEVEX2RhdGE=") != std::string::npos); // "ENCRYPTED_data"
     ASSERT_TRUE(json_string.find("GZIP") != std::string::npos);
+    
+    // Verify encryption_metadata is serialized correctly
+    ASSERT_TRUE(json_string.find("encryption_metadata") != std::string::npos);
+    ASSERT_TRUE(json_string.find("dbps_agent_version") != std::string::npos);
+    ASSERT_TRUE(json_string.find("v0.01") != std::string::npos);
 }
 
 TEST(JsonRequest, DecryptJsonResponseToJson) {

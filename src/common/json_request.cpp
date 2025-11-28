@@ -65,6 +65,16 @@ std::optional<int> SafeParseToInt(const std::string& str) {
     }
 }
 
+// Helper function to safely load JSON body and return nullopt if invalid or null
+static std::optional<crow::json::rvalue> SafeLoadJsonBody(const std::string& json_string) {
+    auto json_body = crow::json::load(json_string);
+    if (!json_body || json_body.t() == crow::json::type::Null) {
+        CROW_LOG_ERROR << "Invalid JSON body: " << json_string;
+        return std::nullopt;
+    }
+    return json_body;
+}
+
 // Helper function to build validation error message from missing fields
 static std::string BuildValidationError(const std::vector<std::string>& missing_fields) {
     if (missing_fields.empty()) {
@@ -122,9 +132,9 @@ std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
 // JsonRequest implementation
 void JsonRequest::ParseCommon(const std::string& request_body) {
     // Load and validate JSON first
-    auto json_body = crow::json::load(request_body);
-    
-    if (!json_body) return; // Stop parsing if JSON is invalid
+    auto json_body_opt = SafeLoadJsonBody(request_body);
+    if (!json_body_opt) return; // Stop parsing if JSON is invalid
+    auto json_body = *json_body_opt;
     
     // Extract common required fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"column_reference", "name"})) {
@@ -243,8 +253,9 @@ void EncryptJsonRequest::Parse(const std::string& request_body) {
     ParseCommon(request_body);
     
     // Load JSON for encrypt-specific fields
-    auto json_body = crow::json::load(request_body);
-    if (!json_body) return;
+    auto json_body_opt = SafeLoadJsonBody(request_body);
+    if (!json_body_opt) return;
+    auto json_body = *json_body_opt;
     
     // Extract encrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value"})) {
@@ -342,13 +353,22 @@ void DecryptJsonRequest::Parse(const std::string& request_body) {
     ParseCommon(request_body);
     
     // Load JSON for decrypt-specific fields
-    auto json_body = crow::json::load(request_body);
-    if (!json_body) return;
+    auto json_body_opt = SafeLoadJsonBody(request_body);
+    if (!json_body_opt) return;
+    auto json_body = *json_body_opt;
     
     // Extract decrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value"})) {
         if (auto decoded_value = DecodeBase64Safe(*parsed_value)) {
             encrypted_value_ = *decoded_value;
+        }
+    }
+
+    if (json_body.has("encryption_metadata") && json_body["encryption_metadata"].t() == crow::json::type::Object) {
+        auto metadata = json_body["encryption_metadata"];
+        auto keys = metadata.keys();
+        for (const auto& key : keys) {
+            encryption_metadata_[key] = std::string(metadata[key]);
         }
     }
 }
@@ -431,6 +451,17 @@ std::string DecryptJsonRequest::ToJsonString() const {
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
 
+    // If the encryption_metadata is empty, create an empty object.
+    if (!encryption_metadata_.empty()) {
+        crow::json::wvalue metadata;
+        for (const auto& pair : encryption_metadata_) {
+            metadata[pair.first] = pair.second;
+        }
+        json["encryption_metadata"] = std::move(metadata);
+    } else {
+        json["encryption_metadata"] = crow::json::load("{}");
+    }
+
     // Converts crow json object to a string with pretty printing
     return PrettyPrintJson(json.dump());
 }
@@ -438,9 +469,9 @@ std::string DecryptJsonRequest::ToJsonString() const {
 // JsonResponse implementations
 void JsonResponse::Parse(const std::string& response_body) {
     // Load and validate JSON first
-    auto json_body = crow::json::load(response_body);
-    
-    if (!json_body) return; // Stop parsing if JSON is invalid
+    auto json_body_opt = SafeLoadJsonBody(response_body);
+    if (!json_body_opt) return; // Stop parsing if JSON is invalid
+    auto json_body = *json_body_opt;
     
     // Extract common required fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"access", "user_id"})) {
@@ -462,9 +493,10 @@ void EncryptJsonResponse::Parse(const std::string& response_body) {
     JsonResponse::Parse(response_body);
     
     // Load JSON for encrypt-specific fields
-    auto json_body = crow::json::load(response_body);
-    if (!json_body) return;
-    
+    auto json_body_opt = SafeLoadJsonBody(response_body);
+    if (!json_body_opt) return;
+    auto json_body = *json_body_opt;
+
     // Extract encrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value_format", "compression"})) {
         if (auto enum_value = to_compression_enum(*parsed_value)) {
@@ -476,6 +508,15 @@ void EncryptJsonResponse::Parse(const std::string& response_body) {
             encrypted_value_ = *decoded_value;
         }
     }
+    
+    // Parse encryption_metadata if it exists
+    if (json_body.has("encryption_metadata") && json_body["encryption_metadata"].t() == crow::json::type::Object) {
+        auto metadata = json_body["encryption_metadata"];
+        auto keys = metadata.keys();
+        for (const auto& key : keys) {
+            encryption_metadata_[key] = std::string(metadata[key]);
+        }
+    }
 }
 
 void DecryptJsonResponse::Parse(const std::string& response_body) {
@@ -483,8 +524,9 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
     JsonResponse::Parse(response_body);
     
     // Load JSON for decrypt-specific fields
-    auto json_body = crow::json::load(response_body);
-    if (!json_body) return;
+    auto json_body_opt = SafeLoadJsonBody(response_body);
+    if (!json_body_opt) return;
+    auto json_body = *json_body_opt;
     
     // Extract decrypt-specific fields
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "datatype_info", "datatype"})) {
@@ -591,6 +633,17 @@ std::string EncryptJsonResponse::ToJsonString() const {
     crow::json::wvalue debug;
     debug["reference_id"] = reference_id_;
     json["debug"] = std::move(debug);
+    
+    // If the encryption_metadata is empty, create an empty object.
+    if (!encryption_metadata_.empty()) {
+        crow::json::wvalue metadata;
+        for (const auto& pair : encryption_metadata_) {
+            metadata[pair.first] = pair.second;
+        }
+        json["encryption_metadata"] = std::move(metadata);
+    } else {
+        json["encryption_metadata"] = crow::json::load("{}");
+    }
     
     // Converts crow json object to a string with pretty printing
     return PrettyPrintJson(json.dump());
