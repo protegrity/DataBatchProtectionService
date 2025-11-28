@@ -76,7 +76,8 @@ int main() {
             request.encrypted_compression_.value(),
             request.key_id_,
             request.user_id_,
-            request.application_context_
+            request.application_context_,
+            {} // encryption_metadata does not exist in the Encryption request.
         );
         
         try {
@@ -88,8 +89,9 @@ int main() {
             return CreateErrorResponse("Invalid input for encryption: " + std::string(e.what()));
         }
         
-        // Set encrypted value
+        // Set encrypted value and encryption_metadata
         response.encrypted_value_ = sequencer.encrypted_result_;
+        response.encryption_metadata_ = sequencer.encryption_metadata_;
         
         // Set common fields of response
         // TODO: Add role and access control logic based on context-aware access control logic during encryption.
@@ -151,7 +153,8 @@ int main() {
             request.encrypted_compression_.value(),
             request.key_id_,
             request.user_id_,
-            request.application_context_
+            request.application_context_,
+            request.encryption_metadata_
         );
         
         try {

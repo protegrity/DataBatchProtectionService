@@ -40,6 +40,7 @@ public:
 
     std::size_t size() const override { return data_.size(); }
     bool success() const override { return success_; }
+    const std::optional<std::map<std::string, std::string>> encryption_metadata() const override { return std::nullopt; }
     const std::string& error_message() const override { static std::string empty; return empty; }
     const std::map<std::string, std::string>& error_fields() const override { static std::map<std::string, std::string> empty; return empty; }
 };
