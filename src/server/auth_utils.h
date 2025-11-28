@@ -17,10 +17,10 @@
 
 // Note for Protegrity integration:
 // - This is a simplified Authentication module used to complete the client integration.
-// - It is fully functional, but for production deployment a fully pledged Identity Provider can be used instead.
+// - It is fully functional, but for production deployment a fully fledged Identity Provider can be used instead.
 //
 // TODO: Expand explanation below.
-// - Note that no Arrow codebase changes would be needed to replace this with a fully pledged Identity Provider
+// - Note that no Arrow codebase changes would be needed to replace this with a fully fledged Identity Provider
 //   as the connection configuration specified on the application level is passed as-is to the DBPS agents for authentication.
 
 #pragma once
@@ -41,7 +41,7 @@
  */
 class DBPS_EXPORT ClientCredentialStore {
 public:
-    ClientCredentialStore() = default;    
+    ClientCredentialStore() = default;
     ~ClientCredentialStore() = default;
     
     /**
