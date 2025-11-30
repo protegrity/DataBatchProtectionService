@@ -34,15 +34,7 @@ using namespace dbps::enum_utils;
  * @return Compressed bytes, or original bytes if UNCOMPRESSED
  * @throws DBPSUnsupportedException if the compression codec is not supported
  */
-inline std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
-    if (compression == CompressionCodec::UNCOMPRESSED) {
-        return bytes;
-    }
-    // Note for future implementations: If compression fails because of invalid or corrupt input,
-    // then throw an InvalidInputException.
-    throw DBPSUnsupportedException(
-        "Unsupported compression codec: " + std::string(to_string(compression)));
-}
+std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression);
 
 /**
  * Decompress bytes using the compression codec.
@@ -52,13 +44,4 @@ inline std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, Compress
  * @return Decompressed bytes, or original bytes if UNCOMPRESSED
  * @throws DBPSUnsupportedException if the compression codec is not supported
  */
-inline std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
-    if (compression == CompressionCodec::UNCOMPRESSED) {
-        return bytes;
-    }
-    // Note for future implementations: If decompression fails because of invalid or corrupt input,
-    // then throw an InvalidInputException.
-    throw DBPSUnsupportedException(
-        "Unsupported compression codec: " + std::string(to_string(compression)));
-}
-
+std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression);
