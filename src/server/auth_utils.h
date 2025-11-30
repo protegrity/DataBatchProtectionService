@@ -58,6 +58,25 @@ public:
     void init(const std::map<std::string, std::string>& credentials);
     
     /**
+     * Sets the skip_credential_check flag.
+     * @param skip_credential_check If true, credential validation will be skipped during GenerateJWT
+     */
+    void init(bool skip_credential_check);
+    
+    /**
+     * Gets the skip_credential_check flag.
+     * @return true if credential validation is skipped, false otherwise
+     */
+    bool GetSkipCredentialCheck() const;
+    
+    /**
+     * Verifies JWT token from Authorization header for protected endpoints.
+     * @param authorization_header The Authorization header value (e.g., "Bearer <token>")
+     * @return Error message if verification fails, or std::nullopt if verification succeeds
+     */
+    std::optional<std::string> VerifyJWTForEndpoint(const std::string& authorization_header) const;
+    
+    /**
      * Generates a JWT token for the given client_id if the credentials are valid.
      * 
      * The JWT includes:
@@ -85,6 +104,9 @@ private:
     
     // In-memory storage: client_id -> api_key
     std::map<std::string, std::string> credentials_;
+    
+    // Flag to indicate if credential checking should be skipped during GenerateJWT
+    bool skip_credential_check_ = false;
 };
 
 /**

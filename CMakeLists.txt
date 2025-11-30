@@ -191,6 +191,7 @@ target_link_libraries(dbps_api_server
 )
 target_include_directories(dbps_api_server PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
+  ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
 )
 
 # DBPA Remote Test Script executable

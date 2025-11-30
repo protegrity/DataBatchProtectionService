@@ -35,6 +35,49 @@ static const int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
 void ClientCredentialStore::init(const std::map<std::string, std::string>& credentials) {
     credentials_.clear();
     credentials_ = credentials;
+    skip_credential_check_ = false;  // Default: check credentials
+}
+
+// Set the skip_credential_check flag.
+void ClientCredentialStore::init(bool skip_credential_check) {
+    skip_credential_check_ = skip_credential_check;
+}
+
+// Get the skip_credential_check flag.
+bool ClientCredentialStore::GetSkipCredentialCheck() const {
+    return skip_credential_check_;
+}
+
+// Forward declaration
+std::optional<std::string> VerifyJWT(const std::string& token);
+
+// VerifyJWTForEndpoint implementation
+std::optional<std::string> ClientCredentialStore::VerifyJWTForEndpoint(const std::string& authorization_header) const {
+    // Skip verification if credential checking is disabled
+    if (skip_credential_check_) {
+        return std::nullopt;
+    }
+    
+    // Extract Bearer token from Authorization header
+    std::optional<std::string> token = std::nullopt;
+    const std::string bearer_prefix = "Bearer ";
+    if (authorization_header.length() > bearer_prefix.length() && 
+        authorization_header.substr(0, bearer_prefix.length()) == bearer_prefix) {
+        token = authorization_header.substr(bearer_prefix.length());
+    }
+    
+    // Verify JWT token
+    if (!token.has_value()) {
+        return "Unauthorized: JWT token is missing";
+    }
+    
+    auto client_id = VerifyJWT(token.value());
+    if (!client_id.has_value()) {
+        return "Unauthorized: Invalid JWT token";
+    }
+    
+    std::cout << "JWT verified for client_id: " << client_id.value() << std::endl;
+    return std::nullopt;
 }
 
 // Initialize credential store from a JSON file
@@ -60,6 +103,7 @@ bool ClientCredentialStore::init(const std::string& file_path) {
         
         // Clear existing credentials
         credentials_.clear();
+        skip_credential_check_ = false;  // Default: check credentials
         
         // Load each client_id:api_key pair
         for (auto& [client_id, api_key_value] : json_data.items()) {
@@ -104,8 +148,10 @@ std::optional<std::string> ClientCredentialStore::GenerateJWT(const std::string&
         return std::nullopt;
     }
     
-    // Validate credentials before generating JWT
-    if (!ValidateCredential(client_id, api_key)) {
+    // Validate credentials before generating JWT (unless skipping credential check)
+    if (skip_credential_check_) {
+        std::cerr << "Warning: Credential checking is skipped. Generating JWT without validation for client_id: " << client_id << std::endl;
+    } else if (!ValidateCredential(client_id, api_key)) {
         std::cerr << "Error generating JWT: Invalid credentials for client_id: " << client_id << std::endl;
         return std::nullopt;
     }
@@ -170,6 +216,35 @@ AuthRequest ParseAuthRequest(const std::string& request_body) {
     } catch (const std::exception& e) {
         auth_req.error_message = "Error parsing request: " + std::string(e.what());
         return auth_req;
+    }
+}
+
+// VerifyJWT implementation
+std::optional<std::string> VerifyJWT(const std::string& token) {
+    try {
+        // Decode and verify the JWT token
+        auto decoded = jwt::decode(token);
+        
+        // Verify the signature using the same secret key
+        auto verifier = jwt::verify()
+            .allow_algorithm(jwt::algorithm::hs256{JWT_SECRET_KEY});
+        
+        verifier.verify(decoded);
+        
+        // Extract client_id from the token payload
+        if (decoded.has_payload_claim("client_id")) {
+            auto client_id_claim = decoded.get_payload_claim("client_id");
+            return client_id_claim.as_string();
+        } else {
+            std::cerr << "Error verifying JWT: Missing client_id claim in token" << std::endl;
+            return std::nullopt;
+        }
+    } catch (const jwt::error::token_verification_exception& e) {
+        std::cerr << "Error verifying JWT: Token verification failed - " << e.what() << std::endl;
+        return std::nullopt;
+    } catch (const std::exception& e) {
+        std::cerr << "Error verifying JWT: " << e.what() << std::endl;
+        return std::nullopt;
     }
 }
 
