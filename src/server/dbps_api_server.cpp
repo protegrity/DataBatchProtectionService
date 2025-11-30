@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
     });
 
     // Authentication endpoint - POST /auth
-    CROW_ROUTE(app, "/auth").methods("POST"_method)([&credential_store](const crow::request& req) {
+    CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
         // Parse authentication request
         AuthRequest auth_req = ParseAuthRequest(req.body);
         
