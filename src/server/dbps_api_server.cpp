@@ -17,8 +17,11 @@
 
 #include <crow/app.h>
 #include <string>
+#include <optional>
+#include <cxxopts.hpp>
 #include "json_request.h"
 #include "encryption_sequencer.h"
+#include "auth_utils.h"
 
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
@@ -28,22 +31,99 @@ crow::response CreateErrorResponse(const std::string& error_msg, int status_code
     return crow::response(status_code, error_response);
 }
 
-int main() {
+// Helper function to verify JWT token from request
+// Returns error message if verification fails, or nullopt if verification succeeds
+std::optional<std::string> VerifyJWTFromRequest(const crow::request& req, const ClientCredentialStore& credential_store) {
+    std::string auth_header = "";
+    auto auth_header_it = req.headers.find("Authorization");
+    if (auth_header_it != req.headers.end()) {
+        auth_header = auth_header_it->second;
+    }
+    return credential_store.VerifyTokenForEndpoint(auth_header);
+}
+
+int main(int argc, char* argv[]) {
+    // Initialize credentials file path and JWT secret key with parsed command line options
+    std::optional<std::string> credentials_file_path = std::nullopt;
+    std::string jwt_secret_key = "default-secret-key-overwritten-by-command-line";
+    try {
+        cxxopts::Options options("dbps_api_server", "Data Batch Protection Service API Server");
+        options.add_options()
+            ("c,credentials", "Path to credentials JSON file", cxxopts::value<std::string>())
+            ("j,jwt-secret", "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>());
+            auto result = options.parse(argc, argv);        
+        if (result.count("credentials")) {
+            credentials_file_path = result["credentials"].as<std::string>();
+        }
+        if (result.count("jwt-secret")) {
+            jwt_secret_key = result["jwt-secret"].as<std::string>();
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error parsing command line options: " << e.what() << std::endl;
+        return 1;
+    }
+    
+    // Initialize credential store with JWT secret key
+    ClientCredentialStore credential_store(jwt_secret_key);
+    if (credentials_file_path.has_value()) {
+        // Load credentials from file
+        if (!credential_store.init(credentials_file_path.value())) {
+            std::cerr << "Error: Failed to load credentials file: " << credentials_file_path.value() << std::endl;
+            return 1;
+        }
+        std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
+    } else {
+        // No credentials file provided, disable credential checking
+        credential_store.init(false);
+        std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
+    }
+
+    // Initialize API server
     crow::SimpleApp app;
 
     CROW_ROUTE(app, "/healthz")([] {
-        return "OK";
+        return crow::response(200, "OK");
     });
 
-    CROW_ROUTE(app, "/statusz")([]{
+    CROW_ROUTE(app, "/statusz")([&credential_store](const crow::request& req){
+        // Verify JWT token
+        auto auth_error = VerifyJWTFromRequest(req, credential_store);
+        if (auth_error.has_value()) {
+            return CreateErrorResponse(auth_error.value(), 401);
+        }
+
         crow::json::wvalue response;
-        response["status"] = "chill";
-        response["system_settings"] = "set to thrill!";
+        response["enable_credential_check"] = credential_store.GetEnableCredentialCheck();
+        return crow::response(200, response);
+    });
+
+    // Token authentication endpoint - POST /token
+    CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
+        // Process token request
+        TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
+        
+        // Check if processing resulted in an error
+        if (token_response.error_message.has_value()) {
+            return CreateErrorResponse(token_response.error_message.value(), token_response.error_status_code);
+        }
+        
+        // Create success response
+        crow::json::wvalue response;
+        response["token"] = token_response.token.value();
+        response["token_type"] = "Bearer";
+        response["expires_in"] = 14400;  // 4 hours in seconds
+        
         return crow::response(200, response);
     });
 
     // Encryption endpoint - POST /encrypt
-    CROW_ROUTE(app, "/encrypt").methods("POST"_method)([](const crow::request& req) {
+    CROW_ROUTE(app, "/encrypt").methods("POST"_method)([&credential_store](const crow::request& req) {
+        // Verify JWT token
+        auto auth_error = VerifyJWTFromRequest(req, credential_store);
+        if (auth_error.has_value()) {
+            return CreateErrorResponse(auth_error.value(), 401);
+        }
+        
         // Parse and validate request using our new class
         EncryptJsonRequest request;
         request.Parse(req.body);
@@ -107,7 +187,13 @@ int main() {
     });
 
     // Decryption endpoint - POST /decrypt
-    CROW_ROUTE(app, "/decrypt").methods("POST"_method)([](const crow::request& req) {
+    CROW_ROUTE(app, "/decrypt").methods("POST"_method)([&credential_store](const crow::request& req) {
+        // Verify JWT token
+        auto auth_error = VerifyJWTFromRequest(req, credential_store);
+        if (auth_error.has_value()) {
+            return CreateErrorResponse(auth_error.value(), 401);
+        }
+        
         // Parse and validate request using our new class
         DecryptJsonRequest request;
         request.Parse(req.body);
