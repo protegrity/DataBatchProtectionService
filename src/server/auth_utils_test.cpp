@@ -22,7 +22,7 @@
 
 // Test ClientCredentialStore initialization with map
 TEST(AuthUtilsTest, InitWithMap) {
-    ClientCredentialStore store;
+    ClientCredentialStore store("test-secret-key");
     std::map<std::string, std::string> credentials = {
         {"client1", "key1"},
         {"client2", "key2"}
@@ -59,7 +59,7 @@ TEST(AuthUtilsTest, InitWithMap) {
 
 // Test ProcessTokenRequest parsing and validation
 TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
-    ClientCredentialStore store;
+    ClientCredentialStore store("test-secret-key");
     std::map<std::string, std::string> credentials = {{"test_client", "test_key"}};
     store.init(credentials);
     
@@ -95,7 +95,7 @@ TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
 
 // Test ProcessTokenRequest with empty client_id
 TEST(AuthUtilsTest, ProcessTokenRequestEmptyClientId) {
-    ClientCredentialStore store;
+    ClientCredentialStore store("test-secret-key");
     std::map<std::string, std::string> credentials = {{"client1", "key1"}};
     store.init(credentials);
     
@@ -106,16 +106,16 @@ TEST(AuthUtilsTest, ProcessTokenRequestEmptyClientId) {
     EXPECT_EQ(response.error_status_code, 401);
 }
 
-// Test init with skip_credential_check flag
-TEST(AuthUtilsTest, InitWithSkipCredentialCheck) {
-    ClientCredentialStore store;
+// Test init with enable_credential_check flag
+TEST(AuthUtilsTest, InitWithEnableCredentialCheck) {
+    ClientCredentialStore store("test-secret-key");
     std::map<std::string, std::string> credentials = {{"client1", "key1"}};
     
     // Initialize with credentials first
     store.init(credentials);
     
-    // Test with skip_credential_check = true
-    store.init(true);
+    // Test with enable_credential_check = false (skip checking)
+    store.init(false);
     
     // Should succeed even with wrong api_key when skipping credential check
     std::string wrong_key_json = R"({"client_id": "client1", "api_key": "wrong_key"})";
@@ -131,8 +131,8 @@ TEST(AuthUtilsTest, InitWithSkipCredentialCheck) {
     EXPECT_FALSE(response2.token.value().empty());
     EXPECT_FALSE(response2.error_message.has_value());
     
-    // Test with skip_credential_check = false
-    store.init(false);
+    // Test with enable_credential_check = true (enable checking)
+    store.init(true);
     
     // Should fail with wrong api_key when checking credentials
     auto response3 = store.ProcessTokenRequest(wrong_key_json);
@@ -148,10 +148,10 @@ TEST(AuthUtilsTest, InitWithSkipCredentialCheck) {
     EXPECT_FALSE(response4.error_message.has_value());
 }
 
-// Test VerifyTokenForEndpoint with skip_credential_check = true
+// Test VerifyTokenForEndpoint with enable_credential_check = false
 TEST(AuthUtilsTest, VerifyTokenForEndpointSkipCheck) {
-    ClientCredentialStore store;
-    store.init(true);  // Skip credential checking
+    ClientCredentialStore store("test-secret-key");
+    store.init(false);  // Disable credential checking
     
     // Should succeed (return nullopt) regardless of header when skipping check
     auto result1 = store.VerifyTokenForEndpoint("");
@@ -164,11 +164,11 @@ TEST(AuthUtilsTest, VerifyTokenForEndpointSkipCheck) {
     EXPECT_FALSE(result3.has_value());
 }
 
-// Test VerifyTokenForEndpoint with skip_credential_check = false
+// Test VerifyTokenForEndpoint with enable_credential_check = true
 TEST(AuthUtilsTest, VerifyTokenForEndpointWithCheck) {
-    ClientCredentialStore store;
+    ClientCredentialStore store("test-secret-key");
     std::map<std::string, std::string> credentials = {{"clientAAAA", "keyAAAA"}};
-    store.init(credentials);  // This sets skip_credential_check_ to false
+    store.init(credentials);  // This sets enable_credential_check_ to true
     
     // Test with missing/empty Authorization header
     auto result1 = store.VerifyTokenForEndpoint("");

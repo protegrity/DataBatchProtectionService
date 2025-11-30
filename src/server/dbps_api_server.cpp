@@ -43,23 +43,28 @@ std::optional<std::string> VerifyJWTFromRequest(const crow::request& req, const 
 }
 
 int main(int argc, char* argv[]) {
-    // Initialize credentials file path with parsed command line options
+    // Initialize credentials file path and JWT secret key with parsed command line options
     std::optional<std::string> credentials_file_path = std::nullopt;
+    std::string jwt_secret_key = "default-secret-key-overwritten-by-command-line";
     try {
         cxxopts::Options options("dbps_api_server", "Data Batch Protection Service API Server");
         options.add_options()
-            ("c,credentials", "Path to credentials JSON file", cxxopts::value<std::string>());
+            ("c,credentials", "Path to credentials JSON file", cxxopts::value<std::string>())
+            ("j,jwt-secret", "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>());
             auto result = options.parse(argc, argv);        
         if (result.count("credentials")) {
             credentials_file_path = result["credentials"].as<std::string>();
+        }
+        if (result.count("jwt-secret")) {
+            jwt_secret_key = result["jwt-secret"].as<std::string>();
         }
     } catch (const std::exception& e) {
         std::cerr << "Error parsing command line options: " << e.what() << std::endl;
         return 1;
     }
     
-    // Initialize credential store
-    ClientCredentialStore credential_store;
+    // Initialize credential store with JWT secret key
+    ClientCredentialStore credential_store(jwt_secret_key);
     if (credentials_file_path.has_value()) {
         // Load credentials from file
         if (!credential_store.init(credentials_file_path.value())) {
@@ -68,8 +73,8 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
     } else {
-        // No credentials file provided, skip credential checking
-        credential_store.init(true);
+        // No credentials file provided, disable credential checking
+        credential_store.init(false);
         std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
     }
 
@@ -80,9 +85,15 @@ int main(int argc, char* argv[]) {
         return crow::response(200, "OK");
     });
 
-    CROW_ROUTE(app, "/statusz")([&credential_store]{
+    CROW_ROUTE(app, "/statusz")([&credential_store](const crow::request& req){
+        // Verify JWT token
+        auto auth_error = VerifyJWTFromRequest(req, credential_store);
+        if (auth_error.has_value()) {
+            return CreateErrorResponse(auth_error.value(), 401);
+        }
+
         crow::json::wvalue response;
-        response["skip_credential_check"] = credential_store.GetSkipCredentialCheck();
+        response["enable_credential_check"] = credential_store.GetEnableCredentialCheck();
         return crow::response(200, response);
     });
 

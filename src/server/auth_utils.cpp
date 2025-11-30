@@ -22,25 +22,26 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-// Hardcoded JWT secret key for signing tokens
-// TODO: Make this configurable (e.g., from environment variable or config file)
-static const std::string JWT_SECRET_KEY = "default-secret-key-change-in-production";
-
 // JWT expiration time: 4 hours in seconds
 static const int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
 
 // ClientCredentialStore implementation
 
+// Constructor
+ClientCredentialStore::ClientCredentialStore(const std::string& jwt_secret_key)
+    : jwt_secret_key_(jwt_secret_key) {
+}
+
 // Initialize credential store from a given map.
 void ClientCredentialStore::init(const std::map<std::string, std::string>& credentials) {
     credentials_.clear();
     credentials_ = credentials;
-    skip_credential_check_ = false;  // Default: check credentials
+    enable_credential_check_ = true;  // Default: enable credential checking
 }
 
-// Set the skip_credential_check flag.
-void ClientCredentialStore::init(bool skip_credential_check) {
-    skip_credential_check_ = skip_credential_check;
+// Set the enable_credential_check flag.
+void ClientCredentialStore::init(bool enable_credential_check) {
+    enable_credential_check_ = enable_credential_check;
 }
 
 // Initialize credential store from a JSON file
@@ -66,7 +67,7 @@ bool ClientCredentialStore::init(const std::string& file_path) {
         
         // Clear existing credentials
         credentials_.clear();
-        skip_credential_check_ = false;  // Default: check credentials
+        enable_credential_check_ = true;  // Default: enable credential checking
         
         // Load each client_id:api_key pair
         for (auto& [client_id, api_key_value] : json_data.items()) {
@@ -87,9 +88,9 @@ bool ClientCredentialStore::init(const std::string& file_path) {
     }
 }
 
-// Get the skip_credential_check flag.
-bool ClientCredentialStore::GetSkipCredentialCheck() const {
-    return skip_credential_check_;
+// Get the enable_credential_check flag.
+bool ClientCredentialStore::GetEnableCredentialCheck() const {
+    return enable_credential_check_;
 }
 
 void ClientCredentialStore::AddCredential(const std::string& client_id, const std::string& api_key) {
@@ -110,21 +111,20 @@ bool ClientCredentialStore::HasClientId(const std::string& client_id) const {
 
 // GenerateJWT implementation
 std::optional<std::string> ClientCredentialStore::GenerateJWT(const std::string& client_id, const std::string& api_key) const {
-    // Skip credential validation if flag is set
-    if (skip_credential_check_) {
+    // Validate that client_id is not empty
+    if (client_id.empty()) {
+        std::cout << "Error generating JWT: client_id cannot be empty" << std::endl;
+        return std::nullopt;
+    }
+    
+    // Skip credential validation if flag is not set
+    if (!enable_credential_check_) {
         std::cout << "Warning: Credential checking is skipped. Generating JWT without validation for client_id: " << client_id << std::endl;
-    } else {
-        // Validate that client_id is not empty
-        if (client_id.empty()) {
-            std::cout << "Error generating JWT: client_id cannot be empty" << std::endl;
-            return std::nullopt;
-        }
-        
-        // Validate credentials before generating JWT
-        if (!ValidateCredential(client_id, api_key)) {
-            std::cout << "Error generating JWT: Invalid credentials for client_id: " << client_id << std::endl;
-            return std::nullopt;
-        }
+    } 
+    // Validate credentials before generating JWT
+    else if (!ValidateCredential(client_id, api_key)) {
+        std::cout << "Error generating JWT: Invalid credentials for client_id: " << client_id << std::endl;
+        return std::nullopt;
     }
     
     try {
@@ -141,7 +141,7 @@ std::optional<std::string> ClientCredentialStore::GenerateJWT(const std::string&
             .set_payload_claim("client_id", jwt::claim(client_id))
             .set_issued_at(std::chrono::system_clock::from_time_t(now_seconds))
             .set_expires_at(std::chrono::system_clock::from_time_t(exp_seconds))
-            .sign(jwt::algorithm::hs256{JWT_SECRET_KEY});
+            .sign(jwt::algorithm::hs256{jwt_secret_key_});
         
         return token;
     } catch (const std::exception& e) {
@@ -160,7 +160,7 @@ TokenRequest ParseTokenRequest(const std::string& request_body) {
         
         // Validate that it's an object
         if (!json_body.is_object()) {
-            token_req.error_message = "Invalid JSON in request body";
+            token_req.error_message = "Invalid JSON in request body. Invalid format.";
             return token_req;
         }
         
@@ -228,14 +228,14 @@ TokenResponse ClientCredentialStore::ProcessTokenRequest(const std::string& requ
 }
 
 // VerifyJWT implementation
-std::optional<std::string> VerifyJWT(const std::string& token) {
+std::optional<std::string> VerifyJWT(const std::string& token, const std::string& jwt_secret_key) {
     try {
         // Decode and verify the JWT token
         auto decoded = jwt::decode(token);
         
         // Verify the signature using the same secret key
         auto verifier = jwt::verify()
-            .allow_algorithm(jwt::algorithm::hs256{JWT_SECRET_KEY});
+            .allow_algorithm(jwt::algorithm::hs256{jwt_secret_key});
         
         verifier.verify(decoded);
         
@@ -259,7 +259,7 @@ std::optional<std::string> VerifyJWT(const std::string& token) {
 // VerifyTokenForEndpoint implementation
 std::optional<std::string> ClientCredentialStore::VerifyTokenForEndpoint(const std::string& authorization_header) const {
     // Skip verification if credential checking is disabled
-    if (skip_credential_check_) {
+    if (!enable_credential_check_) {
         return std::nullopt;
     }
     
@@ -276,7 +276,7 @@ std::optional<std::string> ClientCredentialStore::VerifyTokenForEndpoint(const s
         return "Unauthorized: JWT token is missing";
     }
     
-    auto client_id = VerifyJWT(token.value());
+    auto client_id = VerifyJWT(token.value(), jwt_secret_key_);
     if (!client_id.has_value()) {
         return "Unauthorized: Invalid JWT token";
     }
@@ -284,4 +284,3 @@ std::optional<std::string> ClientCredentialStore::VerifyTokenForEndpoint(const s
     std::cout << "JWT verified for client_id: " << client_id.value() << std::endl;
     return std::nullopt;
 }
-

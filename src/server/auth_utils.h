@@ -17,10 +17,9 @@
 
 // Note for Protegrity integration:
 // - This is a simplified Authentication module used to complete the client integration.
-// - It is fully functional, but for production deployment a fully fledged Identity Provider can be used instead.
+// - It is fully functional, but for production deployment a fully fledged Certificate Authority or Identity Provider can be used instead.
 //
-// TODO: Expand explanation below.
-// - Note that no Arrow codebase changes would be needed to replace this with a fully fledged Identity Provider
+// - Note that no Arrow codebase changes would be needed to replace this with a fully fledged Certificate Authority (CA) or Identity Provider
 //   as the connection configuration specified on the application level is passed as-is to the DBPS agents for authentication.
 
 #pragma once
@@ -37,7 +36,7 @@
  * Structure to hold parsed token request data.
  *
  * Integration point for Protegrity:
- * - This request can be updated with the production configuration for authentication or credentials checking.
+ * - This request can be updated with a production configuration for authentication or credentials checking.
  * - The specific fields are transparent to the library users. The API call payload of the token request is passed as-is to the module,
  *   so library users don't parse the request payload.
  */
@@ -64,7 +63,11 @@ struct DBPS_EXPORT TokenResponse {
  */
 class DBPS_EXPORT ClientCredentialStore {
 public:
-    ClientCredentialStore() = default;
+    /**
+     * Constructor for ClientCredentialStore.
+     * @param jwt_secret_key The secret key used for signing and verifying JWT tokens
+     */
+    explicit ClientCredentialStore(const std::string& jwt_secret_key);
     ~ClientCredentialStore() = default;
     
     /**
@@ -81,16 +84,16 @@ public:
     void init(const std::map<std::string, std::string>& credentials);
     
     /**
-     * Sets the skip_credential_check flag.
-     * @param skip_credential_check If true, credential validation will be skipped during GenerateJWT
+     * Sets the enable_credential_check flag.
+     * @param enable_credential_check If true, credential validation will be enabled during GenerateJWT
      */
-    void init(bool skip_credential_check);
+    void init(bool enable_credential_check);
     
     /**
-     * Gets the skip_credential_check flag.
-     * @return true if credential validation is skipped, false otherwise
+     * Gets the enable_credential_check flag.
+     * @return true if credential validation is enabled, false otherwise
      */
-    bool GetSkipCredentialCheck() const;
+    bool GetEnableCredentialCheck() const;
     
     /**
      * Processes a token request from JSON body and generates a JWT token.
@@ -138,6 +141,9 @@ private:
     // In-memory storage: client_id -> api_key
     std::map<std::string, std::string> credentials_;
     
-    // Flag to indicate if credential checking should be skipped during GenerateJWT
-    bool skip_credential_check_ = false;
+    // Flag to indicate if credential checking is enabled during GenerateJWT
+    bool enable_credential_check_ = true;
+    
+    // JWT secret key for signing and verifying tokens
+    std::string jwt_secret_key_;
 };
