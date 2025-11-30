@@ -34,6 +34,29 @@
 #endif
 
 /**
+ * Structure to hold parsed token request data.
+ *
+ * Integration point for Protegrity:
+ * - This request can be updated with the production configuration for authentication or credentials checking.
+ * - The specific fields are transparent to the library users. The API call payload of the token request is passed as-is to the module,
+ *   so library users don't parse the request payload.
+ */
+ struct DBPS_EXPORT TokenRequest {
+    std::string client_id;
+    std::string api_key;
+    std::optional<std::string> error_message;  // Error message if parsing failed
+};
+
+/**
+ * Structure to hold token generation result.
+ */
+struct DBPS_EXPORT TokenResponse {
+    std::optional<std::string> token;
+    std::optional<std::string> error_message;
+    int error_status_code = 400;  // HTTP status code for error response
+};
+
+/**
  * ClientCredentialStore manages client_id to api_key mappings for authentication.
  * 
  * - Loads client credentials from a Json file and stores them in-memory.
@@ -70,12 +93,32 @@ public:
     bool GetSkipCredentialCheck() const;
     
     /**
+     * Processes a token request from JSON body and generates a JWT token.
+     * This method encapsulates all token request processing logic, hiding the details
+     * of TokenRequest structure from the caller.
+     * 
+     * @param request_body The raw JSON request body string
+     * @return TokenResponse with token if successful, or error_message and error_status_code if failed
+     */
+     TokenResponse ProcessTokenRequest(const std::string& request_body) const;
+
+     /**
      * Verifies JWT token from Authorization header for protected endpoints.
      * @param authorization_header The Authorization header value (e.g., "Bearer <token>")
      * @return Error message if verification fails, or std::nullopt if verification succeeds
      */
-    std::optional<std::string> VerifyJWTForEndpoint(const std::string& authorization_header) const;
+    std::optional<std::string> VerifyTokenForEndpoint(const std::string& authorization_header) const;
     
+private:
+    // Adds a client credential to the in-memory storage.
+    void AddCredential(const std::string& client_id, const std::string& api_key);
+    
+    // Check if a client credential is valid before generating a JWT token.
+    bool ValidateCredential(const std::string& client_id, const std::string& api_key) const;
+    
+    // Check if a a credential for a client_id exists
+    bool HasClientId(const std::string& client_id) const;
+
     /**
      * Generates a JWT token for the given client_id if the credentials are valid.
      * 
@@ -90,17 +133,7 @@ public:
      * @param api_key The API key to validate against the stored credential
      * @return The JWT token as a string if credentials are valid, or std::nullopt on error or invalid credentials
      */
-    std::optional<std::string> GenerateJWT(const std::string& client_id, const std::string& api_key) const;
-
-private:
-    // Adds a client credential to the in-memory storage.
-    void AddCredential(const std::string& client_id, const std::string& api_key);
-    
-    // Check if a client credential is valid before generating a JWT token.
-    bool ValidateCredential(const std::string& client_id, const std::string& api_key) const;
-    
-    // Check if a a credential for a client_id exists
-    bool HasClientId(const std::string& client_id) const;
+     std::optional<std::string> GenerateJWT(const std::string& client_id, const std::string& api_key) const;
     
     // In-memory storage: client_id -> api_key
     std::map<std::string, std::string> credentials_;
@@ -108,20 +141,3 @@ private:
     // Flag to indicate if credential checking should be skipped during GenerateJWT
     bool skip_credential_check_ = false;
 };
-
-/**
- * Structure to hold parsed authentication request data.
- */
-struct DBPS_EXPORT AuthRequest {
-    std::string client_id;
-    std::string api_key;
-    std::optional<std::string> error_message;  // Error message if parsing failed
-};
-
-/**
- * Parses an authentication request from JSON body.
- * 
- * @param request_body The raw JSON request body string
- * @return AuthRequest struct with parsed client_id and api_key, or error_message if parsing failed
- */
-DBPS_EXPORT AuthRequest ParseAuthRequest(const std::string& request_body);

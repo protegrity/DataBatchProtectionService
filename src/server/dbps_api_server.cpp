@@ -39,7 +39,7 @@ std::optional<std::string> VerifyJWTFromRequest(const crow::request& req, const 
     if (auth_header_it != req.headers.end()) {
         auth_header = auth_header_it->second;
     }
-    return credential_store.VerifyJWTForEndpoint(auth_header);
+    return credential_store.VerifyTokenForEndpoint(auth_header);
 }
 
 int main(int argc, char* argv[]) {
@@ -86,37 +86,21 @@ int main(int argc, char* argv[]) {
         return crow::response(200, response);
     });
 
-    // Authentication endpoint - POST /auth
+    // Token authentication endpoint - POST /token
     CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
-        // Parse authentication request
-        AuthRequest auth_req = ParseAuthRequest(req.body);
+        // Process token request
+        TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
         
-        // Check if parsing resulted in an error
-        if (auth_req.error_message.has_value()) {
-            return CreateErrorResponse(auth_req.error_message.value(), 400);
-        }
-        
-        // Log the request for debugging
-        std::cout << "=== /auth Request ===" << std::endl;
-        std::cout << "client_id: " << auth_req.client_id << std::endl;
-        std::cout << "====================" << std::endl;
-        
-        // Generate JWT token (validates credentials internally)
-        auto token = credential_store.GenerateJWT(auth_req.client_id, auth_req.api_key);
-        
-        if (!token.has_value()) {
-            return CreateErrorResponse("Invalid credentials", 401);
+        // Check if processing resulted in an error
+        if (token_response.error_message.has_value()) {
+            return CreateErrorResponse(token_response.error_message.value(), token_response.error_status_code);
         }
         
         // Create success response
         crow::json::wvalue response;
-        response["token"] = token.value();
+        response["token"] = token_response.token.value();
         response["token_type"] = "Bearer";
         response["expires_in"] = 14400;  // 4 hours in seconds
-        
-        std::cout << "=== /auth Response (Success) ===" << std::endl;
-        std::cout << "Token generated for client_id: " << auth_req.client_id << std::endl;
-        std::cout << "=================================" << std::endl;
         
         return crow::response(200, response);
     });
