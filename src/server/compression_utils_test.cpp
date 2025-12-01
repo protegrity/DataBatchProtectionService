@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 
 using namespace dbps::external;
+using namespace dbps::compression;
 
 TEST(CompressionUtils, Compress_Uncompressed) {
     std::vector<uint8_t> input = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -52,6 +53,8 @@ TEST(CompressionUtils, CompressDecompress_Snappy_RoundTrip) {
     std::vector<uint8_t> compressed = Compress(original, CompressionCodec::SNAPPY);
     std::vector<uint8_t> decompressed = Decompress(compressed, CompressionCodec::SNAPPY);
     EXPECT_EQ(original, decompressed);
+    // Verify that compression actually occurred (compressed data should differ from original)
+    EXPECT_NE(original, compressed);
 }
 
 TEST(CompressionUtils, Decompress_InvalidData) {
@@ -74,6 +77,8 @@ TEST(CompressionUtils, CompressDecompress_Snappy_SingleByte) {
     std::vector<uint8_t> compressed = Compress(original, CompressionCodec::SNAPPY);
     std::vector<uint8_t> decompressed = Decompress(compressed, CompressionCodec::SNAPPY);
     EXPECT_EQ(original, decompressed);
+    // Verify that compression actually occurred (compressed data should differ from original)
+    EXPECT_NE(original, compressed);
 }
 
 TEST(CompressionUtils, CompressDecompress_Snappy_LargeData) {
@@ -85,6 +90,8 @@ TEST(CompressionUtils, CompressDecompress_Snappy_LargeData) {
     std::vector<uint8_t> compressed = Compress(original, CompressionCodec::SNAPPY);
     std::vector<uint8_t> decompressed = Decompress(compressed, CompressionCodec::SNAPPY);
     EXPECT_EQ(original, decompressed);
+    // Verify that compression actually occurred (compressed data should differ from original)
+    EXPECT_NE(original, compressed);
 }
 
 TEST(CompressionUtils, CompressDecompress_Snappy_RepeatingPattern) {

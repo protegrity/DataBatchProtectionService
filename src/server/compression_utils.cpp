@@ -21,6 +21,8 @@
 using namespace dbps::external;
 using namespace dbps::enum_utils;
 
+namespace dbps::compression {
+
 std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
     if (compression == CompressionCodec::UNCOMPRESSED) {
         return bytes;
@@ -64,3 +66,4 @@ std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCo
         "Unsupported compression codec: " + std::string(to_string(compression)));
 }
 
+} // namespace dbps::compression

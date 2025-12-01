@@ -33,6 +33,7 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
+using namespace dbps::compression;
 
 template <typename T>
 using span = tcb::span<T>;
