@@ -86,7 +86,7 @@ FetchContent_Declare(
 FetchContent_Declare(
   snappy
   GIT_REPOSITORY https://github.com/google/snappy.git
-  GIT_TAG 1.1.10
+  GIT_TAG 1.2.2
 )
 
 # Fetch dependencies
@@ -222,9 +222,12 @@ target_link_libraries(dbpa_remote_testapp
   dbps_remote_lib
   dbps_client_lib
   dbps_common_lib
+  dbps_server_lib
 )
 target_include_directories(dbpa_remote_testapp PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
+  src/server
+  ${CMAKE_BINARY_DIR}/_deps/snappy-src
 )
 
 # =============================================================================
