@@ -125,9 +125,11 @@ include(GoogleTest)
 add_library(dbps_common_lib STATIC 
   src/common/json_request.cpp
   src/common/enum_utils.cpp
+  src/common/value_encryption_utils.cpp
 )
 target_include_directories(dbps_common_lib PUBLIC
   src/common
+  src/server
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
 )
@@ -249,6 +251,13 @@ if(BUILD_TESTS)
   # Enum utils tests
   add_executable(enum_utils_test src/common/enum_utils_test.cpp)
   target_link_libraries(enum_utils_test
+    dbps_common_lib
+    gtest_main
+  )
+
+  # Value encryption utils tests
+  add_executable(value_encryption_utils_test src/common/value_encryption_utils_test.cpp)
+  target_link_libraries(value_encryption_utils_test
     dbps_common_lib
     gtest_main
   )
@@ -464,6 +473,7 @@ if(BUILD_TESTS)
     DEPENDS 
       json_request_test
       enum_utils_test
+      value_encryption_utils_test
       encryption_sequencer_test
       decoding_utils_test
       bytes_utils_test
@@ -483,6 +493,7 @@ if(BUILD_TESTS)
   # Register tests with CTest via GoogleTest discovery
   gtest_discover_tests(json_request_test)
   gtest_discover_tests(enum_utils_test)
+  gtest_discover_tests(value_encryption_utils_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
   gtest_discover_tests(bytes_utils_test)
