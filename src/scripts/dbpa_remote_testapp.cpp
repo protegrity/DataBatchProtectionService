@@ -28,10 +28,12 @@
 #include "../common/dbpa_remote.h"
 #include "../client/httplib_client.h"
 #include "../common/enums.h"
+#include "../server/compression_utils.h"
 #include "tcb/span.hpp"
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
+using namespace dbps::compression;
 
 template <typename T>
 using span = tcb::span<T>;
@@ -143,7 +145,7 @@ public:
                 "demo_fixed_len_key_001",      // column_key_id
                 Type::FIXED_LEN_BYTE_ARRAY,   // datatype
                 8,                            // datatype_length (8 bytes per element)
-                CompressionCodec::UNCOMPRESSED, // compression_type
+                CompressionCodec::SNAPPY,      // compression_type (input will be Snappy-compressed)
                 VALID_ENCRYPTION_METADATA       // column_encryption_metadata
             );
             
@@ -464,11 +466,16 @@ public:
             }
             
             std::cout << "Test data: 3 fixed-length strings (8 bytes each)" << std::endl;
-            std::cout << "Total size: " << fixed_length_data.size() << " bytes" << std::endl;
+            std::cout << "Original size: " << fixed_length_data.size() << " bytes" << std::endl;
             
+            // Compress the test data using Snappy before sending to server
+            std::vector<uint8_t> fixed_length_data_compressed = Compress(fixed_length_data, CompressionCodec::SNAPPY);
+            std::cout << "Compressed size: " << fixed_length_data_compressed.size() << " bytes" << std::endl;
+
             // Test encryption with FIXED_LEN_BYTE_ARRAY and datatype_length
+            // The server will decompress the fixed_length_data_compressed, encrypt it, and compress the encrypted result
             std::map<std::string, std::string> fixed_len_encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data), fixed_len_encoding_attributes);
+            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data_compressed), fixed_len_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY encryption failed" << std::endl;
@@ -493,13 +500,22 @@ public:
             
             std::cout << "OK: FIXED_LEN_BYTE_ARRAY decrypted successfully" << std::endl;
             
+            // The server returns compressed plaintext (same compression as input)
+            // Decompress it before comparing with original data
+            auto decrypted_compressed_span = decrypt_result->plaintext();
+            std::vector<uint8_t> decrypted_compressed(decrypted_compressed_span.begin(), decrypted_compressed_span.end());
+            std::vector<uint8_t> decrypted_data = Decompress(decrypted_compressed, CompressionCodec::SNAPPY);
+            std::cout << "Decrypted compressed size: " << decrypted_compressed.size() << " bytes" << std::endl;
+            std::cout << "Decrypted uncompressed size: " << decrypted_data.size() << " bytes" << std::endl;
+            
             // Verify data integrity
-            auto decrypted_data = decrypt_result->plaintext();
             if (decrypted_data.size() == fixed_length_data.size() && 
-                std::equal(decrypted_data.begin(), decrypted_data.end(), fixed_length_data.begin())) {
+                std::equal(decrypted_data.begin(), decrypted_data.end(), fixed_length_data.begin(), fixed_length_data.end())) {
                 std::cout << "OK: FIXED_LEN_BYTE_ARRAY data integrity verified" << std::endl;
             } else {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY data integrity check failed" << std::endl;
+                std::cout << "  Expected size: " << fixed_length_data.size() << " bytes" << std::endl;
+                std::cout << "  Got size: " << decrypted_data.size() << " bytes" << std::endl;
                 return false;
             }
             

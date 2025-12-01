@@ -82,6 +82,13 @@ FetchContent_Declare(
   GIT_TAG master
 )
 
+# Snappy is a fast compression/decompression library
+FetchContent_Declare(
+  snappy
+  GIT_REPOSITORY https://github.com/google/snappy.git
+  GIT_TAG 1.2.2
+)
+
 # Fetch dependencies
 
 # Disable dependency tests for cppcodec
@@ -91,6 +98,19 @@ FetchContent_Declare(
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cppcodec)
 set(BUILD_TESTING ON CACHE BOOL "" FORCE)
+
+# Disable Snappy tests to avoid conflicts with our GoogleTest
+# Snappy includes its own GoogleTest which conflicts with our FetchContent GoogleTest
+set(SNAPPY_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(snappy)
+set(SNAPPY_BUILD_TESTS ON CACHE BOOL "" FORCE)
+
+# Suppress warnings from Snappy's source code
+if(TARGET snappy)
+    target_compile_options(snappy PRIVATE
+        -Wno-sign-compare
+    )
+endif()
 
 FetchContent_MakeAvailable(crow httplib nlohmann_json cxxopts googletest jwt-cpp)
 
@@ -118,13 +138,15 @@ add_library(dbps_server_lib STATIC
   src/server/encryption_sequencer.cpp
   src/server/auth_utils.cpp
   src/server/decoding_utils.cpp
+  src/server/compression_utils.cpp
 )
-target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib)
+target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
 target_include_directories(dbps_server_lib PUBLIC
   src/server
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/jwt-cpp-src/include
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
+  ${CMAKE_BINARY_DIR}/_deps/snappy-src
 )
 
 # Find and link OpenSSL (required by jwt-cpp)
@@ -200,9 +222,12 @@ target_link_libraries(dbpa_remote_testapp
   dbps_remote_lib
   dbps_client_lib
   dbps_common_lib
+  dbps_server_lib
 )
 target_include_directories(dbpa_remote_testapp PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
+  src/server
+  ${CMAKE_BINARY_DIR}/_deps/snappy-src
 )
 
 # =============================================================================
@@ -243,6 +268,15 @@ if(BUILD_TESTS)
     gtest_main
   )
   target_include_directories(decoding_utils_test PRIVATE src/server)
+
+  # Compression utils tests
+  add_executable(compression_utils_test src/server/compression_utils_test.cpp)
+  target_link_libraries(compression_utils_test
+    dbps_server_lib
+    dbps_common_lib
+    gtest_main
+  )
+  target_include_directories(compression_utils_test PRIVATE src/server)
 
   # Auth utils tests
   add_executable(auth_utils_test src/server/auth_utils_test.cpp)
@@ -413,6 +447,7 @@ if(BUILD_TESTS)
       enum_utils_test
       encryption_sequencer_test
       decoding_utils_test
+      compression_utils_test
       auth_utils_test
       dbpa_interface_test
       dbpa_utils_test
@@ -429,6 +464,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(enum_utils_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
+  gtest_discover_tests(compression_utils_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)
   gtest_discover_tests(dbpa_utils_test)

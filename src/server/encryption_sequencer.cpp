@@ -29,6 +29,7 @@
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
+using namespace dbps::compression;
 
 namespace {
     constexpr const char* DBPS_VERSION_KEY = "dbps_agent_version";
