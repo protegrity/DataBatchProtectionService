@@ -32,6 +32,8 @@ std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCode
         if (bytes.empty()) {
             return bytes;
         }
+        // `compressed` is a std::string because Snappy's API requires it.
+        // It is used as a binary buffer (not text), and immediately converted back to std::vector<uint8_t> to preserve binary semantics.
         std::string compressed;
         snappy::Compress(reinterpret_cast<const char*>(bytes.data()), bytes.size(), &compressed);
         return std::vector<uint8_t>(compressed.begin(), compressed.end());
@@ -52,6 +54,8 @@ std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCo
         if (bytes.empty()) {
             return bytes;
         }
+        // `decompressed` is a std::string because Snappy's API requires it.
+        // It is used as a binary buffer (not text), and immediately converted back to std::vector<uint8_t> to preserve binary semantics.
         std::string decompressed;
         bool success = snappy::Uncompress(reinterpret_cast<const char*>(bytes.data()), bytes.size(), &decompressed);
         if (!success) {
