@@ -39,7 +39,6 @@ template <typename T>
 using span = tcb::span<T>;
 
 namespace {
-    const std::map<std::string, std::string> VALID_ENCRYPTION_METADATA = {{"dbps_agent_version", "v0.01_unittest"}};
     const std::string SEQUENCER_ENCRYPTION_METADATA_VERSION = "v0.01";
 }
 
@@ -92,7 +91,7 @@ public:
                 Type::UNDEFINED,               // datatype
                 std::nullopt,                  // datatype_length (not needed for UNDEFINED)
                 CompressionCodec::UNCOMPRESSED, // compression_type
-                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
+                std::nullopt                    // column_encryption_metadata
             );
             
             std::cout << "OK: Main DBPA agent initialized successfully" << std::endl;
@@ -119,7 +118,7 @@ public:
                 Type::FLOAT,                   // datatype
                 std::nullopt,                  // datatype_length (not needed for FLOAT)
                 CompressionCodec::UNCOMPRESSED, // compression_type
-                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
+                std::nullopt                    // column_encryption_metadata
             );
             
             std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
@@ -146,7 +145,7 @@ public:
                 Type::FIXED_LEN_BYTE_ARRAY,   // datatype
                 8,                            // datatype_length (8 bytes per element)
                 CompressionCodec::SNAPPY,      // compression_type (input will be Snappy-compressed)
-                VALID_ENCRYPTION_METADATA       // column_encryption_metadata
+                std::nullopt                    // column_encryption_metadata
             );
             
             std::cout << "OK: Fixed-length DBPA agent initialized successfully" << std::endl;
@@ -235,6 +234,7 @@ public:
                 std::cout << std::endl;
                 
                 // Then decrypt
+                agent_->UpdateEncryptionMetadata(encryption_metadata);
                 auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
                 
                 if (!decrypt_result || !decrypt_result->success()) {
@@ -306,6 +306,7 @@ public:
                 }
                 
                 // Decrypt
+                agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
                 auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
                 
                 if (!decrypt_result || !decrypt_result->success()) {
@@ -384,6 +385,7 @@ public:
             std::cout << "OK: Float data encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
             
             // Decrypt the float data
+            float_agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
             auto decrypt_result = float_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {
@@ -488,6 +490,7 @@ public:
             std::cout << "OK: FIXED_LEN_BYTE_ARRAY encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
             
             // Test decryption
+            fixed_len_agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
             auto decrypt_result = fixed_len_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), fixed_len_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {

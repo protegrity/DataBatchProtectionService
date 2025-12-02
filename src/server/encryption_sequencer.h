@@ -22,6 +22,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -99,6 +100,39 @@ protected:
     std::string user_id_;
     std::string application_context_;
 
+    /**
+     * Decompresses and splits the plaintext into level and value bytes.
+     * Returns the level and value bytes.
+     */
+     LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
+
+     /**
+      * Merges level and value bytes and compresses them into plaintext.
+      * This is the reverse operation of DecompressAndSplit.
+      * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
+      * Returns the merged and compressed plaintext.
+      */
+     std::vector<uint8_t> CompressAndMerge(const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
+ 
+
+    /**
+     * Integration point: Encryption function based on list of values that will be the implemented by Protegrity.
+     *
+     * The level_bytes and the elements need to be encrypted and combined into a single encrypted
+     * vector of bytes.
+     */
+     std::vector<uint8_t> EncryptTypedList(
+        const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes);
+    
+    /**
+     * Integration point: Decryption function based on encrypted bytes that will be the implemented by Protegrity.
+     * 
+     * Takes encrypted bytes and decrypts them back into a typed list and level bytes.
+     * Returns a pair containing the decrypted TypedListValues and level_bytes.
+     */
+    std::pair<TypedListValues, std::vector<uint8_t>> DecryptTypedList(
+        const std::vector<uint8_t>& encrypted_bytes);
+    
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
@@ -119,18 +153,20 @@ protected:
     bool ValidateParameters();
 
     /**
-     * Decompresses and splits the plaintext into level and value bytes.
-     * Returns the level and value bytes.
+     * Validates the DBPS version in encryption_metadata during decryption.
+     * The DBPS server version check during Decrypt is to future-proof against changes on the Encryption process.
+     * The Encryption process could change due to updates on the payload decoding, updates on fallback encryption methods, or other changes,
+     * and it is possible that it results on a mismatch with the Decryption implementation. This check helps to catch such mismatches.
+     * Returns empty string if validation passes, otherwise returns the error message.
      */
-    LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
-
+     std::string ValidateDecryptionVersion();
+    
     /**
-     * Data element encryption function that will be the integration point for Protegrity.
-     * The level_bytes and the elements need to be encrypted and combined into a single encrypted
-     * vector of bytes.
+     * Safely gets the encryption_mode value from encryption_metadata.
+     * Returns the encryption mode value ("per_block" or "per_value") if found and valid,
+     * otherwise returns empty string.
      */
-    std::vector<uint8_t> EncryptTypedList(
-        const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes);
+    std::optional<std::string> SafeGetEncryptionMode();
     
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);

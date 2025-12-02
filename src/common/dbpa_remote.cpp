@@ -362,6 +362,10 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     return std::make_unique<RemoteDecryptionResult>(std::make_unique<DecryptApiResponse>(std::move(response)));
 }
 
+void RemoteDataBatchProtectionAgent::UpdateEncryptionMetadata(std::optional<std::map<std::string, std::string>> encryption_metadata) {
+    column_encryption_metadata_ = std::move(encryption_metadata);
+}
+
 std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConnectionConfigFile(const std::map<std::string, std::string>& connection_config) const {
     const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::LoadConnectionConfigFile() - ";
     auto config_file_it = connection_config.find(k_connection_config_key_);

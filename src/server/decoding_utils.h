@@ -84,6 +84,24 @@ TypedListValues ParseValueBytesIntoTypedList(
     Format::type format);
 
 /**
+ * Convert a typed list back into value bytes based on the data type and format.
+ * This is the reverse operation of ParseValueBytesIntoTypedList.
+ * 
+ * @param list The typed list to convert
+ * @param datatype The data type of the values
+ * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
+ * @param format The format of the data (currently only PLAIN is supported)
+ * @return std::vector<uint8_t> containing the serialized value bytes
+ * @throws DBPSUnsupportedException if format or datatype is unsupported
+ * @throws InvalidInputException if the data is invalid or malformed
+ */
+std::vector<uint8_t> GetTypedListAsValueBytes(
+    const TypedListValues& list,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format);
+
+/**
  * Print a typed list in a human-readable format.
  * 
  * @param list The typed list to print
