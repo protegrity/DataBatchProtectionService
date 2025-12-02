@@ -123,6 +123,10 @@ public:
         span<const uint8_t> ciphertext,
         std::map<std::string, std::string> encoding_attributes) override;
     
+    // Updates the encryption metadata for this agent. Primary used to facilitate testing.
+    // This metadata is used during decryption operations to ensure compatibility with the encryption parameters.
+    void UpdateEncryptionMetadata(std::optional<std::map<std::string, std::string>> encryption_metadata);
+    
     ~RemoteDataBatchProtectionAgent() override = default;
 
 protected:
