@@ -23,8 +23,10 @@
 using namespace dbps::external;
 
 namespace {
-    // should rename to DBPS_ENCRYPTION_METADATA 
-    const std::map<std::string, std::string> DBPS_ENCRYPTION_METADATA = {{"dbps_agent_version", "v0.01_unittest"}};
+    const std::map<std::string, std::string> DBPS_ENCRYPTION_METADATA = {
+        {"dbps_agent_version", "v0.01_unittest"},
+        {"encryption_mode", "per_block"}
+    };
 }
 
 // Test fixture for LocalDataBatchProtectionAgent tests
@@ -121,8 +123,8 @@ TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
     // Verify encryption_metadata is present in the result
     auto encryption_metadata = encrypt_result->encryption_metadata();
     ASSERT_TRUE(encryption_metadata.has_value());
-    ASSERT_EQ(1, encryption_metadata->size());
-    ASSERT_TRUE(encryption_metadata->at("dbps_agent_version").length() > 0); // Non-empty string
+    ASSERT_TRUE(encryption_metadata->find("dbps_agent_version") != encryption_metadata->end());
+    ASSERT_TRUE(encryption_metadata->find("encryption_mode") != encryption_metadata->end());
     
     // Get the ciphertext
     auto ciphertext_span = encrypt_result->ciphertext();

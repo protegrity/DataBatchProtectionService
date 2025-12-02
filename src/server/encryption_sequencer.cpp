@@ -19,6 +19,7 @@
 #include "enum_utils.h"
 #include "decoding_utils.h"
 #include "compression_utils.h"
+#include "exceptions.h"
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -33,7 +34,10 @@ using namespace dbps::compression;
 
 namespace {
     constexpr const char* DBPS_VERSION_KEY = "dbps_agent_version";
-    constexpr const char* DBPS_VERSION_VALUE = "v0.01";
+    constexpr const char* DBPS_VERSION = "v0.01";
+    constexpr const char* ENCRYPTION_MODE = "encryption_mode";
+    constexpr const char* ENCRYPTION_PER_BLOCK = "per_block";
+    constexpr const char* ENCRYPTION_PER_VALUE = "per_value";
 }
 
 // Constructor implementation
@@ -61,6 +65,8 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     application_context_(application_context),
     encryption_metadata_(encryption_metadata) {}
 
+// Top level encryption/decryption methods.
+
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
@@ -76,32 +82,106 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     }
 
     try {
-        auto level_and_value_bytes = DecompressAndSplit(plaintext);
+        // Decompress and split plaintext into level and value bytes
+        auto [level_bytes, value_bytes] = DecompressAndSplit(plaintext);
+        
+        // Parse value bytes into typed list
         auto typed_list = ParseValueBytesIntoTypedList(
-            level_and_value_bytes.value_bytes, datatype_, datatype_length_, format_);
-        auto encrypted_bytes = EncryptTypedList(typed_list, level_and_value_bytes.level_bytes);
+            value_bytes, datatype_, datatype_length_, format_);
+        
+        // Encrypt the typed list and level bytes
+        auto encrypted_bytes = EncryptTypedList(typed_list, level_bytes);
+        
+        // Compress the encrypted bytes
         encrypted_result_ = Compress(encrypted_bytes, encrypted_compression_);
+        
     } catch (const DBPSUnsupportedException& e) {
-        // If any stage is as of yet unsupported, default to whole payload 
-        // (as opposed to per-value) XOR encryption
+        // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
+        // (as opposed to per-value)
         encrypted_result_ = EncryptData(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
             error_message_ = "Failed to encrypt data";
             return false;
         }
-        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION_VALUE;
+        // If the sequence was interrupted by a DBPSUnsupportedException at any point, use per block encryption.
+        // Set the encryption type to per block.
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+        encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_BLOCK;
         return true;
     } catch (const InvalidInputException& e) {
         // Throw the exception so it can be caught by the caller.
         throw;
     }
-    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION_VALUE;
+    // If the sequencer got here, it means the encryption of the values in the typed list finished successfully.
+    // Set the encryption type to per value
+    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+    encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
     return true;
 }
 
-// Main processing methods
+// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
+    // Validate all parameters and key_id
+    if (!ValidateParameters()) {
+        return false;
+    }
+    
+    // Check that ciphertext is not null and not empty
+    if (ciphertext.empty()) {
+        error_stage_ = "validation";
+        error_message_ = "ciphertext cannot be null or empty";
+        return false;
+    }
+    
+    // Check encryption_metadata for dbps_agent_version
+    std::string version_error = ValidateDecryptionVersion();
+    if (!version_error.empty()) {
+        error_stage_ = "decrypt_version_check";
+        error_message_ = version_error;
+        return false;
+    }
+    
+    // Get encryption_mode from encryption_metadata
+    std::string encryption_mode = SafeGetEncryptionMode();
+    if (encryption_mode.empty()) {
+        error_stage_ = "decrypt_encryption_mode_validation";
+        error_message_ = "Failed to get encryption_mode from encryption_metadata";
+        return false;
+    }
+    
+    // Per-value encryption
+    if (encryption_mode == ENCRYPTION_PER_VALUE) {
+        // Decompress the encrypted bytes
+        auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
+        
+        // Decrypt the typed list and level bytes
+        auto [typed_list, level_bytes] = DecryptTypedList(decompressed_encrypted_bytes);
+        
+        // Convert typed list back to value bytes
+        auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);
+        
+        // Merge level and value bytes and compress to get plaintext
+        decrypted_result_ = CompressAndMerge(level_bytes, value_bytes);
+    }
+    
+    // Per-block encryption
+    else if (encryption_mode == ENCRYPTION_PER_BLOCK) {
+        // Simple XOR decryption (same operation as encryption) for per-block encryption
+        decrypted_result_ = DecryptData(ciphertext);
+        if (decrypted_result_.empty()) {
+            error_stage_ = "decryption";
+            error_message_ = "Failed to decrypt data";
+            return false;
+        }
+    }
+    
+    return true;
+}
 
+// Functions to pack/unpack the plaintext into level and value bytes.
+
+// Used during Encryption. Decompresses and splits the plaintext into level and value bytes.
 LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     const std::vector<uint8_t>& plaintext) {
     LevelAndValueBytes result;
@@ -144,14 +224,20 @@ LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     throw InvalidInputException("Unexpected page type: " + page_type);
 }
 
-// This is the primary integration point for Protegrity to encrypt individual items from a typed list.
+// Used during Decryption. Merges level and value bytes and compresses them back into the output format.
+std::vector<uint8_t> DataBatchEncryptionSequencer::CompressAndMerge(
+    const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes) {
+    throw DBPSUnsupportedException("CompressAndMerge not implemented");
+}
+
+// This is the primary integration point for Protegrity to encrypt individual values from a typed list.
 // 
 // Also the context rich encryptor can use these additional parameters: column_name, user_id, key_id, application_context.
 //
-// The current implementation prints out the list of items in the typed list and throws the DBPSUnsupportedException
+// The current implementation prints out the list of values in the typed list and throws the DBPSUnsupportedException
 // so that the default encryption method is used.
 //
-// Both the level_bytes AND elements need to be encrypted and combined as a single encrypted vector of bytes.
+// Both the level_bytes AND list of values need to be encrypted and combined as a single encrypted vector of bytes.
 //
 std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptTypedList(
     const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes) {
@@ -176,49 +262,12 @@ std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptTypedList(
     throw DBPSUnsupportedException("EncryptTypedList not implemented");
 }
 
-// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
-bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
-    // Validate all parameters and key_id
-    if (!ValidateParameters()) {
-        return false;
-    }
-    
-    // Check that ciphertext is not null and not empty
-    if (ciphertext.empty()) {
-        error_stage_ = "validation";
-        error_message_ = "ciphertext cannot be null or empty";
-        return false;
-    }
-    
-    // Check encryption_metadata for dbps_agent_version
-    // 
-    // The DBPS server version check during Decrypt is to future-proof against changes on the Encryption process.
-    // The Encryption process could change due to updates on the payload decoding, updates on fallback encryption methods, or other changes,
-    // and it is possible that it results on a mismatch with the Decryption implementation. This check helps to catch such mismatches.
-    auto it = encryption_metadata_.find(DBPS_VERSION_KEY);
-    if (it == encryption_metadata_.end()) {
-        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata must contain key '" << DBPS_VERSION_KEY << "'" << std::endl;
-        error_stage_ = "decrypt_version_check";
-        error_message_ = "encryption_metadata must contain key '" + std::string(DBPS_VERSION_KEY) + "'";
-        return false;
-    } else if (it->second.find(DBPS_VERSION_VALUE) != 0) {
-        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must match '" 
-                  << DBPS_VERSION_VALUE << "', but got '" << it->second << "'" << std::endl;
-        error_stage_ = "decrypt_version_check";
-        error_message_ = "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must match '" + std::string(DBPS_VERSION_VALUE) + "'";
-        return false;
-    }
-    
-    // Simple XOR decryption (same operation as encryption)
-    decrypted_result_ = DecryptData(ciphertext);
-    if (decrypted_result_.empty()) {
-        error_stage_ = "decryption";
-        error_message_ = "Failed to decrypt data";
-        return false;
-    }
-    
-    return true;
+std::pair<TypedListValues, std::vector<uint8_t>> DataBatchEncryptionSequencer::DecryptTypedList(
+    const std::vector<uint8_t>& encrypted_bytes) {
+    throw DBPSUnsupportedException("DecryptTypedList not implemented");
 }
+
+// Helper methods to validate and basic parameter reading.
 
 bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
     // Helper to find key and return value or null
@@ -331,6 +380,35 @@ bool DataBatchEncryptionSequencer::ValidateParameters() {
     
     return true;
 }
+
+std::string DataBatchEncryptionSequencer::ValidateDecryptionVersion() {
+    auto it = encryption_metadata_.find(DBPS_VERSION_KEY);
+    if (it == encryption_metadata_.end()) {
+        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata must contain key '" << DBPS_VERSION_KEY << "'" << std::endl;
+        return "encryption_metadata must contain key '" + std::string(DBPS_VERSION_KEY) + "'";
+    } else if (it->second.find(DBPS_VERSION) != 0) {
+        std::cerr << "ERROR: EncryptionSequencer - encryption_metadata['" << DBPS_VERSION_KEY << "'] must match '" 
+                  << DBPS_VERSION << "', but got '" << it->second << "'" << std::endl;
+        return "encryption_metadata['" + std::string(DBPS_VERSION_KEY) + "'] must match '" + std::string(DBPS_VERSION) + "'";
+    }
+    return "";
+}
+
+std::string DataBatchEncryptionSequencer::SafeGetEncryptionMode() {
+    auto it = encryption_metadata_.find(ENCRYPTION_MODE);
+    if (it == encryption_metadata_.end()) {
+        // The metadata key for encryption mode is missing.
+        return "";
+    }
+    const std::string& encryption_mode = it->second;
+    if (encryption_mode != ENCRYPTION_PER_BLOCK && encryption_mode != ENCRYPTION_PER_VALUE) {
+        // The value for encryption mode is not valid.
+        return "";
+    }
+    return encryption_mode;
+}
+
+// Simple encryption/decryption functions using XOR with key_id hash
 
 std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector<uint8_t>& data) {
     if (data.empty()) {

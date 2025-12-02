@@ -222,6 +222,14 @@ TypedListValues ParseValueBytesIntoTypedList(
     }
 }
 
+std::vector<uint8_t> GetTypedListAsValueBytes(
+    const TypedListValues& list,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format) {
+    throw DBPSUnsupportedException("GetTypedListAsValueBytes not implemented");
+}
+
 template<typename T>
 const char* GetTypeName() {
     if constexpr (std::is_same_v<T, std::vector<int32_t>>) return "INT32";
