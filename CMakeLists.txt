@@ -139,6 +139,7 @@ add_library(dbps_server_lib STATIC
   src/server/auth_utils.cpp
   src/server/decoding_utils.cpp
   src/server/compression_utils.cpp
+  src/server/encryptors/basic_encryptor.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
 target_include_directories(dbps_server_lib PUBLIC
@@ -277,6 +278,15 @@ if(BUILD_TESTS)
     gtest_main
   )
   target_include_directories(compression_utils_test PRIVATE src/server)
+
+  # Basic encryptor tests
+  add_executable(basic_encryptor_test src/server/encryptors/basic_encryptor_test.cpp)
+  target_link_libraries(basic_encryptor_test
+    dbps_server_lib
+    dbps_common_lib
+    gtest_main
+  )
+  target_include_directories(basic_encryptor_test PRIVATE src/server)
 
   # Auth utils tests
   add_executable(auth_utils_test src/server/auth_utils_test.cpp)
@@ -448,6 +458,7 @@ if(BUILD_TESTS)
       encryption_sequencer_test
       decoding_utils_test
       compression_utils_test
+      basic_encryptor_test
       auth_utils_test
       dbpa_interface_test
       dbpa_utils_test
@@ -465,6 +476,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
   gtest_discover_tests(compression_utils_test)
+  gtest_discover_tests(basic_encryptor_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)
   gtest_discover_tests(dbpa_utils_test)
