@@ -100,6 +100,39 @@ protected:
     std::string user_id_;
     std::string application_context_;
 
+    /**
+     * Decompresses and splits the plaintext into level and value bytes.
+     * Returns the level and value bytes.
+     */
+     LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
+
+     /**
+      * Merges level and value bytes and compresses them into plaintext.
+      * This is the reverse operation of DecompressAndSplit.
+      * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
+      * Returns the merged and compressed plaintext.
+      */
+     std::vector<uint8_t> CompressAndMerge(const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
+ 
+
+    /**
+     * Integration point: Encryption function based on list of values that will be the implemented by Protegrity.
+     *
+     * The level_bytes and the elements need to be encrypted and combined into a single encrypted
+     * vector of bytes.
+     */
+     std::vector<uint8_t> EncryptTypedList(
+        const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes);
+    
+    /**
+     * Integration point: Decryption function based on encrypted bytes that will be the implemented by Protegrity.
+     * 
+     * Takes encrypted bytes and decrypts them back into a typed list and level bytes.
+     * Returns a pair containing the decrypted TypedListValues and level_bytes.
+     */
+    std::pair<TypedListValues, std::vector<uint8_t>> DecryptTypedList(
+        const std::vector<uint8_t>& encrypted_bytes);
+    
     // Converted encoding attributes values to corresponding types
     std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
     
@@ -134,39 +167,6 @@ protected:
      * otherwise returns empty string.
      */
     std::string SafeGetEncryptionMode();
-    
-    /**
-     * Decompresses and splits the plaintext into level and value bytes.
-     * Returns the level and value bytes.
-     */
-    LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
-
-    /**
-     * Merges level and value bytes and compresses them into plaintext.
-     * This is the reverse operation of DecompressAndSplit.
-     * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
-     * Returns the merged and compressed plaintext.
-     */
-    std::vector<uint8_t> CompressAndMerge(
-        const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
-
-    /**
-     * Integration point: Encryption function based on list of values that will be the implemented by Protegrity.
-     *
-     * The level_bytes and the elements need to be encrypted and combined into a single encrypted
-     * vector of bytes.
-     */
-    std::vector<uint8_t> EncryptTypedList(
-        const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes);
-    
-    /**
-     * Integration point: Decryption function based on encrypted bytes that will be the implemented by Protegrity.
-     * 
-     * Takes encrypted bytes and decrypts them back into a typed list and level bytes.
-     * Returns a pair containing the decrypted TypedListValues and level_bytes.
-     */
-    std::pair<TypedListValues, std::vector<uint8_t>> DecryptTypedList(
-        const std::vector<uint8_t>& encrypted_bytes);
     
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);
