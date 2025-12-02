@@ -166,7 +166,7 @@ protected:
      * Returns the encryption mode value ("per_block" or "per_value") if found and valid,
      * otherwise returns empty string.
      */
-    std::string SafeGetEncryptionMode();
+    std::optional<std::string> SafeGetEncryptionMode();
     
     // Simple encryption/decryption using XOR with key_id hash
     std::vector<uint8_t> EncryptData(const std::vector<uint8_t>& data);

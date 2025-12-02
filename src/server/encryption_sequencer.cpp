@@ -86,8 +86,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         auto [level_bytes, value_bytes] = DecompressAndSplit(plaintext);
         
         // Parse value bytes into typed list
-        auto typed_list = ParseValueBytesIntoTypedList(
-            value_bytes, datatype_, datatype_length_, format_);
+        auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, format_);
         
         // Encrypt the typed list and level bytes
         auto encrypted_bytes = EncryptTypedList(typed_list, level_bytes);
@@ -106,8 +105,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         }
         // If the sequence was interrupted by a DBPSUnsupportedException at any point, use per block encryption.
         // Set the encryption type to per block.
-        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_BLOCK;
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         return true;
     } catch (const InvalidInputException& e) {
         // Throw the exception so it can be caught by the caller.
@@ -115,8 +114,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     }
     // If the sequencer got here, it means the encryption of the values in the typed list finished successfully.
     // Set the encryption type to per value
-    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
     encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
+    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
     return true;
 }
 
@@ -143,12 +142,13 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     }
     
     // Get encryption_mode from encryption_metadata
-    std::string encryption_mode = SafeGetEncryptionMode();
-    if (encryption_mode.empty()) {
+    auto encryption_mode_opt = SafeGetEncryptionMode();
+    if (!encryption_mode_opt.has_value()) {
         error_stage_ = "decrypt_encryption_mode_validation";
         error_message_ = "Failed to get encryption_mode from encryption_metadata";
         return false;
     }
+    std::string encryption_mode = encryption_mode_opt.value();
     
     // Per-value encryption
     if (encryption_mode == ENCRYPTION_PER_VALUE) {
@@ -394,16 +394,16 @@ std::string DataBatchEncryptionSequencer::ValidateDecryptionVersion() {
     return "";
 }
 
-std::string DataBatchEncryptionSequencer::SafeGetEncryptionMode() {
+std::optional<std::string> DataBatchEncryptionSequencer::SafeGetEncryptionMode() {
     auto it = encryption_metadata_.find(ENCRYPTION_MODE);
     if (it == encryption_metadata_.end()) {
         // The metadata key for encryption mode is missing.
-        return "";
+        return std::nullopt;
     }
     const std::string& encryption_mode = it->second;
     if (encryption_mode != ENCRYPTION_PER_BLOCK && encryption_mode != ENCRYPTION_PER_VALUE) {
         // The value for encryption mode is not valid.
-        return "";
+        return std::nullopt;
     }
     return encryption_mode;
 }
