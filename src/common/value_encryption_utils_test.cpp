@@ -138,6 +138,20 @@ TEST(ValueEncryptionUtilsTest, ConcatenationEncryptionRoundTrip) {
     }
 }
 
+TEST(ValueEncryptionUtilsTest, ConcatenateEncryptedValuesThrowsWhenPayloadSmallerThanSize) {
+    // Construct an EncryptedValue with declared size larger than payload length
+    EncryptedValue ev;
+    ev.payload = std::vector<uint8_t>{0x01, 0x02};
+    ev.size = 3u; // inconsistent on purpose
+
+    std::vector<EncryptedValue> values;
+    values.push_back(ev);
+
+    EXPECT_THROW({
+        (void)ConcatenateEncryptedValues(values);
+    }, std::runtime_error);
+}
+
 TEST(ValueEncryptionUtilsTest, MalformedMissingCount) {
     std::vector<uint8_t> blob;
     blob.push_back(0x01);
