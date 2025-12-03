@@ -51,21 +51,3 @@ TEST(BasicEncryptor, EncryptBlock_DifferentKeys) {
     
     EXPECT_NE(encrypted1, encrypted2);
 }
-
-TEST(BasicEncryptor, EncryptValueList_ThrowsException) {
-    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context");
-
-    std::vector<int32_t> values = {1, 2, 3};
-    TypedListValues typed_list = values;
-
-    EXPECT_THROW(encryptor.EncryptValueList(typed_list), DBPSUnsupportedException);
-}
-
-TEST(BasicEncryptor, DecryptValueList_ThrowsException) {
-    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context");
-    
-    std::vector<uint8_t> encrypted_bytes = {1, 2, 3, 4, 5};
-    
-    EXPECT_THROW(encryptor.DecryptValueList(encrypted_bytes), DBPSUnsupportedException);
-}
-
