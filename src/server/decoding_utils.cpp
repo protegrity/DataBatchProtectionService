@@ -106,18 +106,6 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     return total_level_bytes;
 }
 
-LevelAndValueBytes Split(const std::vector<uint8_t>& bytes, int index) {
-    LevelAndValueBytes result;
-
-    if (index < 0 || index > static_cast<int>(bytes.size())) {
-        throw InvalidInputException("Invalid index for splitting bytes: " + std::to_string(index));
-    }
-    result.level_bytes = std::vector<uint8_t>(bytes.begin(), bytes.begin() + index);
-    result.value_bytes = std::vector<uint8_t>(bytes.begin() + index, bytes.end());
-
-    return result;
-}
-
 template<typename T>
 std::vector<T> DecodeFixedSizeType(const uint8_t* raw_data, size_t raw_size, const char* name) {
     if ((raw_size % sizeof(T)) != 0) {
