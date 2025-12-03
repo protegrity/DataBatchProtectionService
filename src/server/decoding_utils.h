@@ -57,16 +57,6 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs);
 
 /**
- * Split the input bytes in two parts, determined by the given index.
- * 
- * @param bytes The bytes to split
- * @param index The index at which to split (bytes before index go to level_bytes, bytes from index go to value_bytes)
- * @return LevelAndValueBytes structure with split bytes
- * @throws InvalidInputException if index is invalid
- */
-LevelAndValueBytes Split(const std::vector<uint8_t>& bytes, int index);
-
-/**
  * Parse the value bytes into a typed list based on the data type and format.
  * 
  * @param bytes The value bytes to parse

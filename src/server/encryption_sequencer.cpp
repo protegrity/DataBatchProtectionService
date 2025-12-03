@@ -18,6 +18,7 @@
 #include "encryption_sequencer.h"
 #include "enum_utils.h"
 #include "decoding_utils.h"
+#include "bytes_utils.h"
 #include "compression_utils.h"
 #include "exceptions.h"
 #include "encryptors/basic_encryptor.h"
@@ -180,8 +181,8 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         // Convert typed list back to value bytes
         auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);
         
-        // Merge level and value bytes and compress to get plaintext
-        decrypted_result_ = CompressAndMerge(level_bytes, value_bytes);
+        // Join level and value bytes and compress to get plaintext
+        decrypted_result_ = CompressAndJoin(level_bytes, value_bytes);
     }
     
     // Per-block encryption
@@ -203,16 +204,18 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
 // Used during Encryption. Decompresses and splits the plaintext into level and value bytes.
 LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     const std::vector<uint8_t>& plaintext) {
-    LevelAndValueBytes result;
 
+    // Get the page type from the encoding attributes.
     std::string page_type = encoding_attributes_["page_type"];
+
     // Page v1 is fully compressed, so we need to decompress first.
     // Note: This is true only if compression is enabled.
     if (page_type == "DATA_PAGE_V1") {
         auto decompressed_bytes = Decompress(plaintext, compression_);
         int leading_bytes_to_strip = CalculateLevelBytesLength(
             decompressed_bytes, encoding_attributes_converted_);
-        return Split(decompressed_bytes, leading_bytes_to_strip);
+        auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
+        return LevelAndValueBytes{level_bytes, value_bytes};
     }
 
     // Page v2 is only compressed in the value bytes, the level bytes are always uncompressed.
@@ -220,33 +223,33 @@ LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
     if (page_type == "DATA_PAGE_V2") {
         int leading_bytes_to_strip = CalculateLevelBytesLength(
             plaintext, encoding_attributes_converted_);
-        auto split_bytes = Split(plaintext, leading_bytes_to_strip);
-        result.level_bytes = split_bytes.level_bytes;
+        auto [level_bytes, compressed_value_bytes] = Split(plaintext, leading_bytes_to_strip);
 
         // Page V2 has an additional is_compressed bit.
         bool page_v2_is_compressed = std::get<bool>(
             encoding_attributes_converted_["page_v2_is_compressed"]);
+        std::vector<uint8_t> value_bytes;
         if (page_v2_is_compressed) {
-            result.value_bytes = Decompress(split_bytes.value_bytes, compression_);
+            value_bytes = Decompress(compressed_value_bytes, compression_);
         } else {
-            result.value_bytes = split_bytes.value_bytes;
+            value_bytes = compressed_value_bytes;
         }
-        return result;
+        return LevelAndValueBytes{level_bytes, value_bytes};
     }
 
     if (page_type == "DICTIONARY_PAGE") {
-        result.value_bytes = Decompress(plaintext, compression_);
-        result.level_bytes = std::vector<uint8_t>();
-        return result;
+        auto level_bytes = std::vector<uint8_t>(); // DICTIONARY_PAGE has no level bytes.
+        auto value_bytes = Decompress(plaintext, compression_);
+        return LevelAndValueBytes{level_bytes, value_bytes};
     }
     
     throw InvalidInputException("Unexpected page type: " + page_type);
 }
 
-// Used during Decryption. Merges level and value bytes and compresses them back into the output format.
-std::vector<uint8_t> DataBatchEncryptionSequencer::CompressAndMerge(
+// Used during Decryption. Joins level and value bytes and compresses them back into the output format.
+std::vector<uint8_t> DataBatchEncryptionSequencer::CompressAndJoin(
     const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes) {
-    throw DBPSUnsupportedException("CompressAndMerge not implemented");
+    throw DBPSUnsupportedException("CompressAndJoin not implemented");
 }
 
 // Helper methods to validate and basic parameter reading.

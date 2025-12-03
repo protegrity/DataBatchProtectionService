@@ -115,9 +115,9 @@ protected:
       * Merges level and value bytes and compresses them into plaintext.
       * This is the reverse operation of DecompressAndSplit.
       * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
-      * Returns the merged and compressed plaintext.
+      * Returns the joined and compressed plaintext.
       */
-     std::vector<uint8_t> CompressAndMerge(const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
+     std::vector<uint8_t> CompressAndJoin(const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
  
 
     // Converted encoding attributes values to corresponding types
