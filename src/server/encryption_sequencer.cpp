@@ -21,6 +21,7 @@
 #include "bytes_utils.h"
 #include "compression_utils.h"
 #include "exceptions.h"
+#include "encryptors/basic_encryptor.h"
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -28,6 +29,7 @@
 #include <optional>
 #include <cassert>
 #include <cstring>
+#include <memory>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -39,6 +41,17 @@ namespace {
     constexpr const char* ENCRYPTION_MODE = "encryption_mode";
     constexpr const char* ENCRYPTION_PER_BLOCK = "per_block";
     constexpr const char* ENCRYPTION_PER_VALUE = "per_value";
+}
+
+// Helper function to create encryptor instance
+static std::unique_ptr<DBPSEncryptor> CreateEncryptor(
+    const std::string& key_id,
+    const std::string& column_name,
+    const std::string& user_id,
+    const std::string& application_context) {
+
+    // Return a BasicEncryptor instance.
+    return std::make_unique<BasicEncryptor>(key_id, column_name, user_id, application_context);
 }
 
 // Constructor implementation
@@ -64,7 +77,35 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     key_id_(key_id),
     user_id_(user_id),
     application_context_(application_context),
-    encryption_metadata_(encryption_metadata) {}
+    encryption_metadata_(encryption_metadata),
+    encryptor_(CreateEncryptor(key_id, column_name, user_id, application_context)) {}
+
+// Constructor with pre-built encryptor
+DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
+    const std::string& column_name,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    CompressionCodec::type compression,
+    Format::type format,
+    const std::map<std::string, std::string>& encoding_attributes,
+    CompressionCodec::type encrypted_compression,
+    const std::string& key_id,
+    const std::string& user_id,
+    const std::string& application_context,
+    const std::map<std::string, std::string>& encryption_metadata,
+    std::unique_ptr<DBPSEncryptor> encryptor
+) : column_name_(column_name),
+    datatype_(datatype),
+    datatype_length_(datatype_length),
+    compression_(compression),
+    format_(format),
+    encoding_attributes_(encoding_attributes),
+    encrypted_compression_(encrypted_compression),
+    key_id_(key_id),
+    user_id_(user_id),
+    application_context_(application_context),
+    encryption_metadata_(encryption_metadata),
+    encryptor_(std::move(encryptor)) {}
 
 // Top level encryption/decryption methods.
 
@@ -89,16 +130,18 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Parse value bytes into typed list
         auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, format_);
         
-        // Encrypt the typed list and level bytes
-        auto encrypted_bytes = EncryptTypedList(typed_list, level_bytes);
+        // Encrypt the typed list and level bytes, then join them into a single encrypted byte vector.
+        auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
+        auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
+        auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
         
-        // Compress the encrypted bytes
-        encrypted_result_ = Compress(encrypted_bytes, encrypted_compression_);
+        // Compress the joined encrypted bytes
+        encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
         
     } catch (const DBPSUnsupportedException& e) {
         // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
         // (as opposed to per-value)
-        encrypted_result_ = EncryptData(plaintext);
+        encrypted_result_ = encryptor_->EncryptBlock(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
             error_message_ = "Failed to encrypt data";
@@ -156,20 +199,22 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         // Decompress the encrypted bytes
         auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
         
-        // Decrypt the typed list and level bytes
-        auto [typed_list, level_bytes] = DecryptTypedList(decompressed_encrypted_bytes);
+        // Split the joined encrypted bytes, then decrypt the level and value bytes separately.
+        auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(decompressed_encrypted_bytes);
+        auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
+        auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
         
-        // Convert typed list back to value bytes
+        // Convert the decrypted typed list back to value bytes
         auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);
         
-        // Join level and value bytes and compress to get plaintext
+        // Join the decrypted level and value bytes, then compress to get plaintext
         decrypted_result_ = CompressAndJoin(level_bytes, value_bytes);
     }
     
     // Per-block encryption
     else if (encryption_mode == ENCRYPTION_PER_BLOCK) {
         // Simple XOR decryption (same operation as encryption) for per-block encryption
-        decrypted_result_ = DecryptData(ciphertext);
+        decrypted_result_ = encryptor_->DecryptBlock(ciphertext);
         if (decrypted_result_.empty()) {
             error_stage_ = "decryption";
             error_message_ = "Failed to decrypt data";
@@ -231,43 +276,6 @@ LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
 std::vector<uint8_t> DataBatchEncryptionSequencer::CompressAndJoin(
     const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes) {
     throw DBPSUnsupportedException("CompressAndJoin not implemented");
-}
-
-// This is the primary integration point for Protegrity to encrypt individual values from a typed list.
-// 
-// Also the context rich encryptor can use these additional parameters: column_name, user_id, key_id, application_context.
-//
-// The current implementation prints out the list of values in the typed list and throws the DBPSUnsupportedException
-// so that the default encryption method is used.
-//
-// Both the level_bytes AND list of values need to be encrypted and combined as a single encrypted vector of bytes.
-//
-std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptTypedList(
-    const TypedListValues& typed_list, const std::vector<uint8_t>& level_bytes) {
-   
-    // Printout the typed list.
-    auto print_result = PrintTypedList(typed_list);
-    if (print_result.length() > 1000) {
-        std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
-                << print_result.substr(0, 1000) << "...";
-    } else {
-        std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result;
-    }
-
-    // Printout the additional context parameters.
-    std::cout << "Context parameters:\n"
-        << "  column_name: " << column_name_ << "\n"
-        << "  user_id: " << user_id_ << "\n"
-        << "  key_id: " << key_id_ << "\n"
-        << "  application_context: " << application_context_  << "\n"
-        << std::endl;
-
-    throw DBPSUnsupportedException("EncryptTypedList not implemented");
-}
-
-std::pair<TypedListValues, std::vector<uint8_t>> DataBatchEncryptionSequencer::DecryptTypedList(
-    const std::vector<uint8_t>& encrypted_bytes) {
-    throw DBPSUnsupportedException("DecryptTypedList not implemented");
 }
 
 // Helper methods to validate and basic parameter reading.
@@ -409,32 +417,4 @@ std::optional<std::string> DataBatchEncryptionSequencer::SafeGetEncryptionMode()
         return std::nullopt;
     }
     return encryption_mode;
-}
-
-// Simple encryption/decryption functions using XOR with key_id hash
-
-std::vector<uint8_t> DataBatchEncryptionSequencer::EncryptData(const std::vector<uint8_t>& data) {
-    if (data.empty()) {
-        return std::vector<uint8_t>();
-    }
-    
-    std::vector<uint8_t> encrypted_data(data.size());
-
-    // Generate a simple key from key_id by hashing it
-    std::hash<std::string> hasher;
-    size_t key_hash = hasher(key_id_);
-    
-    // XOR each byte with the key hash
-    for (size_t i = 0; i < data.size(); ++i) {
-        encrypted_data[i] = data[i] ^ (key_hash & 0xFF);
-        // Rotate the key hash for next byte
-        key_hash = (key_hash << 1) | (key_hash >> 31);
-    }
-
-    return encrypted_data;
-}
-
-std::vector<uint8_t> DataBatchEncryptionSequencer::DecryptData(const std::vector<uint8_t>& data) {
-    // For XOR encryption, decryption is the same as encryption
-    return EncryptData(data);
 }
