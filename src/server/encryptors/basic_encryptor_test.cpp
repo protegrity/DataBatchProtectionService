@@ -54,12 +54,11 @@ TEST(BasicEncryptor, EncryptBlock_DifferentKeys) {
 
 TEST(BasicEncryptor, EncryptValueList_ThrowsException) {
     BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context");
-    
+
     std::vector<int32_t> values = {1, 2, 3};
     TypedListValues typed_list = values;
-    std::vector<uint8_t> level_bytes = {0, 1, 0};
-    
-    EXPECT_THROW(encryptor.EncryptValueList(typed_list, level_bytes), DBPSUnsupportedException);
+
+    EXPECT_THROW(encryptor.EncryptValueList(typed_list), DBPSUnsupportedException);
 }
 
 TEST(BasicEncryptor, DecryptValueList_ThrowsException) {

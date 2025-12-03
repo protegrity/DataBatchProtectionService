@@ -48,30 +48,29 @@ std::vector<uint8_t> BasicEncryptor::DecryptBlock(const std::vector<uint8_t>& da
 }
 
 std::vector<uint8_t> BasicEncryptor::EncryptValueList(
-    const TypedListValues& typed_list,
-    const std::vector<uint8_t>& level_bytes) {
-    
+    const TypedListValues& typed_list) {
+
     // Printout the typed list.
     auto print_result = PrintTypedList(typed_list);
     if (print_result.length() > 1000) {
-        std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n" 
-                << print_result.substr(0, 1000) << "...";
+        std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n"
+                  << print_result.substr(0, 1000) << "...";
     } else {
         std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result;
     }
 
     // Printout the additional context parameters.
     std::cout << "Context parameters:\n"
-        << "  column_name: " << column_name_ << "\n"
-        << "  user_id: " << user_id_ << "\n"
-        << "  key_id: " << key_id_ << "\n"
-        << "  application_context: " << application_context_ << "\n"
-        << std::endl;
+              << "  column_name: " << column_name_ << "\n"
+              << "  user_id: " << user_id_ << "\n"
+              << "  key_id: " << key_id_ << "\n"
+              << "  application_context: " << application_context_ << "\n"
+              << std::endl;
 
     throw DBPSUnsupportedException("EncryptTypedList not implemented");
 }
 
-std::pair<TypedListValues, std::vector<uint8_t>> BasicEncryptor::DecryptValueList(
+TypedListValues BasicEncryptor::DecryptValueList(
     const std::vector<uint8_t>& encrypted_bytes) {
     
     throw DBPSUnsupportedException("DecryptTypedList not implemented");

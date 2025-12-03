@@ -59,10 +59,9 @@ public:
 
     // Value encryption methods
     std::vector<uint8_t> EncryptValueList(
-        const TypedListValues& typed_list,
-        const std::vector<uint8_t>& level_bytes) override;
+        const TypedListValues& typed_list) override;
 
-    std::pair<TypedListValues, std::vector<uint8_t>> DecryptValueList(
+    TypedListValues DecryptValueList(
         const std::vector<uint8_t>& encrypted_bytes) override;
 };
 

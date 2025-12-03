@@ -79,6 +79,22 @@ public:
         const std::map<std::string, std::string>& encryption_metadata
     );
     
+    // Constructor with pre-built encryptor (for dependency injection)
+    DataBatchEncryptionSequencer(
+        const std::string& column_name,
+        Type::type datatype,
+        const std::optional<int>& datatype_length,
+        CompressionCodec::type compression,
+        Format::type format,
+        const std::map<std::string, std::string>& encoding_attributes,
+        CompressionCodec::type encrypted_compression,
+        const std::string& key_id,
+        const std::string& user_id,
+        const std::string& application_context,
+        const std::map<std::string, std::string>& encryption_metadata,
+        std::unique_ptr<DBPSEncryptor> encryptor
+    );
+    
     // Default constructor
     DataBatchEncryptionSequencer() = default;
     

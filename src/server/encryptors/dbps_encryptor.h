@@ -85,35 +85,27 @@ public:
      * The context-rich encryptor can use the additional parameters stored in the constructor:
      *    column_name, user_id, key_id, application_context.
      * 
-     * This method encrypts individual values from a typed list (e.g., integers, floats, strings)
-     * along with associated level bytes. The encrypted result combines both the encrypted
-     * typed list values and level bytes into a single encrypted byte vector.
-     * 
-     * Both the level_bytes AND list of values need to be encrypted and combined as a single encrypted
-     * vector of bytes.
+     * This method encrypts individual values from a typed list (e.g., integers, floats, strings).
      * 
      * @param typed_list The typed list of values to encrypt (variant type supporting multiple data types)
-     * @param level_bytes The level bytes associated with the typed list
-     * @return The encrypted data as a vector of bytes containing both encrypted typed list and level bytes
+     * @return The encrypted data as a vector of bytes containing the encrypted typed list values
      * @throws InvalidInputException if the input data is invalid or empty
      * @throws DBPSUnsupportedException if the encryption operation is not supported
      */
     virtual std::vector<uint8_t> EncryptValueList(
-        const TypedListValues& typed_list,
-        const std::vector<uint8_t>& level_bytes) = 0;
+        const TypedListValues& typed_list) = 0;
 
     /**
      * Integration point: Decryption function based on encrypted bytes that will be implemented by Protegrity.
      * 
-     * This method decrypts the encrypted byte vector back into its constituent parts:
-     * a typed list of values and associated level bytes.
+     * This method decrypts the encrypted byte vector containing only the typed list values.
      * 
-     * @param encrypted_bytes The encrypted data as a vector of bytes
-     * @return A pair containing the decrypted TypedListValues and level_bytes
+     * @param encrypted_bytes The encrypted data as a vector of bytes containing only the encrypted typed list
+     * @return The decrypted TypedListValues
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
      * @throws DBPSUnsupportedException if the decryption operation is not supported
      */
-    virtual std::pair<TypedListValues, std::vector<uint8_t>> DecryptValueList(
+    virtual TypedListValues DecryptValueList(
         const std::vector<uint8_t>& encrypted_bytes) = 0;
 
 protected:

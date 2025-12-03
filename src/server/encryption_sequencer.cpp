@@ -48,15 +48,10 @@ static std::unique_ptr<DBPSEncryptor> CreateEncryptor(
     const std::string& key_id,
     const std::string& column_name,
     const std::string& user_id,
-    const std::string& application_context,
-    const std::string& encryptor_type) {
+    const std::string& application_context) {
 
     // Return a BasicEncryptor instance.
-    if (encryptor_type == "basic") {
-        return std::make_unique<BasicEncryptor>(key_id, column_name, user_id, application_context);
-    }
-    // TODO: Add other encryptor types here (e.g., ProtegrityEncryptor).
-    throw DBPSUnsupportedException("Unsupported encryptor type: " + encryptor_type);
+    return std::make_unique<BasicEncryptor>(key_id, column_name, user_id, application_context);
 }
 
 // Constructor implementation
@@ -83,7 +78,34 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     user_id_(user_id),
     application_context_(application_context),
     encryption_metadata_(encryption_metadata),
-    encryptor_(CreateEncryptor(key_id, column_name, user_id, application_context, "basic")) {}
+    encryptor_(CreateEncryptor(key_id, column_name, user_id, application_context)) {}
+
+// Constructor with pre-built encryptor
+DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
+    const std::string& column_name,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    CompressionCodec::type compression,
+    Format::type format,
+    const std::map<std::string, std::string>& encoding_attributes,
+    CompressionCodec::type encrypted_compression,
+    const std::string& key_id,
+    const std::string& user_id,
+    const std::string& application_context,
+    const std::map<std::string, std::string>& encryption_metadata,
+    std::unique_ptr<DBPSEncryptor> encryptor
+) : column_name_(column_name),
+    datatype_(datatype),
+    datatype_length_(datatype_length),
+    compression_(compression),
+    format_(format),
+    encoding_attributes_(encoding_attributes),
+    encrypted_compression_(encrypted_compression),
+    key_id_(key_id),
+    user_id_(user_id),
+    application_context_(application_context),
+    encryption_metadata_(encryption_metadata),
+    encryptor_(std::move(encryptor)) {}
 
 // Top level encryption/decryption methods.
 
@@ -108,11 +130,13 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Parse value bytes into typed list
         auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, format_);
         
-        // Encrypt the typed list and level bytes
-        auto encrypted_bytes = encryptor_->EncryptValueList(typed_list, level_bytes);
+        // Encrypt the typed list and level bytes, then join them into a single encrypted byte vector.
+        auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
+        auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
+        auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
         
-        // Compress the encrypted bytes
-        encrypted_result_ = Compress(encrypted_bytes, encrypted_compression_);
+        // Compress the joined encrypted bytes
+        encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
         
     } catch (const DBPSUnsupportedException& e) {
         // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
@@ -175,13 +199,15 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         // Decompress the encrypted bytes
         auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
         
-        // Decrypt the typed list and level bytes
-        auto [typed_list, level_bytes] = encryptor_->DecryptValueList(decompressed_encrypted_bytes);
+        // Split the joined encrypted bytes, then decrypt the level and value bytes separately.
+        auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(decompressed_encrypted_bytes);
+        auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
+        auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
         
-        // Convert typed list back to value bytes
+        // Convert the decrypted typed list back to value bytes
         auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);
         
-        // Join level and value bytes and compress to get plaintext
+        // Join the decrypted level and value bytes, then compress to get plaintext
         decrypted_result_ = CompressAndJoin(level_bytes, value_bytes);
     }
     
