@@ -269,6 +269,15 @@ if(BUILD_TESTS)
   )
   target_include_directories(decoding_utils_test PRIVATE src/server)
 
+  # Bytes utils tests
+  add_executable(bytes_utils_test src/server/bytes_utils_test.cpp)
+  target_link_libraries(bytes_utils_test
+    dbps_server_lib
+    dbps_common_lib
+    gtest_main
+  )
+  target_include_directories(bytes_utils_test PRIVATE src/server)
+
   # Compression utils tests
   add_executable(compression_utils_test src/server/compression_utils_test.cpp)
   target_link_libraries(compression_utils_test
@@ -447,6 +456,7 @@ if(BUILD_TESTS)
       enum_utils_test
       encryption_sequencer_test
       decoding_utils_test
+      bytes_utils_test
       compression_utils_test
       auth_utils_test
       dbpa_interface_test
@@ -464,6 +474,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(enum_utils_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
+  gtest_discover_tests(bytes_utils_test)
   gtest_discover_tests(compression_utils_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)

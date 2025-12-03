@@ -154,43 +154,6 @@ TEST(DecodingUtils, CalculateLevelBytesLength_NegativeTotalSize) {
     EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
-TEST(DecodingUtils, Split_Normal) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    LevelAndValueBytes result = Split(bytes, 3);
-    
-    EXPECT_EQ(3, result.level_bytes.size());
-    EXPECT_EQ(3, result.value_bytes.size());
-    EXPECT_EQ(std::vector<uint8_t>({0x01, 0x02, 0x03}), result.level_bytes);
-    EXPECT_EQ(std::vector<uint8_t>({0x04, 0x05, 0x06}), result.value_bytes);
-}
-
-TEST(DecodingUtils, Split_AtBeginning) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    LevelAndValueBytes result = Split(bytes, 0);
-    
-    EXPECT_EQ(0, result.level_bytes.size());
-    EXPECT_EQ(3, result.value_bytes.size());
-    EXPECT_EQ(bytes, result.value_bytes);
-}
-
-TEST(DecodingUtils, Split_AtEnd) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    LevelAndValueBytes result = Split(bytes, 3);
-    
-    EXPECT_EQ(3, result.level_bytes.size());
-    EXPECT_EQ(0, result.value_bytes.size());
-    EXPECT_EQ(bytes, result.level_bytes);
-}
-
-TEST(DecodingUtils, Split_InvalidIndex_Negative) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    EXPECT_THROW(Split(bytes, -1), InvalidInputException);
-}
-
-TEST(DecodingUtils, Split_InvalidIndex_TooLarge) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    EXPECT_THROW(Split(bytes, 4), InvalidInputException);
-}
 
 TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT32) {
     std::vector<int32_t> values = {100, 200, 300};
