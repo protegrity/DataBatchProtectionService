@@ -42,13 +42,16 @@ public:
      * @param column_name The name of the column being encrypted/decrypted
      * @param user_id The user identifier for context
      * @param application_context Additional application context information
+     * @param datatype The data type of the column being encrypted/decrypted. 
+     *    It is needed for correct type specific parsing during the DecryptValueList call.
      */
     BasicEncryptor(
         const std::string& key_id,
         const std::string& column_name,
         const std::string& user_id,
-        const std::string& application_context)
-        : DBPSEncryptor(key_id, column_name, user_id, application_context) {}
+        const std::string& application_context,
+        dbps::external::Type::type datatype)
+        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype) {}
 
     ~BasicEncryptor() override = default;
 
