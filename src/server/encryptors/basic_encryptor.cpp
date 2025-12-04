@@ -18,6 +18,7 @@
 #include "basic_encryptor.h"
 #include "../decoding_utils.h"
 #include "../exceptions.h"
+#include "../../common/enum_utils.h"
 #include <functional>
 #include <iostream>
 
@@ -65,6 +66,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
               << "  user_id: " << user_id_ << "\n"
               << "  key_id: " << key_id_ << "\n"
               << "  application_context: " << application_context_ << "\n"
+              << "  datatype: " << dbps::enum_utils::to_string(datatype_) << "\n"
               << std::endl;
 
     throw DBPSUnsupportedException("EncryptTypedList not implemented");

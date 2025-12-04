@@ -23,6 +23,7 @@
 #include <vector>
 #include "../exceptions.h"
 #include "../decoding_utils.h"
+#include "../common/enums.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
@@ -46,16 +47,20 @@ public:
      * @param column_name The name of the column being encrypted/decrypted
      * @param user_id The user identifier for context
      * @param application_context Additional application context information
+     * @param datatype The data type of the column being encrypted/decrypted.
+     *    It is needed for correct type specific parsing during the DecryptValueList call.
      */
     DBPSEncryptor(
         const std::string& key_id,
         const std::string& column_name,
         const std::string& user_id,
-        const std::string& application_context)
+        const std::string& application_context,
+        dbps::external::Type::type datatype)
         : key_id_(key_id),
           column_name_(column_name),
           user_id_(user_id),
-          application_context_(application_context) {}
+          application_context_(application_context),
+          datatype_(datatype) {}
 
     virtual ~DBPSEncryptor() = default;
 
@@ -114,4 +119,5 @@ protected:
     std::string column_name_;
     std::string user_id_;
     std::string application_context_;
+    dbps::external::Type::type datatype_;
 };

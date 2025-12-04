@@ -18,11 +18,14 @@
 #include "basic_encryptor.h"
 #include "../exceptions.h"
 #include "../decoding_utils.h"
+#include "../common/enums.h"
 #include <gtest/gtest.h>
 #include <vector>
 
+using namespace dbps::external;
+
 TEST(BasicEncryptor, EncryptDecryptBlock_RoundTrip) {
-    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context");
+    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context", Type::BYTE_ARRAY);
     
     std::vector<uint8_t> original = {1, 2, 3, 4, 5, 10, 20, 30, 40, 50};
     std::vector<uint8_t> encrypted = encryptor.EncryptBlock(original);
@@ -33,7 +36,7 @@ TEST(BasicEncryptor, EncryptDecryptBlock_RoundTrip) {
 }
 
 TEST(BasicEncryptor, EncryptBlock_EmptyData) {
-    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context");
+    BasicEncryptor encryptor("test_key", "test_column", "test_user", "test_context", Type::BYTE_ARRAY);
     
     std::vector<uint8_t> empty;
     std::vector<uint8_t> encrypted = encryptor.EncryptBlock(empty);
@@ -42,8 +45,8 @@ TEST(BasicEncryptor, EncryptBlock_EmptyData) {
 }
 
 TEST(BasicEncryptor, EncryptBlock_DifferentKeys) {
-    BasicEncryptor encryptor1("key1", "test_column", "test_user", "test_context");
-    BasicEncryptor encryptor2("key2", "test_column", "test_user", "test_context");
+    BasicEncryptor encryptor1("key1", "test_column", "test_user", "test_context", Type::BYTE_ARRAY);
+    BasicEncryptor encryptor2("key2", "test_column", "test_user", "test_context", Type::BYTE_ARRAY);
     
     std::vector<uint8_t> data = {1, 2, 3, 4, 5};
     std::vector<uint8_t> encrypted1 = encryptor1.EncryptBlock(data);
