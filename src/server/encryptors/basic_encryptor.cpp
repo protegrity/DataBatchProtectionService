@@ -26,37 +26,43 @@
 
 using namespace dbps::value_encryption_utils;
 
-
 namespace {
-	std::vector<uint8_t> EncryptByteArray(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
+	std::vector<uint8_t> EncryptByteArray(const std::vector<uint8_t>& data, const std::string& key_id) {
 		if (data.empty()) {
 			return std::vector<uint8_t>();
 		}
-		if (key.empty()) {
+		if (key_id.empty()) {
 			throw std::invalid_argument("EncryptByteArray: key must not be empty for non-empty data");
 		}
-		std::vector<uint8_t> out(data.size());
-		const size_t key_len = key.size();
-		for (size_t i = 0; i < data.size(); ++i) {
-			out[i] = static_cast<uint8_t>(data[i] ^ key[i % key_len]);
-		}
-		return out;
+
+        std::vector<uint8_t> encrypted_data(data.size());
+
+        // Generate a simple key from key_id by hashing it
+        std::hash<std::string> hasher;
+        size_t key_hash = hasher(key_id);
+        
+        // XOR each byte with the key hash
+        for (size_t i = 0; i < data.size(); ++i) {
+            encrypted_data[i] = data[i] ^ (key_hash & 0xFF);
+            // Rotate the key hash for next byte
+            key_hash = (key_hash << 1) | (key_hash >> 31);
+        }
+
+        return encrypted_data;
 	}
 
-    std::vector<uint8_t> DecryptByteArray(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
-        return EncryptByteArray(data, key); // for XOR encryption, decryption is the same as encryption
+    std::vector<uint8_t> DecryptByteArray(const std::vector<uint8_t>& data, const std::string& key_id) {
+        return EncryptByteArray(data, key_id); // for XOR encryption, decryption is the same as encryption
     }
 }
 
 std::vector<uint8_t> BasicEncryptor::EncryptBlock(const std::vector<uint8_t>& data) {
-	std::vector<uint8_t> key_bytes(key_id_.begin(), key_id_.end());
-	return EncryptByteArray(data, key_bytes);
+	return EncryptByteArray(data, key_id_);
 }
 
 std::vector<uint8_t> BasicEncryptor::DecryptBlock(const std::vector<uint8_t>& data) {
-    std::vector<uint8_t> key_bytes(key_id_.begin(), key_id_.end());
     // For XOR encryption, decryption is the same as encryption
-    return DecryptByteArray(data, key_bytes);
+    return DecryptByteArray(data, key_id_);
 }
 
 std::vector<uint8_t> BasicEncryptor::EncryptValueList(
@@ -80,15 +86,12 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
               << "  datatype: " << dbps::enum_utils::to_string(datatype_) << "\n"
               << std::endl;
 
-    // Encrypt the typed list using the provided byte-array encryptor
-    // generate the key bytes from the key_id (key_id is used as the actual key for this encryptor)
-    std::vector<uint8_t> key_bytes(key_id_.begin(), key_id_.end());
-
     // create a closure for the encrypt function (to be used below)
     // the closure captures the key_bytes and calls the EncryptByteArray function.
-    auto encrypt_function = [key_bytes](const std::vector<uint8_t>& in) -> std::vector<uint8_t> {
-        return EncryptByteArray(in, key_bytes);
-    };
+	const std::string key_id_copy = key_id_;
+	auto encrypt_function = [key_id_copy](const std::vector<uint8_t>& in) -> std::vector<uint8_t> {
+		return EncryptByteArray(in, key_id_copy);
+	};
 
     // here begins the actual encryption logic.
 
@@ -109,14 +112,12 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
 TypedListValues BasicEncryptor::DecryptValueList(
     const std::vector<uint8_t>& encrypted_bytes) {
 
-    // generate the key bytes from the key_id (key_id is used as the actual key for this encryptor)
-    std::vector<uint8_t> key_bytes(key_id_.begin(), key_id_.end());
-
     // create a closure for the decrypt function (to be used below)
     // the closure captures the key_bytes and calls the DecryptByteArray function.
-    auto decrypt_function = [key_bytes](const std::vector<uint8_t>& in) -> std::vector<uint8_t> {
-        return DecryptByteArray(in, key_bytes);
-    };
+	const std::string key_id_copy = key_id_;
+	auto decrypt_function = [key_id_copy](const std::vector<uint8_t>& in) -> std::vector<uint8_t> {
+		return DecryptByteArray(in, key_id_copy);
+	};
 
     // here begins the actual decryption logic.
 
