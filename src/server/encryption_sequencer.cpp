@@ -136,6 +136,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
         auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
         
+        throw DBPSUnsupportedException("Per-value encryption implementation is not complete.");
+
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
         
@@ -204,6 +206,9 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(decompressed_encrypted_bytes);
         auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
         auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
+
+
+        throw DBPSUnsupportedException("Per-value decryption implementation is not complete.");
         
         // Convert the decrypted typed list back to value bytes
         auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);

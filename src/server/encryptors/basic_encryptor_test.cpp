@@ -54,3 +54,45 @@ TEST(BasicEncryptor, EncryptBlock_DifferentKeys) {
     
     EXPECT_NE(encrypted1, encrypted2);
 }
+
+TEST(BasicEncryptor, EncryptDecryptValueList_RoundTrip_INT32) {
+    BasicEncryptor encryptor("test_key", "int32_column", "test_user", "test_context", Type::INT32);
+    
+    std::vector<int32_t> values = {0, -1, 1, 123456789, -123456789};
+    TypedListValues typed_list = values;
+    
+    std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_list);
+    TypedListValues decrypted_list = encryptor.DecryptValueList(encrypted_blob);
+    
+    auto* out = std::get_if<std::vector<int32_t>>(&decrypted_list);
+    ASSERT_NE(out, nullptr);
+    EXPECT_EQ(values, *out);
+}
+
+TEST(BasicEncryptor, EncryptDecryptValueList_RoundTrip_DOUBLE) {
+    BasicEncryptor encryptor("test_key", "double_column", "test_user", "test_context", Type::DOUBLE);
+    
+    std::vector<double> values = {0.0, -1.0, 1.0, 3.141592653589793, -2.718281828459045};
+    TypedListValues typed_list = values;
+    
+    std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_list);
+    TypedListValues decrypted_list = encryptor.DecryptValueList(encrypted_blob);
+    
+    auto* out = std::get_if<std::vector<double>>(&decrypted_list);
+    ASSERT_NE(out, nullptr);
+    EXPECT_EQ(values, *out);
+}
+
+TEST(BasicEncryptor, EncryptDecryptValueList_RoundTrip_BYTE_ARRAY) {
+    BasicEncryptor encryptor("test_key", "byte_array_column", "test_user", "test_context", Type::BYTE_ARRAY);
+    
+    std::vector<std::string> values = {"", "a", "hello", std::string("\x01\x02\x00\xFF", 4)};
+    TypedListValues typed_list = values;
+    
+    std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_list);
+    TypedListValues decrypted_list = encryptor.DecryptValueList(encrypted_blob);
+    
+    auto* out = std::get_if<std::vector<std::string>>(&decrypted_list);
+    ASSERT_NE(out, nullptr);
+    EXPECT_EQ(values, *out);
+}
