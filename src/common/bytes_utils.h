@@ -98,7 +98,7 @@ inline std::vector<uint8_t> Join(const std::vector<uint8_t>& leading, const std:
  * @return SplitBytesPair structure with split bytes
  * @throws InvalidInputException if index is invalid
  */
-inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
+ inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
     SplitBytesPair result;
 
     if (index < 0 || index > static_cast<int>(bytes.size())) {
@@ -120,7 +120,7 @@ inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
  * @return Combined bytes vector with length prefix, leading, then trailing
  * @throws InvalidInputException if leading size exceeds maximum representable value (2^32 - 1)
  */
- inline std::vector<uint8_t> JoinWithLengthPrefix(const std::vector<uint8_t>& leading, const std::vector<uint8_t>& trailing) {
+inline std::vector<uint8_t> JoinWithLengthPrefix(const std::vector<uint8_t>& leading, const std::vector<uint8_t>& trailing) {
     if (leading.size() > std::numeric_limits<uint32_t>::max()) {
         throw InvalidInputException("Leading bytes size exceeds maximum representable value");
     }
@@ -171,4 +171,3 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
     
     return result;
 }
-
