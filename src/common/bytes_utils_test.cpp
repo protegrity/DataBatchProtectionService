@@ -184,3 +184,19 @@ TEST(BytesUtils, SplitWithLengthPrefix_InvalidData_TruncatedLeading) {
     EXPECT_THROW(SplitWithLengthPrefix(bytes), InvalidInputException);
 }
 
+TEST(BytesUtils, SplitWithLengthPrefix_InvalidInsufficientData) {
+    // Length prefix says 10 bytes, but we only have 4 bytes total
+    std::vector<uint8_t> invalid = {0x0A, 0x00, 0x00, 0x00}; // length = 10, but only 4 bytes total
+    EXPECT_THROW(SplitWithLengthPrefix(invalid), InvalidInputException);
+}
+
+TEST(BytesUtils, JoinWithLengthPrefixAndSplit_RoundTrip) {
+    std::vector<uint8_t> leading = {0x01, 0x02, 0x03, 0x04, 0x05};
+    std::vector<uint8_t> trailing = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60};
+    
+    std::vector<uint8_t> joined = JoinWithLengthPrefix(leading, trailing);
+    SplitBytesPair parsed = SplitWithLengthPrefix(joined);
+    
+    EXPECT_EQ(leading, parsed.leading);
+    EXPECT_EQ(trailing, parsed.trailing);
+}

@@ -98,7 +98,7 @@ inline std::vector<uint8_t> Join(const std::vector<uint8_t>& leading, const std:
  * @return SplitBytesPair structure with split bytes
  * @throws InvalidInputException if index is invalid
  */
- inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
+inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
     SplitBytesPair result;
 
     if (index < 0 || index > static_cast<int>(bytes.size())) {
