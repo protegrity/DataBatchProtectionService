@@ -17,7 +17,7 @@
 
 #include "basic_encryptor.h"
 #include "../decoding_utils.h"
-#include "../exceptions.h"
+#include "../../common/exceptions.h"
 #include "../../common/enum_utils.h"
 #include <functional>
 #include <iostream>

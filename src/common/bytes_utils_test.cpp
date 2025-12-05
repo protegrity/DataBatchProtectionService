@@ -17,6 +17,7 @@
 
 #include "bytes_utils.h"
 #include "exceptions.h"
+
 #include <vector>
 #include <gtest/gtest.h>
 
@@ -125,8 +126,8 @@ TEST(BytesUtils, JoinWithLengthPrefix_EmptyLeading) {
     std::vector<uint8_t> trailing = {0x04, 0x05, 0x06};
     std::vector<uint8_t> result = JoinWithLengthPrefix(leading, trailing);
     
-    EXPECT_EQ(7, result.size()); // 4 bytes length + 0 bytes leading + 3 bytes trailing
-    EXPECT_EQ(0x00, result[0]); // length = 0
+    EXPECT_EQ(7, result.size()); // 4 bytes length + 0 leading + 3 trailing
+    EXPECT_EQ(0x00, result[0]);
     EXPECT_EQ(0x00, result[1]);
     EXPECT_EQ(0x00, result[2]);
     EXPECT_EQ(0x00, result[3]);
@@ -140,45 +141,46 @@ TEST(BytesUtils, JoinWithLengthPrefix_EmptyTrailing) {
     std::vector<uint8_t> trailing;
     std::vector<uint8_t> result = JoinWithLengthPrefix(leading, trailing);
     
-    EXPECT_EQ(7, result.size()); // 4 bytes length + 3 bytes leading + 0 bytes trailing
-    EXPECT_EQ(0x03, result[0]); // length = 3
+    EXPECT_EQ(7, result.size()); // 4 bytes length + 3 leading + 0 trailing
+    EXPECT_EQ(0x03, result[0]);
+    EXPECT_EQ(0x00, result[1]);
+    EXPECT_EQ(0x00, result[2]);
+    EXPECT_EQ(0x00, result[3]);
     EXPECT_EQ(0x01, result[4]);
     EXPECT_EQ(0x02, result[5]);
     EXPECT_EQ(0x03, result[6]);
 }
 
+TEST(BytesUtils, JoinWithLengthPrefix_BothEmpty) {
+    std::vector<uint8_t> leading;
+    std::vector<uint8_t> trailing;
+    std::vector<uint8_t> result = JoinWithLengthPrefix(leading, trailing);
+    
+    EXPECT_EQ(4, result.size()); // only the 4-byte length prefix
+    EXPECT_EQ(0x00, result[0]);
+    EXPECT_EQ(0x00, result[1]);
+    EXPECT_EQ(0x00, result[2]);
+    EXPECT_EQ(0x00, result[3]);
+}
+
 TEST(BytesUtils, SplitWithLengthPrefix_Normal) {
-    // Create data with JoinWithLengthPrefix
     std::vector<uint8_t> leading = {0x01, 0x02, 0x03};
     std::vector<uint8_t> trailing = {0x04, 0x05, 0x06};
-    std::vector<uint8_t> joined = JoinWithLengthPrefix(leading, trailing);
-    
-    // Parse it back
-    SplitBytesPair result = SplitWithLengthPrefix(joined);
+    std::vector<uint8_t> combined = JoinWithLengthPrefix(leading, trailing);
+    SplitBytesPair result = SplitWithLengthPrefix(combined);
     
     EXPECT_EQ(leading, result.leading);
     EXPECT_EQ(trailing, result.trailing);
 }
 
-TEST(BytesUtils, SplitWithLengthPrefix_InvalidTooShort) {
-    std::vector<uint8_t> invalid = {0x01, 0x02}; // Less than 4 bytes
-    EXPECT_THROW(SplitWithLengthPrefix(invalid), InvalidInputException);
+TEST(BytesUtils, SplitWithLengthPrefix_InvalidData_Short) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // too short for length prefix
+    EXPECT_THROW(SplitWithLengthPrefix(bytes), InvalidInputException);
 }
 
-TEST(BytesUtils, SplitWithLengthPrefix_InvalidInsufficientData) {
-    // Length prefix says 10 bytes, but we only have 4 bytes total
-    std::vector<uint8_t> invalid = {0x0A, 0x00, 0x00, 0x00}; // length = 10, but only 4 bytes total
-    EXPECT_THROW(SplitWithLengthPrefix(invalid), InvalidInputException);
-}
-
-TEST(BytesUtils, JoinWithLengthPrefixAndSplit_RoundTrip) {
-    std::vector<uint8_t> leading = {0x01, 0x02, 0x03, 0x04, 0x05};
-    std::vector<uint8_t> trailing = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60};
-    
-    std::vector<uint8_t> joined = JoinWithLengthPrefix(leading, trailing);
-    SplitBytesPair parsed = SplitWithLengthPrefix(joined);
-    
-    EXPECT_EQ(leading, parsed.leading);
-    EXPECT_EQ(trailing, parsed.trailing);
+TEST(BytesUtils, SplitWithLengthPrefix_InvalidData_TruncatedLeading) {
+    // length=5 but only 4 bytes provided after prefix
+    std::vector<uint8_t> bytes = {0x05, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04};
+    EXPECT_THROW(SplitWithLengthPrefix(bytes), InvalidInputException);
 }
 

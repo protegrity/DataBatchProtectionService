@@ -21,9 +21,9 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "../exceptions.h"
-#include "../decoding_utils.h"
-#include "../common/enums.h"
+#include "../../common/exceptions.h"
+#include "../../common/typed_list_values.h"
+#include "../../common/enums.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT

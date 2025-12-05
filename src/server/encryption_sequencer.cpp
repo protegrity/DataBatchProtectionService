@@ -18,9 +18,9 @@
 #include "encryption_sequencer.h"
 #include "enum_utils.h"
 #include "decoding_utils.h"
-#include "bytes_utils.h"
+#include "../common/bytes_utils.h"
 #include "compression_utils.h"
-#include "exceptions.h"
+#include "../common/exceptions.h"
 #include "encryptors/basic_encryptor.h"
 #include <functional>
 #include <iomanip>
