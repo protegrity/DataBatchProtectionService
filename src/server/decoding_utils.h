@@ -49,6 +49,7 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
 
 /**
  * Slice a flat byte buffer into RawValueBytes elements according to datatype/format.
+ * This follows the Parquet specific encoding.
  */
 std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     const std::vector<uint8_t>& bytes,

@@ -54,6 +54,7 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
         int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
         total_level_bytes = def_level_length + rep_level_length;
+        // TODO(Issue 183): Remove unnecessary printouts in this function.
         std::cout << "CalculateLevelBytesLength DATA_PAGE_V2: total_level_bytes="
                   << total_level_bytes << std::endl;
         
@@ -106,7 +107,7 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     return total_level_bytes;
 }
 
-static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
+inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
     switch (datatype) {
         case Type::INT32:
         case Type::FLOAT:
@@ -144,6 +145,7 @@ std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     }
 
     // Variable-length BYTE_ARRAY: parse [4-byte len][bytes...] elements in order.
+    // This is the Parquet specific encoding for BYTE_ARRAY.
     if (datatype == Type::BYTE_ARRAY) {
         std::vector<RawValueBytes> out;
         const uint8_t* p = bytes.data();

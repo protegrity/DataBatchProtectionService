@@ -210,7 +210,7 @@ const char* GetTypeName() {
 
 } // namespace
 
-std::string PrintTypedList(const TypedListValues& list) {
+std::string TypedListToString(const TypedListValues& list) {
     std::ostringstream out;
     
     std::visit([&out](auto&& values) {

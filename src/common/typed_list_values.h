@@ -68,5 +68,5 @@ std::vector<RawValueBytes> BuildRawBytesFromTypedListValues(
  * @param list The typed list to print
  * @return String representation of the typed list
  */
-std::string PrintTypedList(const TypedListValues& list);
+std::string TypedListToString(const TypedListValues& list);
 

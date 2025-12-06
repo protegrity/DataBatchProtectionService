@@ -31,11 +31,9 @@ namespace dbps::value_encryption_utils {
 using namespace dbps::external;
 
 /**
- * Simple container for an encrypted payload and its size.
+ * Type alias for encrypted value bytes.
  */
-struct EncryptedValue {
-    std::vector<uint8_t> payload;
-};
+using EncryptedValue = std::vector<uint8_t>;
 
 /**
  * Concatenate a list of EncryptedValue into a single binary blob:

@@ -68,7 +68,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
     const TypedListValues& typed_list) {
 
     // Printout the typed list.
-    auto print_result = PrintTypedList(typed_list);
+    auto print_result = TypedListToString(typed_list);
     if (print_result.length() > 1000) {
         std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n"
                   << print_result.substr(0, 1000) << "...";

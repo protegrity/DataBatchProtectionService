@@ -26,17 +26,7 @@
 #include <array>
 #include <limits>
 
-namespace {
-
 using namespace dbps::value_encryption_utils;
-
-EncryptedValue make_ev(const std::vector<uint8_t>& bytes) {
-    EncryptedValue ev;
-    ev.payload = bytes;
-    return ev;
-}
-
-} // namespace
 
 TEST(ValueEncryptionUtilsTest, ConcatenateEncryptedValues_ParseConcatenatedEncryptedValues_RoundTrip) {
     std::vector<EncryptedValue> input;
@@ -45,16 +35,16 @@ TEST(ValueEncryptionUtilsTest, ConcatenateEncryptedValues_ParseConcatenatedEncry
         v1.push_back(1);
         v1.push_back(2);
         v1.push_back(3);
-        input.push_back(make_ev(v1));
+        input.push_back(v1);
     }
     {
         std::vector<uint8_t> v2; // empty
-        input.push_back(make_ev(v2));
+        input.push_back(v2);
     }
     {
         std::vector<uint8_t> v3;
         v3.push_back(0xFF);
-        input.push_back(make_ev(v3));
+        input.push_back(v3);
     }
 
     std::vector<uint8_t> blob = ConcatenateEncryptedValues(input);
@@ -62,7 +52,7 @@ TEST(ValueEncryptionUtilsTest, ConcatenateEncryptedValues_ParseConcatenatedEncry
 
     ASSERT_EQ(output.size(), input.size());
     for (size_t i = 0; i < input.size(); ++i) {
-        EXPECT_EQ(output[i].payload, input[i].payload);
+        EXPECT_EQ(output[i], input[i]);
     }
 }
 
@@ -131,7 +121,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     // Ensure declared sizes match the raw element sizes (4 per int32)
     ASSERT_EQ(encrypted.size(), 3u);
     for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.payload.size(), 4u);
+        EXPECT_EQ(ev.size(), 4u);
     }
     auto decrypted = DecryptTypedListValues(encrypted, Type::INT32, dec);
     const auto& out_vec = std::get<std::vector<int32_t>>(decrypted);
@@ -167,7 +157,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     auto encrypted = EncryptTypedListValues(input, enc);
     ASSERT_EQ(encrypted.size(), 3u);
     for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.payload.size(), 4u);
+        EXPECT_EQ(ev.size(), 4u);
     }
     auto decrypted = DecryptTypedListValues(encrypted, Type::FLOAT, dec);
     const auto& out_vec = std::get<std::vector<float>>(decrypted);
@@ -185,7 +175,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     auto encrypted = EncryptTypedListValues(input, enc);
     ASSERT_EQ(encrypted.size(), 3u);
     for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.payload.size(), 8u);
+        EXPECT_EQ(ev.size(), 8u);
     }
     auto decrypted = DecryptTypedListValues(encrypted, Type::INT64, dec);
     const auto& out_vec = std::get<std::vector<int64_t>>(decrypted);
@@ -214,7 +204,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     auto encrypted = EncryptTypedListValues(input, enc);
     ASSERT_EQ(encrypted.size(), vals.size());
     for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.payload.size(), 12u);
+        EXPECT_EQ(ev.size(), 12u);
     }
     auto decrypted = DecryptTypedListValues(encrypted, Type::INT96, dec);
     const auto& out_vec = std::get<std::vector<std::array<uint32_t, 3>>>(decrypted);
@@ -228,7 +218,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     auto encrypted = EncryptTypedListValues(input, enc);
     ASSERT_EQ(encrypted.size(), 3u);
     for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.payload.size(), 1u);
+        EXPECT_EQ(ev.size(), 1u);
     }
     auto decrypted = DecryptTypedListValues(encrypted, Type::UNDEFINED, dec);
     const auto& out_vec = std::get<std::vector<uint8_t>>(decrypted);
@@ -237,8 +227,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
 
 TEST(ValueEncryptionUtilsTest, DecryptTypedListValues_InvalidDecryptedSize_Throws) {
     // Provide an encrypted value whose decrypted bytes are of incorrect size for FLOAT (expect 4, give 3)
-    EncryptedValue ev;
-    ev.payload = std::vector<uint8_t>{0x00, 0x00, 0x80}; // 3 bytes
+    EncryptedValue ev = std::vector<uint8_t>{0x00, 0x00, 0x80}; // 3 bytes
     std::vector<EncryptedValue> values{ev};
     auto dec = [](const std::vector<uint8_t>& b) { return b; }; // identity
     EXPECT_THROW({
@@ -319,7 +308,7 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Var
     // Ensure ciphertext length is exactly double the plaintext bytes length
     for (size_t i = 0; i < strs.size(); ++i) {
         const auto& ev = encrypted[i];
-        EXPECT_EQ(ev.payload.size(), std::get<std::vector<std::string>>(input)[i].size() * 2);
+        EXPECT_EQ(ev.size(), std::get<std::vector<std::string>>(input)[i].size() * 2);
     }
 
     auto decrypted = DecryptTypedListValues(encrypted, Type::BYTE_ARRAY, dec);

@@ -37,7 +37,7 @@ std::vector<uint8_t> ConcatenateEncryptedValues(const std::vector<EncryptedValue
     size_t total_capacity = 4;
     for (size_t i = 0; i < values.size(); ++i) {
         const EncryptedValue& ev = values[i];
-        const size_t payload_size = ev.payload.size();
+        const size_t payload_size = ev.size();
         if (payload_size > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
             throw InvalidInputException("Element size exceeds uint32 capacity");
         }
@@ -51,9 +51,9 @@ std::vector<uint8_t> ConcatenateEncryptedValues(const std::vector<EncryptedValue
 
     for (size_t i = 0; i < values.size(); ++i) {
         const EncryptedValue& ev = values[i];
-        append_u32_le(out, static_cast<uint32_t>(ev.payload.size()));
+        append_u32_le(out, static_cast<uint32_t>(ev.size()));
         // Append the entire payload (ciphertext)
-        out.insert(out.end(), ev.payload.begin(), ev.payload.end());
+        out.insert(out.end(), ev.begin(), ev.end());
     }
 
     return out;
@@ -82,8 +82,8 @@ std::vector<EncryptedValue> ParseConcatenatedEncryptedValues(const std::vector<u
         }
 
         EncryptedValue ev;
-        ev.payload.assign(blob.begin() + static_cast<std::ptrdiff_t>(offset),
-                          blob.begin() + static_cast<std::ptrdiff_t>(offset + sz));
+        ev.assign(blob.begin() + static_cast<std::ptrdiff_t>(offset),
+                  blob.begin() + static_cast<std::ptrdiff_t>(offset + sz));
         offset += static_cast<size_t>(sz);
         result.push_back(std::move(ev));
     }
@@ -105,9 +105,7 @@ std::vector<EncryptedValue> EncryptTypedListValues(
     for (size_t i = 0; i < raw_values.size(); ++i) {
         const RawValueBytes& raw = raw_values[i];
         std::vector<uint8_t> payload = fn_encrypt_byte_array(raw);
-        EncryptedValue ev;
-        ev.payload = std::move(payload);
-        encrypted_elements.push_back(std::move(ev));
+        encrypted_elements.push_back(std::move(payload));
     }
     return encrypted_elements;
 }
@@ -122,7 +120,7 @@ TypedListValues DecryptTypedListValues(
     decrypted_values.reserve(encrypted_values.size());
     for (size_t i = 0; i < encrypted_values.size(); ++i) {
         const EncryptedValue& ev = encrypted_values[i];
-        RawValueBytes decrypted = fn_decrypt_byte_array(ev.payload);
+        RawValueBytes decrypted = fn_decrypt_byte_array(ev);
         decrypted_values.push_back(std::move(decrypted));
     }
 
