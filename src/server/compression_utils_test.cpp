@@ -16,7 +16,7 @@
 // under the License.
 
 #include "compression_utils.h"
-#include "exceptions.h"
+#include "../common/exceptions.h"
 #include <vector>
 #include <cstdint>
 #include <gtest/gtest.h>

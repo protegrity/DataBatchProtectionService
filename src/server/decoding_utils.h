@@ -23,25 +23,16 @@
 #include <map>
 #include <variant>
 #include <cstdint>
-#include <array>
 #include "enums.h"
-#include "exceptions.h"
+#include "../common/exceptions.h"
 #include "enum_utils.h"
+#include "../common/typed_list_values.h"
+#include "../common/bytes_utils.h"
 
 struct LevelAndValueBytes {
     std::vector<uint8_t> level_bytes;
     std::vector<uint8_t> value_bytes;
 };
-
-using TypedListValues = std::variant<
-    std::vector<int32_t>,
-    std::vector<int64_t>,
-    std::vector<float>,
-    std::vector<double>,
-    std::vector<std::array<uint32_t, 3>>,     // For INT96
-    std::vector<std::string>,                 // For BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY
-    std::vector<uint8_t>                      // For UNDEFINED, a plain untyped byte sequence.
->;
 
 using namespace dbps::external;
 
@@ -55,6 +46,25 @@ using namespace dbps::external;
  */
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs);
+
+/**
+ * Slice a flat byte buffer into RawValueBytes elements according to datatype/format.
+ * This follows the Parquet specific encoding.
+ */
+std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
+    const std::vector<uint8_t>& bytes,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format);
+
+/**
+ * Combine RawValueBytes elements back into a flat value-bytes buffer.
+ */
+std::vector<uint8_t> CombineRawBytesIntoValueBytes(
+    const std::vector<RawValueBytes>& elements,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format);
 
 /**
  * Parse the value bytes into a typed list based on the data type and format.
@@ -90,11 +100,3 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Format::type format);
-
-/**
- * Print a typed list in a human-readable format.
- * 
- * @param list The typed list to print
- * @return String representation of the typed list
- */
-std::string PrintTypedList(const TypedListValues& list);

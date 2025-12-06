@@ -126,6 +126,7 @@ add_library(dbps_common_lib STATIC
   src/common/json_request.cpp
   src/common/enum_utils.cpp
   src/common/value_encryption_utils.cpp
+  src/common/typed_list_values.cpp
 )
 target_include_directories(dbps_common_lib PUBLIC
   src/common
@@ -145,6 +146,7 @@ add_library(dbps_server_lib STATIC
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
 target_include_directories(dbps_server_lib PUBLIC
   src/server
+  src/common
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/jwt-cpp-src/include
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
@@ -261,6 +263,13 @@ if(BUILD_TESTS)
     gtest_main
   )
 
+  # Typed list values tests
+  add_executable(typed_list_values_test src/common/typed_list_values_test.cpp)
+  target_link_libraries(typed_list_values_test
+    dbps_common_lib
+    gtest_main
+  )
+
   # Encryption sequencer tests
   add_executable(encryption_sequencer_test src/server/encryption_sequencer_test.cpp)
   target_link_libraries(encryption_sequencer_test 
@@ -279,13 +288,13 @@ if(BUILD_TESTS)
   target_include_directories(decoding_utils_test PRIVATE src/server)
 
   # Bytes utils tests
-  add_executable(bytes_utils_test src/server/bytes_utils_test.cpp)
+  add_executable(bytes_utils_test src/common/bytes_utils_test.cpp)
   target_link_libraries(bytes_utils_test
     dbps_server_lib
     dbps_common_lib
     gtest_main
   )
-  target_include_directories(bytes_utils_test PRIVATE src/server)
+  target_include_directories(bytes_utils_test PRIVATE src/server src/common)
 
   # Compression utils tests
   add_executable(compression_utils_test src/server/compression_utils_test.cpp)
@@ -473,6 +482,7 @@ if(BUILD_TESTS)
       json_request_test
       enum_utils_test
       value_encryption_utils_test
+      typed_list_values_test
       encryption_sequencer_test
       decoding_utils_test
       bytes_utils_test
@@ -493,6 +503,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(json_request_test)
   gtest_discover_tests(enum_utils_test)
   gtest_discover_tests(value_encryption_utils_test)
+  gtest_discover_tests(typed_list_values_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(decoding_utils_test)
   gtest_discover_tests(bytes_utils_test)

@@ -20,7 +20,54 @@
 #include <vector>
 #include <cstdint>
 #include <limits>
+#include <cstring>
 #include "exceptions.h"
+
+// Little-endian helpers reused across modules
+inline void append_u32_le(std::vector<uint8_t>& out, uint32_t v) {
+    out.push_back(static_cast<uint8_t>(v & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+}
+
+inline void append_i32_le(std::vector<uint8_t>& out, int32_t v) {
+    append_u32_le(out, static_cast<uint32_t>(v));
+}
+
+inline void append_u64_le(std::vector<uint8_t>& out, uint64_t v) {
+    out.push_back(static_cast<uint8_t>(v & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 32) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 40) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 48) & 0xFF));
+    out.push_back(static_cast<uint8_t>((v >> 56) & 0xFF));
+}
+
+inline void append_i64_le(std::vector<uint8_t>& out, int64_t v) {
+    append_u64_le(out, static_cast<uint64_t>(v));
+}
+
+inline void append_f32_le(std::vector<uint8_t>& out, float v) {
+    uint32_t bits = 0;
+    std::memcpy(&bits, &v, sizeof(bits));
+    append_u32_le(out, bits);
+}
+
+inline void append_f64_le(std::vector<uint8_t>& out, double v) {
+    uint64_t bits = 0;
+    std::memcpy(&bits, &v, sizeof(bits));
+    append_u64_le(out, bits);
+}
+
+inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
+    return static_cast<uint32_t>(in[offset]) |
+        (static_cast<uint32_t>(in[offset + 1]) << 8) |
+        (static_cast<uint32_t>(in[offset + 2]) << 16) |
+        (static_cast<uint32_t>(in[offset + 3]) << 24);
+}
 
 struct SplitBytesPair {
     std::vector<uint8_t> leading;
@@ -35,7 +82,7 @@ struct SplitBytesPair {
  * @param trailing The second part of the bytes
  * @return Combined bytes vector with leading followed by trailing
  */
- inline std::vector<uint8_t> Join(const std::vector<uint8_t>& leading, const std::vector<uint8_t>& trailing) {
+inline std::vector<uint8_t> Join(const std::vector<uint8_t>& leading, const std::vector<uint8_t>& trailing) {
     std::vector<uint8_t> result;
     result.reserve(leading.size() + trailing.size());
     result.insert(result.end(), leading.begin(), leading.end());
@@ -78,20 +125,16 @@ inline std::vector<uint8_t> JoinWithLengthPrefix(const std::vector<uint8_t>& lea
         throw InvalidInputException("Leading bytes size exceeds maximum representable value");
     }
     
+    // Calculate the length of the leading bytes
     uint32_t leading_length = static_cast<uint32_t>(leading.size());
     std::vector<uint8_t> result;
     result.reserve(4 + leading.size() + trailing.size());
     
-    // Prepend 4-byte length (little-endian)
-    result.push_back(leading_length & 0xFF);
-    result.push_back((leading_length >> 8) & 0xFF);
-    result.push_back((leading_length >> 16) & 0xFF);
-    result.push_back((leading_length >> 24) & 0xFF);
+    // Prepend 4-byte length
+    append_u32_le(result, leading_length);
     
-    // Append leading bytes
+    // Append leading and trailing bytes
     result.insert(result.end(), leading.begin(), leading.end());
-    
-    // Append trailing bytes
     result.insert(result.end(), trailing.begin(), trailing.end());
     
     return result;
@@ -110,11 +153,8 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
         throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for length prefix");
     }
     
-    // Read 4-byte length (little-endian)
-    uint32_t leading_length = static_cast<uint32_t>(bytes[0]) |
-                              (static_cast<uint32_t>(bytes[1]) << 8) |
-                              (static_cast<uint32_t>(bytes[2]) << 16) |
-                              (static_cast<uint32_t>(bytes[3]) << 24);
+    // Read 4-byte length
+    uint32_t leading_length = read_u32_le(bytes, 0);
     
     if (bytes.size() < 4 + leading_length) {
         throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for leading data (expected " +
@@ -125,7 +165,7 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
     
     // Extract leading bytes (skip the 4-byte length prefix)
     result.leading = std::vector<uint8_t>(bytes.begin() + 4, bytes.begin() + 4 + leading_length);
-    
+
     // Extract trailing bytes (everything after leading)
     result.trailing = std::vector<uint8_t>(bytes.begin() + 4 + leading_length, bytes.end());
     

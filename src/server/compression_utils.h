@@ -21,7 +21,7 @@
 #include <cstdint>
 #include "enums.h"
 #include "enum_utils.h"
-#include "exceptions.h"
+#include "../common/exceptions.h"
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;

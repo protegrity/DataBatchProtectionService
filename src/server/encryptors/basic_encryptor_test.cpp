@@ -16,9 +16,9 @@
 // under the License.
 
 #include "basic_encryptor.h"
-#include "../exceptions.h"
+#include "../../common/enums.h"
+#include "../../common/exceptions.h"
 #include "../decoding_utils.h"
-#include "../common/enums.h"
 #include <gtest/gtest.h>
 #include <vector>
 

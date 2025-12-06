@@ -16,7 +16,7 @@
 // under the License.
 
 #include "decoding_utils.h"
-#include "exceptions.h"
+#include "../common/exceptions.h"
 #include <vector>
 #include <string>
 #include <cstring>
@@ -25,6 +25,7 @@
 #include <map>
 #include <variant>
 #include <gtest/gtest.h>
+#include "../common/bytes_utils.h"
 
 using namespace dbps::external;
 
@@ -223,4 +224,109 @@ TEST(DecodingUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // 3 bytes, not divisible by sizeof(int32_t)
     EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN), 
                  InvalidInputException);
+}
+
+TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT32) {
+    std::vector<uint8_t> bytes = {0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A};
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Format::PLAIN);
+    ASSERT_EQ(out.size(), 2u);
+    EXPECT_EQ(out[0], (std::vector<uint8_t>{0x04,0x03,0x02,0x01}));
+    EXPECT_EQ(out[1], (std::vector<uint8_t>{0x0D,0x0C,0x0B,0x0A}));
+}
+
+TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT96) {
+    std::vector<uint8_t> bytes = {
+        0x01,0x02,0x03,0x04,
+        0x05,0x06,0x07,0x08,
+        0x09,0x0A,0x0B,0x0C
+    };
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT96, std::nullopt, Format::PLAIN);
+    ASSERT_EQ(out.size(), 1u);
+    EXPECT_EQ(out[0], bytes);
+}
+
+TEST(DecodingUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
+    std::vector<uint8_t> bytes;
+    append_u32_le(bytes, 2);
+    bytes.insert(bytes.end(), {'h','i'});
+    append_u32_le(bytes, 3);
+    bytes.insert(bytes.end(), {'x','y','z'});
+
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    ASSERT_EQ(out.size(), 2u);
+    EXPECT_EQ(out[0], (std::vector<uint8_t>{'h','i'}));
+    EXPECT_EQ(out[1], (std::vector<uint8_t>{'x','y','z'}));
+}
+
+TEST(DecodingUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY_Truncated) {
+    std::vector<uint8_t> bytes = {0x04,0x00,0x00,0x00, 'a','b','c'};
+    EXPECT_THROW(
+        SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN),
+        InvalidInputException);
+}
+
+TEST(DecodingUtils, SliceValueBytesIntoRawBytes_FixedSizeMisaligned) {
+    std::vector<uint8_t> bytes = {0x00,0x01,0x02}; // not divisible by 8 for INT64
+    EXPECT_THROW(
+        SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Format::PLAIN),
+        InvalidInputException);
+}
+
+TEST(DecodingUtils, CombineRawBytesIntoValueBytes_INT32) {
+    std::vector<RawValueBytes> elems = {
+        {0x04,0x03,0x02,0x01},
+        {0x0D,0x0C,0x0B,0x0A}
+    };
+    auto out = CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Format::PLAIN);
+    EXPECT_EQ(out, (std::vector<uint8_t>{0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A}));
+}
+
+TEST(DecodingUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
+    std::vector<RawValueBytes> elems = {
+        {'h','i'},
+        {'x','y','z'}
+    };
+    auto out = CombineRawBytesIntoValueBytes(elems, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    // Expect [len=2][hi][len=3][xyz]
+    std::vector<uint8_t> expected;
+    append_u32_le(expected, 2);
+    expected.insert(expected.end(), {'h','i'});
+    append_u32_le(expected, 3);
+    expected.insert(expected.end(), {'x','y','z'});
+    EXPECT_EQ(out, expected);
+}
+
+TEST(DecodingUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismatch) {
+    // Expect length 3, but provide a 2-byte element -> should throw
+    std::vector<RawValueBytes> elems = {
+        {'a','b'},
+        {'x','y','z'}
+    };
+    EXPECT_THROW(
+        CombineRawBytesIntoValueBytes(elems, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN),
+        InvalidInputException);
+}
+
+TEST(DecodingUtils, SliceAndCombine_RoundTrip_INT64) {
+    // Two int64 values: little-endian bytes
+    std::vector<uint8_t> bytes = {
+        0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+        0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+    };
+    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Format::PLAIN);
+    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::INT64, std::nullopt, Format::PLAIN);
+    EXPECT_EQ(bytes, combined);
+}
+
+TEST(DecodingUtils, SliceAndCombine_RoundTrip_BYTE_ARRAY) {
+    std::vector<uint8_t> bytes;
+    append_u32_le(bytes, 3);
+    bytes.insert(bytes.end(), {'f','o','o'});
+    append_u32_le(bytes, 0); // empty string
+    append_u32_le(bytes, 4);
+    bytes.insert(bytes.end(), {'b','a','r','!'});
+
+    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    EXPECT_EQ(bytes, combined);
 }

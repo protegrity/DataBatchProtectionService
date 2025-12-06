@@ -17,11 +17,8 @@
 
 #include "decoding_utils.h"
 #include "enum_utils.h"
-#include <iostream>
 #include <cstring>
-#include <sstream>
-#include <iomanip>
-#include <array>
+#include <iostream>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -57,7 +54,9 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
         int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
         total_level_bytes = def_level_length + rep_level_length;
-        std::cout << "CalculateLevelBytesLength DATA_PAGE_V2: total_level_bytes=" << total_level_bytes << std::endl;
+        // TODO(Issue 183): Remove unnecessary printouts in this function.
+        std::cout << "CalculateLevelBytesLength DATA_PAGE_V2: total_level_bytes="
+                  << total_level_bytes << std::endl;
         
     } else if (page_type == "DATA_PAGE_V1") {
         // Check that encoding types are RLE (instead of BIT_PACKED which is deprecated)
@@ -76,12 +75,14 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         if (max_rep_level > 0) {
             int bytes_skipped = SkipV1RLELevel(offset);
             total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: repetition level bytes skipped=" << bytes_skipped << std::endl;
+            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: repetition level bytes skipped="
+                      << bytes_skipped << std::endl;
         }
         if (max_def_level > 0) {
             int bytes_skipped = SkipV1RLELevel(offset);
             total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: definition level bytes skipped=" << bytes_skipped << std::endl;
+            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: definition level bytes skipped="
+                      << bytes_skipped << std::endl;
         }
 
     } else if (page_type == "DICTIONARY_PAGE") {
@@ -106,19 +107,35 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     return total_level_bytes;
 }
 
-template<typename T>
-std::vector<T> DecodeFixedSizeType(const uint8_t* raw_data, size_t raw_size, const char* name) {
-    if ((raw_size % sizeof(T)) != 0) {
-        throw InvalidInputException(std::string("Invalid data size for ") + name + " decoding");
+inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
+    switch (datatype) {
+        case Type::INT32:
+        case Type::FLOAT:
+            return 4;
+        case Type::INT64:
+        case Type::DOUBLE:
+            return 8;
+        case Type::INT96:
+            // INT96 is three little-endian uint32 words laid out consecutively (lo, mid, hi).
+            return 12;
+        case Type::FIXED_LEN_BYTE_ARRAY: {
+            if (!datatype_length.has_value() || datatype_length.value() <= 0) {
+                throw InvalidInputException(
+                    "FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
+            }
+            return static_cast<size_t>(datatype_length.value());
+        }
+        case Type::UNDEFINED:
+            return 1;
+        case Type::BYTE_ARRAY:
+            throw DBPSUnsupportedException("BYTE_ARRAY is variable-length; not fixed-size");
+        default:
+            throw DBPSUnsupportedException(
+                "Unsupported datatype: " + std::string(to_string(datatype)));
     }
-    std::vector<T> result;
-    const T* v = reinterpret_cast<const T*>(raw_data);
-    size_t count = raw_size / sizeof(T);
-    result.assign(v, v + count);
-    return result;
 }
 
-TypedListValues ParseValueBytesIntoTypedList(
+std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
     const std::optional<int>& datatype_length,
@@ -126,88 +143,96 @@ TypedListValues ParseValueBytesIntoTypedList(
     if (format != Format::PLAIN) {
         throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format)));
     }
-    switch (datatype) {
-        case Type::INT32: {
-            return DecodeFixedSizeType<int32_t>(bytes.data(), bytes.size(), "INT32");
-        }
-        case Type::INT64: {
-            return DecodeFixedSizeType<int64_t>(bytes.data(), bytes.size(), "INT64");
-        }
-        case Type::FLOAT: {
-            return DecodeFixedSizeType<float>(bytes.data(), bytes.size(), "FLOAT");
-        }
-        case Type::DOUBLE: {
-            return DecodeFixedSizeType<double>(bytes.data(), bytes.size(), "DOUBLE");
-        }
-        case Type::INT96: {
-            if ((bytes.size() % 12) != 0) {
-                throw InvalidInputException("Invalid data size for INT96 decoding");
-            }
-            std::vector<std::array<uint32_t, 3>> result;
-            const uint8_t* p = bytes.data();
-            const uint8_t* last_byte = bytes.data() + bytes.size();
-            while (p + 12 <= last_byte) {
-                std::array<uint32_t, 3> value;
-                memcpy(&value[0], p + 0, 4);
-                memcpy(&value[1], p + 4, 4);
-                memcpy(&value[2], p + 8, 4);
-                result.push_back(value);
-                p += 12;
-            }
-            return result;
-        }
-        case Type::BYTE_ARRAY: {
-            std::vector<std::string> result;
-            const uint8_t* p = bytes.data();
-            const uint8_t* last_byte = bytes.data() + bytes.size();
-            while (p + 4 <= last_byte) {
-                uint32_t len;
-                memcpy(&len, p, sizeof(len));
-                p += 4;
-                if (p + len > last_byte) {
-                    throw InvalidInputException(
-                        "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
-                }
-                const char* s = reinterpret_cast<const char*>(p);
-                result.emplace_back(s, len);
-                p += len;
-            }
-            if (p != last_byte) {
+
+    // Variable-length BYTE_ARRAY: parse [4-byte len][bytes...] elements in order.
+    // This is the Parquet specific encoding for BYTE_ARRAY.
+    if (datatype == Type::BYTE_ARRAY) {
+        std::vector<RawValueBytes> out;
+        const uint8_t* p = bytes.data();
+        const uint8_t* last = bytes.data() + bytes.size();
+        while (p + 4 <= last) {
+            uint32_t len = 0;
+            std::memcpy(&len, p, sizeof(len)); // little-endian length
+            p += 4;
+            if (p + len > last) {
                 throw InvalidInputException(
-                    "Invalid BYTE_ARRAY encoding: unexpected trailing bytes");
+                    "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
             }
-            return result;
+            out.emplace_back(p, p + len);
+            p += len;
         }
-        case Type::FIXED_LEN_BYTE_ARRAY: {
-            if (!datatype_length.has_value() || datatype_length.value() <= 0) {
-                throw InvalidInputException(
-                    "FIXED_LEN_BYTE_ARRAY requires positive datatype_length");
-            }
-            int fixed_length = datatype_length.value();
-            if ((bytes.size() % fixed_length) != 0) {
-                throw InvalidInputException(
-                    "Invalid data size for FIXED_LEN_BYTE_ARRAY decoding");
-            }
-            std::vector<std::string> result;
-            size_t element_count = bytes.size() / fixed_length;
-            for (size_t i = 0; i < element_count; ++i) {
-                const char* element_start = reinterpret_cast<const char*>(
-                    bytes.data() + i * fixed_length);
-                result.emplace_back(element_start, fixed_length);
-            }
-            return result;
+        if (p != last) {
+            throw InvalidInputException("Invalid BYTE_ARRAY encoding: trailing bytes remain");
         }
-        case Type::UNDEFINED: {
-            std::vector<uint8_t> result;
-            const char* s = reinterpret_cast<const char*>(bytes.data());
-            result.assign(s, s + bytes.size());
-            return result;
+        return out;
+    }
+
+    // Fixed-size types: slice into raw value bytes in order.
+    const size_t elem_size = GetFixedElemSizeOrThrow(datatype, datatype_length);
+
+    // Validate that the input size is divisible by the element size
+    if ((bytes.size() % elem_size) != 0) {
+        throw InvalidInputException("Input size not divisible by element width");
+    }
+
+    // Slice the input bytes into raw value bytes
+    const size_t count = bytes.size() / elem_size;
+    std::vector<RawValueBytes> out;
+    out.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        const auto begin = bytes.begin() + static_cast<std::ptrdiff_t>(i * elem_size);
+        out.emplace_back(begin, begin + static_cast<std::ptrdiff_t>(elem_size));
+    }
+    return out;
+}
+
+std::vector<uint8_t> CombineRawBytesIntoValueBytes(
+    const std::vector<RawValueBytes>& elements,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format) {
+    if (format != Format::PLAIN) {
+        throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format)));
+    }
+
+    if (datatype == Type::BYTE_ARRAY) {
+        std::vector<uint8_t> out;
+        size_t total = 0;
+        for (const auto& v : elements) {
+            total += 4 + v.size();
         }
-        default: {
-            throw DBPSUnsupportedException(
-                "Unsupported datatype: " + std::string(to_string(datatype)));
+        out.reserve(total);
+        for (const auto& v : elements) {
+            append_u32_le(out, static_cast<uint32_t>(v.size()));
+            out.insert(out.end(), v.begin(), v.end());
+        }
+        return out;
+    }
+
+    const size_t elem_size = GetFixedElemSizeOrThrow(datatype, datatype_length);
+
+    for (size_t i = 0; i < elements.size(); ++i) {
+        if (elements[i].size() != elem_size) {
+            throw InvalidInputException("Element size mismatch for fixed-size datatype");
         }
     }
+
+    std::vector<uint8_t> out;
+    out.reserve(elem_size * elements.size());
+    for (const auto& v : elements) {
+        out.insert(out.end(), v.begin(), v.end());
+    }
+    return out;
+}
+
+TypedListValues ParseValueBytesIntoTypedList(
+    const std::vector<uint8_t>& bytes,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Format::type format) {
+    std::vector<RawValueBytes> raw_values =
+        SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, format);
+    return BuildTypedListFromRawBytes(datatype, raw_values);
 }
 
 std::vector<uint8_t> GetTypedListAsValueBytes(
@@ -215,77 +240,6 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Format::type format) {
-    throw DBPSUnsupportedException("GetTypedListAsValueBytes not implemented");
-}
-
-template<typename T>
-const char* GetTypeName() {
-    if constexpr (std::is_same_v<T, std::vector<int32_t>>) return "INT32";
-    else if constexpr (std::is_same_v<T, std::vector<int64_t>>) return "INT64";
-    else if constexpr (std::is_same_v<T, std::vector<float>>) return "FLOAT";
-    else if constexpr (std::is_same_v<T, std::vector<double>>) return "DOUBLE";
-    else if constexpr (std::is_same_v<T, std::vector<std::array<uint32_t, 3>>>) return "INT96";
-    else if constexpr (std::is_same_v<T, std::vector<std::string>>) 
-      return "string (BYTE_ARRAY/FIXED_LEN_BYTE_ARRAY)";
-    else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) return "UNDEFINED (raw bytes)";
-    else if constexpr (std::is_same_v<T, std::monostate>) return "empty/error";
-    else return "unknown";
-}
-
-std::string PrintTypedList(const TypedListValues& list) {
-    std::ostringstream out;
-    
-    std::visit([&out](auto&& values) {
-        using T = std::decay_t<decltype(values)>;
-        
-        if constexpr (std::is_same_v<T, std::monostate>) {
-            out << "Empty/error state\n";
-        }
-        else if constexpr (std::is_same_v<T, std::vector<std::array<uint32_t, 3>>>) {
-            // Special case for INT96 - [lo, mid, hi] format
-            out << "Decoded INT96 values ([lo, mid, hi] 32-bit words):\n";
-            for (size_t i = 0; i < values.size(); ++i) {
-                out << "  [" << i << "] [" << values[i][0] << ", " 
-                    << values[i][1] << ", " << values[i][2] << "]\n";
-            }
-        }
-        else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
-            // Special case for UNDEFINED - raw bytes as hex
-            out << "Decoded UNDEFINED type (raw bytes):\n";
-            out << "  Hex: ";
-            for (size_t i = 0; i < values.size(); ++i) {
-                out << std::hex << std::setw(2) << std::setfill('0') 
-                    << static_cast<int>(values[i]);
-                if (i < values.size() - 1) out << " ";
-            }
-            out << std::dec << "\n";  // Reset to decimal
-            
-            // Also show as string if printable
-            out << "  String: \"";
-            for (uint8_t byte : values) {
-                if (byte >= 32 && byte < 127) {
-                    out << static_cast<char>(byte);
-                } else {
-                    out << ".";
-                }
-            }
-            out << "\"\n";
-        }
-        else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
-            // String values with quotes and the length of the string.
-            out << "Decoded " << GetTypeName<T>() << " values:\n";
-            for (size_t i = 0; i < values.size(); ++i) {
-                out << "  [" << i << "] \"" << values[i] << "\" (length: " << values[i].size() << ")\n";
-            }
-        }
-        else {
-            // Generic case for numeric types (int32, int64, float, double)
-            out << "Decoded " << GetTypeName<T>() << " values:\n";
-            for (size_t i = 0; i < values.size(); ++i) {
-                out << "  [" << i << "] " << values[i] << "\n";
-            }
-        }
-    }, list);
-    
-    return out.str();
+    std::vector<RawValueBytes> raw_values = BuildRawBytesFromTypedListValues(list);
+    return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, format);
 }
