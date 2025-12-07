@@ -235,6 +235,9 @@ LevelAndValueBytes DecompressAndSplit(
     // Get the page type from the encoding attributes.
     auto page_type = std::get<std::string>(encoding_attributes.at("page_type"));
 
+    // On DATA_PAGE_V1, the whole payload is compressed.
+    // So the split of level and value byte requires to
+    // (1) decompress the whole payload, (2) calculate length of level bytes, (3) split into level and value bytes.
     if (page_type == "DATA_PAGE_V1") {
         auto decompressed_bytes = Decompress(plaintext, compression);
         int leading_bytes_to_strip = CalculateLevelBytesLength(
@@ -243,6 +246,9 @@ LevelAndValueBytes DecompressAndSplit(
         return LevelAndValueBytes{level_bytes, value_bytes};
     }
 
+    // On DATA_PAGE_V2, only the value bytes are compressed.
+    // So the split of level and value byte requires to
+    // (1) calculate length of level bytes, (2) split into level, (3) decompress only the value bytes.
     if (page_type == "DATA_PAGE_V2") {
         int leading_bytes_to_strip = CalculateLevelBytesLength(
             plaintext, encoding_attributes);
@@ -259,8 +265,9 @@ LevelAndValueBytes DecompressAndSplit(
         return LevelAndValueBytes{level_bytes, value_bytes};
     }
 
+    // DICTIONARY_PAGE has no level bytes.
     if (page_type == "DICTIONARY_PAGE") {
-        auto level_bytes = std::vector<uint8_t>(); // DICTIONARY_PAGE has no level bytes.
+        auto level_bytes = std::vector<uint8_t>();
         auto value_bytes = Decompress(plaintext, compression);
         return LevelAndValueBytes{level_bytes, value_bytes};
     }

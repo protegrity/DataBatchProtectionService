@@ -182,6 +182,7 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
 // Utility functions for creating an AttributesMap
 
 // Common alias for converted encoding attributes used across modules.
+// Numeric values are captured as int32_t.
 using AttributesMap = std::map<std::string, std::variant<int32_t, bool, std::string>>;
 
 inline const std::string& GetRequiredAttribute(

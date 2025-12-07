@@ -384,3 +384,21 @@ TEST(ParquetUtils, DecompressAndSplit_DataPageV2_Compressed) {
     EXPECT_EQ(level_bytes, result.level_bytes);
     EXPECT_EQ(value_bytes, result.value_bytes);
 }
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV2_UnsupportedCompression) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(1)},
+        {"data_page_max_definition_level", int32_t(0)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(0)},
+        {"page_v2_repetition_levels_byte_length", int32_t(0)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", true}
+    };
+
+    std::vector<uint8_t> plaintext = {0x00};
+    EXPECT_THROW(
+        DecompressAndSplit(plaintext, CompressionCodec::LZO, attribs),
+        DBPSUnsupportedException);
+}
