@@ -274,6 +274,13 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_FixedSizeMisaligned) {
         InvalidInputException);
 }
 
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_UnsupportedFormat) {
+    std::vector<uint8_t> bytes = {0x01,0x00,0x00,0x00};
+    EXPECT_THROW(
+        SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Format::RLE),
+        DBPSUnsupportedException);
+}
+
 TEST(ParquetUtils, CombineRawBytesIntoValueBytes_INT32) {
     std::vector<RawValueBytes> elems = {
         {0x04,0x03,0x02,0x01},
@@ -307,6 +314,15 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismat
     EXPECT_THROW(
         CombineRawBytesIntoValueBytes(elems, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN),
         InvalidInputException);
+}
+
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_UnsupportedFormat) {
+    std::vector<RawValueBytes> elems = {
+        {0x04,0x03,0x02,0x01}
+    };
+    EXPECT_THROW(
+        CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Format::RLE),
+        DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, SliceAndCombine_RoundTrip_INT64) {
@@ -525,4 +541,26 @@ TEST(ParquetUtils, CompressAndJoin_UnsupportedCompression) {
     EXPECT_THROW(
         CompressAndJoin(level_bytes, value_bytes, CompressionCodec::LZO, attribs),
         DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, CompressAndJoin_UnsupportedEncoding) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(1)}, // triggers repetition level parsing
+        {"data_page_max_definition_level", int32_t(0)},
+        {"page_v1_repetition_level_encoding", std::string("BIT_PACKED")}, // unsupported
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    // Build minimal level bytes that would be valid if encoding were RLE: len + payload
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 1);
+    level_bytes.push_back(0x00);
+
+    std::vector<uint8_t> value_bytes = {0x01, 0x02};
+
+    EXPECT_THROW(
+        CompressAndJoin(level_bytes, value_bytes, CompressionCodec::UNCOMPRESSED, attribs),
+        InvalidInputException);
 }
