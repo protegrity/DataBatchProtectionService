@@ -24,6 +24,7 @@
 #include <map>
 #include <string>
 #include <variant>
+#include <cassert>
 #include "exceptions.h"
 
 // Utility functions for little-endian number reading and writing.
