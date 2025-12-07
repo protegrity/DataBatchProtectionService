@@ -526,7 +526,7 @@ TEST(EncryptionSequencer, ConvertEncodingAttributesToValues_Negative) {
     std::map<std::string, std::string> empty_attribs;
     TestDataBatchEncryptionSequencer sequencer1("test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Format::PLAIN, empty_attribs, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {});
     EXPECT_FALSE(sequencer1.TestConvertEncodingAttributesToValues());
-    EXPECT_EQ(sequencer1.error_stage_, "encoding_attribute_validation");
+    EXPECT_EQ(sequencer1.error_stage_, "encoding_attribute_conversion");
     
     // Test invalid int conversion
     std::map<std::string, std::string> invalid_int = {
