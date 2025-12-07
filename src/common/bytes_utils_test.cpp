@@ -19,6 +19,7 @@
 #include "exceptions.h"
 
 #include <vector>
+#include <variant>
 #include <gtest/gtest.h>
 
 TEST(BytesUtils, Split_Normal) {
@@ -199,4 +200,43 @@ TEST(BytesUtils, JoinWithLengthPrefixAndSplit_RoundTrip) {
     
     EXPECT_EQ(leading, parsed.leading);
     EXPECT_EQ(trailing, parsed.trailing);
+}
+
+TEST(BytesUtils, AttributesMap_AddString) {
+    std::map<std::string, std::string> attrs{{"page_type", "DATA_PAGE_V1"}};
+    AttributesMap out;
+
+    auto v = AddStringAttribute(out, attrs, "page_type");
+    EXPECT_EQ("DATA_PAGE_V1", v);
+    EXPECT_EQ("DATA_PAGE_V1", std::get<std::string>(out.at("page_type")));
+
+    EXPECT_THROW(AddStringAttribute(out, attrs, "missing_key"), InvalidInputException);
+}
+
+TEST(BytesUtils, AttributesMap_AddInt) {
+    std::map<std::string, std::string> attrs{{"data_page_num_values", "10"}};
+    AttributesMap out;
+
+    auto v = AddIntAttribute(out, attrs, "data_page_num_values");
+    EXPECT_EQ(10, v);
+    EXPECT_EQ(10, std::get<int32_t>(out.at("data_page_num_values")));
+
+    std::map<std::string, std::string> bad_attrs{{"data_page_num_values", "abc"}};
+    EXPECT_THROW(AddIntAttribute(out, bad_attrs, "data_page_num_values"), InvalidInputException);
+}
+
+TEST(BytesUtils, AttributesMap_AddBool) {
+    std::map<std::string, std::string> attrs_true{{"page_v2_is_compressed", "true"}};
+    AttributesMap out;
+    auto v_true = AddBoolAttribute(out, attrs_true, "page_v2_is_compressed");
+    EXPECT_TRUE(v_true);
+    EXPECT_TRUE(std::get<bool>(out.at("page_v2_is_compressed")));
+
+    std::map<std::string, std::string> attrs_false{{"page_v2_is_compressed", "false"}};
+    auto v_false = AddBoolAttribute(out, attrs_false, "page_v2_is_compressed");
+    EXPECT_FALSE(v_false);
+    EXPECT_FALSE(std::get<bool>(out.at("page_v2_is_compressed")));
+
+    std::map<std::string, std::string> bad_attrs{{"page_v2_is_compressed", "maybe"}};
+    EXPECT_THROW(AddBoolAttribute(out, bad_attrs, "page_v2_is_compressed"), InvalidInputException);
 }

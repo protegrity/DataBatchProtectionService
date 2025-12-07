@@ -18,7 +18,6 @@
 #include "basic_encryptor.h"
 #include "../../common/enums.h"
 #include "../../common/exceptions.h"
-#include "../decoding_utils.h"
 #include <gtest/gtest.h>
 #include <vector>
 

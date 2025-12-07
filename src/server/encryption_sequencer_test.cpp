@@ -18,6 +18,7 @@
 #include "encryption_sequencer.h"
 #include "compression_utils.h"
 #include "../common/enums.h"
+#include "../common/bytes_utils.h"
 #include <iostream>
 #include <cassert>
 #include <string>
@@ -92,12 +93,8 @@ public:
         return ConvertEncodingAttributesToValues();
     }
     
-    const std::map<std::string, std::variant<int32_t, bool, std::string>>& GetEncodingAttributesConverted() const {
+    const AttributesMap& GetEncodingAttributesConverted() const {
         return encoding_attributes_converted_;
-    }
-    
-    LevelAndValueBytes TestDecompressAndSplit(const std::vector<uint8_t>& plaintext) {
-        return DecompressAndSplit(plaintext);
     }
 };
 
@@ -461,7 +458,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
 
 // Helper function to check if an encoding attribute variant contains expected value
 template<typename T>
-bool CheckEncodingAttribValue(const std::map<std::string, std::variant<int32_t, bool, std::string>>& converted,
+bool CheckEncodingAttribValue(const AttributesMap& converted,
                       const std::string& key, const T& expected) {
     auto it = converted.find(key);
     if (it == converted.end()) {
@@ -562,98 +559,4 @@ TEST(EncryptionSequencer, ConvertEncodingAttributesToValues_Negative) {
     TestDataBatchEncryptionSequencer sequencer3("test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Format::PLAIN, invalid_bool, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {});
     EXPECT_FALSE(sequencer3.TestConvertEncodingAttributesToValues());
     EXPECT_EQ(sequencer3.error_stage_, "encoding_attribute_conversion");
-}
-
-TEST(EncryptionSequencer, DecompressAndSplit_DataPageV2) {
-    // Test 1: Uncompressed value bytes
-    {
-        std::map<std::string, std::string> attribs = {
-            {"page_type", "DATA_PAGE_V2"},
-            {"data_page_num_values", "10"},
-            {"data_page_max_definition_level", "1"},
-            {"data_page_max_repetition_level", "0"},
-            {"page_v2_definition_levels_byte_length", "5"},
-            {"page_v2_repetition_levels_byte_length", "0"},
-            {"page_v2_num_nulls", "0"},
-            {"page_v2_is_compressed", "false"}
-        };
-        
-        TestDataBatchEncryptionSequencer sequencer(
-            "test_column",
-            Type::BYTE_ARRAY,
-            std::nullopt,
-            CompressionCodec::UNCOMPRESSED,
-            Format::PLAIN,
-            attribs,
-            CompressionCodec::UNCOMPRESSED,
-            "test_key",
-            "test_user",
-            "{}",
-            {}
-        );
-        
-        // Convert encoding attributes to values (required for DecompressAndSplit)
-        ASSERT_TRUE(sequencer.TestConvertEncodingAttributesToValues());
-        
-        // Create test data: 5 bytes of level data + 10 bytes of value data
-        std::vector<uint8_t> level_bytes = {0x01, 0x02, 0x03, 0x04, 0x05};
-        std::vector<uint8_t> value_bytes = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0};
-        std::vector<uint8_t> plaintext;
-        plaintext.insert(plaintext.end(), level_bytes.begin(), level_bytes.end());
-        plaintext.insert(plaintext.end(), value_bytes.begin(), value_bytes.end());
-        
-        // Call DecompressAndSplit
-        LevelAndValueBytes result = sequencer.TestDecompressAndSplit(plaintext);
-        
-        // Verify results
-        EXPECT_EQ(level_bytes, result.level_bytes);
-        EXPECT_EQ(value_bytes, result.value_bytes);
-    }
-    
-    // Test 2: Snappy-compressed value bytes
-    {
-        std::map<std::string, std::string> attribs = {
-            {"page_type", "DATA_PAGE_V2"},
-            {"data_page_num_values", "10"},
-            {"data_page_max_definition_level", "1"},
-            {"data_page_max_repetition_level", "0"},
-            {"page_v2_definition_levels_byte_length", "5"},
-            {"page_v2_repetition_levels_byte_length", "0"},
-            {"page_v2_num_nulls", "0"},
-            {"page_v2_is_compressed", "true"}
-        };
-        
-        TestDataBatchEncryptionSequencer sequencer(
-            "test_column",
-            Type::BYTE_ARRAY,
-            std::nullopt,
-            CompressionCodec::SNAPPY,
-            Format::PLAIN,
-            attribs,
-            CompressionCodec::UNCOMPRESSED,
-            "test_key",
-            "test_user",
-            "{}",
-            {}
-        );
-        
-        // Convert encoding attributes to values (required for DecompressAndSplit)
-        ASSERT_TRUE(sequencer.TestConvertEncodingAttributesToValues());
-        
-        // Create test data: 5 bytes of level data + compressed value bytes
-        std::vector<uint8_t> level_bytes = {0x01, 0x02, 0x03, 0x04, 0x05};
-        std::vector<uint8_t> value_bytes = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0};
-        std::vector<uint8_t> compressed_value_bytes = Compress(value_bytes, CompressionCodec::SNAPPY);
-        
-        std::vector<uint8_t> plaintext;
-        plaintext.insert(plaintext.end(), level_bytes.begin(), level_bytes.end());
-        plaintext.insert(plaintext.end(), compressed_value_bytes.begin(), compressed_value_bytes.end());
-        
-        // Call DecompressAndSplit
-        LevelAndValueBytes result = sequencer.TestDecompressAndSplit(plaintext);
-        
-        // Verify results
-        EXPECT_EQ(level_bytes, result.level_bytes);
-        EXPECT_EQ(value_bytes, result.value_bytes);
-    }
 }

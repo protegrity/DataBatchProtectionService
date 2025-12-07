@@ -17,7 +17,7 @@
 
 #include "encryption_sequencer.h"
 #include "enum_utils.h"
-#include "decoding_utils.h"
+#include "parquet_utils.h"
 #include "../common/bytes_utils.h"
 #include "compression_utils.h"
 #include "../common/exceptions.h"
@@ -126,7 +126,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
 
     try {
         // Decompress and split plaintext into level and value bytes
-        auto [level_bytes, value_bytes] = DecompressAndSplit(plaintext);
+        auto [level_bytes, value_bytes] = DecompressAndSplit(
+            plaintext, compression_, encoding_attributes_converted_);
         
         // Parse value bytes into typed list
         auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, format_);
@@ -136,11 +137,12 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
         auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
         
-        throw DBPSUnsupportedException("Per-value encryption implementation is not complete.");
-
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
-        
+
+        // TODO: Remove this once the per-value decryption implementation is complete.
+        throw DBPSUnsupportedException("Per-value encryption implementation is not complete.");
+
     } catch (const DBPSUnsupportedException& e) {
         // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
         // (as opposed to per-value)
@@ -231,141 +233,46 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     return true;
 }
 
-// Functions to pack/unpack the plaintext into level and value bytes.
-
-// Used during Encryption. Decompresses and splits the plaintext into level and value bytes.
-LevelAndValueBytes DataBatchEncryptionSequencer::DecompressAndSplit(
-    const std::vector<uint8_t>& plaintext) {
-
-    // Get the page type from the encoding attributes.
-    std::string page_type = encoding_attributes_["page_type"];
-
-    // Page v1 is fully compressed, so we need to decompress first.
-    // Note: This is true only if compression is enabled.
-    if (page_type == "DATA_PAGE_V1") {
-        auto decompressed_bytes = Decompress(plaintext, compression_);
-        int leading_bytes_to_strip = CalculateLevelBytesLength(
-            decompressed_bytes, encoding_attributes_converted_);
-        auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
-        return LevelAndValueBytes{level_bytes, value_bytes};
-    }
-
-    // Page v2 is only compressed in the value bytes, the level bytes are always uncompressed.
-    // So first split, then uncompress.
-    if (page_type == "DATA_PAGE_V2") {
-        int leading_bytes_to_strip = CalculateLevelBytesLength(
-            plaintext, encoding_attributes_converted_);
-        auto [level_bytes, compressed_value_bytes] = Split(plaintext, leading_bytes_to_strip);
-
-        // Page V2 has an additional is_compressed bit.
-        bool page_v2_is_compressed = std::get<bool>(
-            encoding_attributes_converted_["page_v2_is_compressed"]);
-        std::vector<uint8_t> value_bytes;
-        if (page_v2_is_compressed) {
-            value_bytes = Decompress(compressed_value_bytes, compression_);
-        } else {
-            value_bytes = compressed_value_bytes;
-        }
-        return LevelAndValueBytes{level_bytes, value_bytes};
-    }
-
-    if (page_type == "DICTIONARY_PAGE") {
-        auto level_bytes = std::vector<uint8_t>(); // DICTIONARY_PAGE has no level bytes.
-        auto value_bytes = Decompress(plaintext, compression_);
-        return LevelAndValueBytes{level_bytes, value_bytes};
-    }
-    
-    throw InvalidInputException("Unexpected page type: " + page_type);
-}
-
-// Used during Decryption. Joins level and value bytes and compresses them back into the output format.
-std::vector<uint8_t> DataBatchEncryptionSequencer::CompressAndJoin(
-    const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes) {
-    throw DBPSUnsupportedException("CompressAndJoin not implemented");
-}
-
 // Helper methods to validate and basic parameter reading.
 
 bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
-    // Helper to find key and return value or null
-    auto FindKey = [this](const std::string& key) -> const std::string* {
-        auto it = encoding_attributes_.find(key);
-        if (it == encoding_attributes_.end()) {
-            error_stage_ = "encoding_attribute_validation";
-            error_message_ = "Required encoding attribute [" + key + "] is missing";
-            return nullptr;
+    try {
+        auto add_str = [&](const std::string& key) {
+            return AddStringAttribute(encoding_attributes_converted_, encoding_attributes_, key);
+        };
+        auto add_int = [&](const std::string& key) {
+            return AddIntAttribute(encoding_attributes_converted_, encoding_attributes_, key);
+        };
+        auto add_bool = [&](const std::string& key) {
+            return AddBoolAttribute(encoding_attributes_converted_, encoding_attributes_, key);
+        };
+
+        std::string page_type = add_str("page_type");
+        // Convert common attributes for DATA_PAGE_V1 and DATA_PAGE_V2
+        if (page_type == "DATA_PAGE_V1" || page_type == "DATA_PAGE_V2") {
+            add_int("data_page_num_values");
+            add_int("data_page_max_definition_level");
+            add_int("data_page_max_repetition_level");
         }
-        return &it->second;
-    };
-    
-    // Type-specific conversion helpers
-    auto SafeAddIntToMap = [this, &FindKey](const std::string& key) -> bool {
-        const std::string* value = FindKey(key);
-        if (!value) {
-            return false;
+        if (page_type == "DATA_PAGE_V1") {
+            add_str("page_v1_definition_level_encoding");
+            add_str("page_v1_repetition_level_encoding");
+            
+        } else if (page_type == "DATA_PAGE_V2") {
+            add_int("page_v2_definition_levels_byte_length");
+            add_int("page_v2_repetition_levels_byte_length");
+            add_int("page_v2_num_nulls");
+            add_bool("page_v2_is_compressed");
+        } else if (page_type == "DICTIONARY_PAGE") {
+            // DICTIONARY_PAGE has no specific encoding attributes
         }
-        try {
-            int32_t value_int = static_cast<int32_t>(std::stol(*value));
-            encoding_attributes_converted_[key] = value_int;
-            assert(value_int >= 0);
-            return true;
-        } catch (const std::exception& e) {
-            error_stage_ = "encoding_attribute_conversion";
-            error_message_ = "Failed to convert [" + key + "] with value [" + *value + "] to int: " + e.what();
-            return false;
-        }
-    };
-    
-    auto SafeAddBoolToMap = [this, &FindKey](const std::string& key) -> bool {
-        const std::string* value = FindKey(key);
-        if (!value) {
-            return false;
-        }
-        if (*value == "true") {
-            encoding_attributes_converted_[key] = true;
-            return true;
-        } else if (*value == "false") {
-            encoding_attributes_converted_[key] = false;
-            return true;
-        } else {
-            error_stage_ = "encoding_attribute_conversion";
-            error_message_ = "Failed to convert [" + key + "] with value [" + *value + "] to bool";
-            return false;
-        }
-    };
-    
-    auto SafeAddStringToMap = [this, &FindKey](const std::string& key) -> bool {
-        const std::string* value = FindKey(key);
-        if (!value) {
-            return false;
-        }
-        encoding_attributes_converted_[key] = *value;
         return true;
-    };
-    
-    if (!SafeAddStringToMap("page_type")) return false;
-    std::string page_type = encoding_attributes_["page_type"];
-    
-    // Convert common attributes for DATA_PAGE_V1 and DATA_PAGE_V2
-    if (page_type == "DATA_PAGE_V1" || page_type == "DATA_PAGE_V2") {
-        if (!SafeAddIntToMap("data_page_num_values")) return false;
-        if (!SafeAddIntToMap("data_page_max_definition_level")) return false;
-        if (!SafeAddIntToMap("data_page_max_repetition_level")) return false;
-    }
-    if (page_type == "DATA_PAGE_V1") {
-        if (!SafeAddStringToMap("page_v1_definition_level_encoding")) return false;
-        if (!SafeAddStringToMap("page_v1_repetition_level_encoding")) return false;
         
-    } else if (page_type == "DATA_PAGE_V2") {
-        if (!SafeAddIntToMap("page_v2_definition_levels_byte_length")) return false;
-        if (!SafeAddIntToMap("page_v2_repetition_levels_byte_length")) return false;
-        if (!SafeAddIntToMap("page_v2_num_nulls")) return false;
-        if (!SafeAddBoolToMap("page_v2_is_compressed")) return false;
-    } else if (page_type == "DICTIONARY_PAGE") {
-        // DICTIONARY_PAGE has no specific encoding attributes
+    } catch (const InvalidInputException& e) {
+        error_stage_ = "encoding_attribute_conversion";
+        error_message_ = e.what();
+        return false;
     }
-    
-    return true;
 }
 
 bool DataBatchEncryptionSequencer::ValidateParameters() {

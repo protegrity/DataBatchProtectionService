@@ -45,7 +45,7 @@ using namespace dbps::external;
  * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
  */
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
-    const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs);
+    const AttributesMap& encoding_attribs);
 
 /**
  * Slice a flat byte buffer into RawValueBytes elements according to datatype/format.
@@ -65,6 +65,25 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Format::type format);
+
+/**
+ * Decompresses and splits a Parquet page into level and value bytes.
+ * Handles DATA_PAGE_V1, DATA_PAGE_V2 (including optional compression on value bytes),
+ * and DICTIONARY_PAGE.
+ */
+LevelAndValueBytes DecompressAndSplit(
+    const std::vector<uint8_t>& plaintext,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes);
+
+/**
+ * Merges level and value bytes and compresses them into plaintext.
+ * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
+ * Returns the joined and compressed plaintext.
+ */
+std::vector<uint8_t> CompressAndJoin(
+    const std::vector<uint8_t>& level_bytes,
+    const std::vector<uint8_t>& value_bytes);
 
 /**
  * Parse the value bytes into a typed list based on the data type and format.

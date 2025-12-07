@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "decoding_utils.h"
+#include "parquet_utils.h"
 #include "../common/exceptions.h"
 #include <vector>
 #include <string>
@@ -26,12 +26,14 @@
 #include <variant>
 #include <gtest/gtest.h>
 #include "../common/bytes_utils.h"
+#include "compression_utils.h"
 
 using namespace dbps::external;
+using namespace dbps::compression;
 
-TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V2) {
+TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V2) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V2")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_definition_level", int32_t(2)},
@@ -45,18 +47,18 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V2) {
     EXPECT_EQ(4, result); // 1 + 3 
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_DICTIONARY_PAGE) {
+TEST(ParquetUtils, CalculateLevelBytesLength_DICTIONARY_PAGE) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DICTIONARY_PAGE")}
     };
     int result = CalculateLevelBytesLength(raw, attribs);
     EXPECT_EQ(0, result);
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_NoLevels) {
+TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V1_NoLevels) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V1")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_repetition_level", int32_t(0)},
@@ -68,7 +70,7 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_NoLevels) {
     EXPECT_EQ(0, result);
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_WithLevels) {
+TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V1_WithLevels) {
     std::vector<uint8_t> raw;
 
     // First RLE structure: 4-byte length + 8 bytes of data
@@ -84,7 +86,7 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_WithLevels) {
     raw.insert(raw.end(), {0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14});
 
     // Test DATA_PAGE_V1 with both repetition and definition levels
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V1")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_repetition_level", int32_t(1)}, // > 0, so repetition levels present
@@ -96,11 +98,11 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_WithLevels) {
     EXPECT_EQ(28, result); // (4+8) + (4+12) = 12 + 16 = 28
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_InvalidEncoding) {
+TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V1_InvalidEncoding) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
 
     // Test DATA_PAGE_V1 with non-RLE encoding (should throw exception)
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V1")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_repetition_level", int32_t(1)},
@@ -111,21 +113,21 @@ TEST(DecodingUtils, CalculateLevelBytesLength_DATA_PAGE_V1_InvalidEncoding) {
     EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_UnknownPageType) {
+TEST(ParquetUtils, CalculateLevelBytesLength_UnknownPageType) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03};
 
     // Test unknown page type (should throw exception)
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("UNKNOWN_PAGE_TYPE")}
     };
     EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), DBPSUnsupportedException);
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_InvalidTotalSize) {
+TEST(ParquetUtils, CalculateLevelBytesLength_InvalidTotalSize) {
     std::vector<uint8_t> raw = {0x01, 0x02};
 
     // Test DATA_PAGE_V2 with byte lengths exceeding raw data size (should throw exception)
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V2")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_definition_level", int32_t(2)},
@@ -138,11 +140,11 @@ TEST(DecodingUtils, CalculateLevelBytesLength_InvalidTotalSize) {
     EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
-TEST(DecodingUtils, CalculateLevelBytesLength_NegativeTotalSize) {
+TEST(ParquetUtils, CalculateLevelBytesLength_NegativeTotalSize) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04};
 
     // Test DATA_PAGE_V2 with negative byte lengths (should throw exception)
-    std::map<std::string, std::variant<int32_t, bool, std::string>> attribs = {
+    AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V2")},
         {"data_page_num_values", int32_t(100)},
         {"data_page_max_definition_level", int32_t(2)},
@@ -156,7 +158,7 @@ TEST(DecodingUtils, CalculateLevelBytesLength_NegativeTotalSize) {
 }
 
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT32) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_INT32) {
     std::vector<int32_t> values = {100, 200, 300};
     std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
@@ -168,7 +170,7 @@ TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT32) {
     EXPECT_EQ(values, *int32_values);
 }
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT64) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_INT64) {
     std::vector<int64_t> values = {1000, 2000};
     std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int64_t));
@@ -180,7 +182,7 @@ TEST(DecodingUtils, ParseValueBytesIntoTypedList_INT64) {
     EXPECT_EQ(values, *int64_values);
 }
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
     std::vector<uint8_t> bytes;
     // First string: "hello" (length 5)
     uint32_t len1 = 5;
@@ -202,7 +204,7 @@ TEST(DecodingUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
     EXPECT_EQ("world", (*string_values)[1]);
 }
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
     std::vector<uint8_t> bytes = {'a', 'b', 'c', 'x', 'y', 'z'}; // Two 3-byte strings
     
     TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN);
@@ -214,19 +216,19 @@ TEST(DecodingUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
     EXPECT_EQ("xyz", (*string_values)[1]);
 }
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_UnsupportedFormat) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_UnsupportedFormat) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
     EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::RLE), 
                  DBPSUnsupportedException);
 }
 
-TEST(DecodingUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // 3 bytes, not divisible by sizeof(int32_t)
     EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN), 
                  InvalidInputException);
 }
 
-TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT32) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT32) {
     std::vector<uint8_t> bytes = {0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A};
     auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Format::PLAIN);
     ASSERT_EQ(out.size(), 2u);
@@ -234,7 +236,7 @@ TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT32) {
     EXPECT_EQ(out[1], (std::vector<uint8_t>{0x0D,0x0C,0x0B,0x0A}));
 }
 
-TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT96) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT96) {
     std::vector<uint8_t> bytes = {
         0x01,0x02,0x03,0x04,
         0x05,0x06,0x07,0x08,
@@ -245,7 +247,7 @@ TEST(DecodingUtils, SliceValueBytesIntoRawBytes_INT96) {
     EXPECT_EQ(out[0], bytes);
 }
 
-TEST(DecodingUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
     std::vector<uint8_t> bytes;
     append_u32_le(bytes, 2);
     bytes.insert(bytes.end(), {'h','i'});
@@ -258,21 +260,21 @@ TEST(DecodingUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
     EXPECT_EQ(out[1], (std::vector<uint8_t>{'x','y','z'}));
 }
 
-TEST(DecodingUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY_Truncated) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY_Truncated) {
     std::vector<uint8_t> bytes = {0x04,0x00,0x00,0x00, 'a','b','c'};
     EXPECT_THROW(
         SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN),
         InvalidInputException);
 }
 
-TEST(DecodingUtils, SliceValueBytesIntoRawBytes_FixedSizeMisaligned) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_FixedSizeMisaligned) {
     std::vector<uint8_t> bytes = {0x00,0x01,0x02}; // not divisible by 8 for INT64
     EXPECT_THROW(
         SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Format::PLAIN),
         InvalidInputException);
 }
 
-TEST(DecodingUtils, CombineRawBytesIntoValueBytes_INT32) {
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_INT32) {
     std::vector<RawValueBytes> elems = {
         {0x04,0x03,0x02,0x01},
         {0x0D,0x0C,0x0B,0x0A}
@@ -281,7 +283,7 @@ TEST(DecodingUtils, CombineRawBytesIntoValueBytes_INT32) {
     EXPECT_EQ(out, (std::vector<uint8_t>{0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A}));
 }
 
-TEST(DecodingUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
     std::vector<RawValueBytes> elems = {
         {'h','i'},
         {'x','y','z'}
@@ -296,7 +298,7 @@ TEST(DecodingUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
     EXPECT_EQ(out, expected);
 }
 
-TEST(DecodingUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismatch) {
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismatch) {
     // Expect length 3, but provide a 2-byte element -> should throw
     std::vector<RawValueBytes> elems = {
         {'a','b'},
@@ -307,7 +309,7 @@ TEST(DecodingUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMisma
         InvalidInputException);
 }
 
-TEST(DecodingUtils, SliceAndCombine_RoundTrip_INT64) {
+TEST(ParquetUtils, SliceAndCombine_RoundTrip_INT64) {
     // Two int64 values: little-endian bytes
     std::vector<uint8_t> bytes = {
         0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -318,7 +320,7 @@ TEST(DecodingUtils, SliceAndCombine_RoundTrip_INT64) {
     EXPECT_EQ(bytes, combined);
 }
 
-TEST(DecodingUtils, SliceAndCombine_RoundTrip_BYTE_ARRAY) {
+TEST(ParquetUtils, SliceAndCombine_RoundTrip_BYTE_ARRAY) {
     std::vector<uint8_t> bytes;
     append_u32_le(bytes, 3);
     bytes.insert(bytes.end(), {'f','o','o'});
@@ -329,4 +331,56 @@ TEST(DecodingUtils, SliceAndCombine_RoundTrip_BYTE_ARRAY) {
     auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
     auto combined = CombineRawBytesIntoValueBytes(sliced, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
     EXPECT_EQ(bytes, combined);
+}
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV2_Uncompressed) {
+    AttributesMap attribs_conv = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(10)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(5)},
+        {"page_v2_repetition_levels_byte_length", int32_t(0)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", false}
+    };
+
+    std::vector<uint8_t> level_bytes = {0x01, 0x02, 0x03, 0x04, 0x05};
+    std::vector<uint8_t> value_bytes = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0};
+    std::vector<uint8_t> plaintext;
+    plaintext.insert(plaintext.end(), level_bytes.begin(), level_bytes.end());
+    plaintext.insert(plaintext.end(), value_bytes.begin(), value_bytes.end());
+
+    auto result = DecompressAndSplit(
+        plaintext, CompressionCodec::UNCOMPRESSED, attribs_conv);
+
+    EXPECT_EQ(level_bytes, result.level_bytes);
+    EXPECT_EQ(value_bytes, result.value_bytes);
+}
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV2_Compressed) {
+    AttributesMap attribs_conv = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(10)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(5)},
+        {"page_v2_repetition_levels_byte_length", int32_t(0)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", true}
+    };
+
+    std::vector<uint8_t> level_bytes = {0x01, 0x02, 0x03, 0x04, 0x05};
+    std::vector<uint8_t> value_bytes = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0};
+    std::vector<uint8_t> compressed_value_bytes = Compress(value_bytes, CompressionCodec::SNAPPY);
+
+    std::vector<uint8_t> plaintext;
+    plaintext.insert(plaintext.end(), level_bytes.begin(), level_bytes.end());
+    plaintext.insert(plaintext.end(), compressed_value_bytes.begin(), compressed_value_bytes.end());
+
+    auto result = DecompressAndSplit(
+        plaintext, CompressionCodec::SNAPPY, attribs_conv);
+
+    EXPECT_EQ(level_bytes, result.level_bytes);
+    EXPECT_EQ(value_bytes, result.value_bytes);
 }
