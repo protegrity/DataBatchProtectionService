@@ -277,8 +277,41 @@ LevelAndValueBytes DecompressAndSplit(
 
 std::vector<uint8_t> CompressAndJoin(
     const std::vector<uint8_t>& level_bytes,
-    const std::vector<uint8_t>& value_bytes) {
-    throw DBPSUnsupportedException("CompressAndJoin not implemented");
+    const std::vector<uint8_t>& value_bytes,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes) {
+
+    // Get the page type from the encoding attributes.
+    const auto& page_type = std::get<std::string>(encoding_attributes.at("page_type"));
+    
+    // Check that the calculated level bytes size == the size of the actual level bytes.
+    int expected_level_bytes = CalculateLevelBytesLength(level_bytes, encoding_attributes);
+    if (static_cast<size_t>(expected_level_bytes) != level_bytes.size()) {
+        throw InvalidInputException("Level bytes size does not match encoding attributes");
+    }
+
+    if (page_type == "DATA_PAGE_V1") {
+        auto joined = Join(level_bytes, value_bytes);
+        return Compress(joined, compression);
+    }
+
+    if (page_type == "DATA_PAGE_V2") {
+        bool page_v2_is_compressed =
+            std::get<bool>(encoding_attributes.at("page_v2_is_compressed"));
+        if (page_v2_is_compressed) {
+            auto compressed_values = Compress(value_bytes, compression);
+            return Join(level_bytes, compressed_values);
+        } else {
+            return Join(level_bytes, value_bytes);
+        }
+    }
+
+    // DICTIONARY_PAGE has no level bytes.
+    if (page_type == "DICTIONARY_PAGE") {
+        return Compress(value_bytes, compression);
+    }
+
+    throw InvalidInputException("Unexpected page type: " + page_type);
 }
 
 TypedListValues ParseValueBytesIntoTypedList(

@@ -402,3 +402,127 @@ TEST(ParquetUtils, DecompressAndSplit_DataPageV2_UnsupportedCompression) {
         DecompressAndSplit(plaintext, CompressionCodec::LZO, attribs),
         DBPSUnsupportedException);
 }
+
+TEST(ParquetUtils, CompressAndJoin_DataPageV1_Compressed) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(2)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 2); // RLE block length
+    level_bytes.insert(level_bytes.end(), {0x0A, 0x0B});
+    std::vector<uint8_t> value_bytes = {0x21, 0x22, 0x23, 0x24};
+
+    auto joined = CompressAndJoin(level_bytes, value_bytes, CompressionCodec::SNAPPY, attribs);
+    auto expected = Compress(Join(level_bytes, value_bytes), CompressionCodec::SNAPPY);
+    EXPECT_EQ(joined, expected);
+
+    auto decomposed = DecompressAndSplit(joined, CompressionCodec::SNAPPY, attribs);
+    EXPECT_EQ(decomposed.level_bytes, level_bytes);
+    EXPECT_EQ(decomposed.value_bytes, value_bytes);
+}
+
+TEST(ParquetUtils, CompressAndJoin_DataPageV2_Uncompressed) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(3)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(2)},
+        {"page_v2_repetition_levels_byte_length", int32_t(1)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", false}
+    };
+
+    std::vector<uint8_t> level_bytes = {0x10, 0x11, 0x12}; // 2+1
+    std::vector<uint8_t> value_bytes = {0x21, 0x22, 0x23, 0x24};
+
+    auto joined = CompressAndJoin(level_bytes, value_bytes, CompressionCodec::UNCOMPRESSED, attribs);
+    std::vector<uint8_t> expected = Join(level_bytes, value_bytes);
+    EXPECT_EQ(joined, expected);
+
+    auto decomposed = DecompressAndSplit(joined, CompressionCodec::UNCOMPRESSED, attribs);
+    EXPECT_EQ(decomposed.level_bytes, level_bytes);
+    EXPECT_EQ(decomposed.value_bytes, value_bytes);
+}
+
+TEST(ParquetUtils, CompressAndJoin_DataPageV2_Compressed_RoundTrip) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(4)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(2)},
+        {"page_v2_repetition_levels_byte_length", int32_t(1)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", true}
+    };
+
+    std::vector<uint8_t> level_bytes = {0x10, 0x11, 0x12}; // len matches 2+1
+    std::vector<uint8_t> value_bytes = {0x21, 0x22, 0x23, 0x24, 0x25};
+
+    auto joined = CompressAndJoin(level_bytes, value_bytes, CompressionCodec::SNAPPY, attribs);
+    auto expected_compressed = Compress(value_bytes, CompressionCodec::SNAPPY);
+    auto expected_joined = Join(level_bytes, expected_compressed);
+    EXPECT_EQ(joined, expected_joined);
+
+    auto decomposed = DecompressAndSplit(joined, CompressionCodec::SNAPPY, attribs);
+
+    EXPECT_EQ(decomposed.level_bytes, level_bytes);
+    EXPECT_EQ(decomposed.value_bytes, value_bytes);
+}
+
+TEST(ParquetUtils, CompressAndJoin_DataPageV2_LevelLengthMismatch) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V2")},
+        {"data_page_num_values", int32_t(2)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"page_v2_definition_levels_byte_length", int32_t(2)},
+        {"page_v2_repetition_levels_byte_length", int32_t(1)},
+        {"page_v2_num_nulls", int32_t(0)},
+        {"page_v2_is_compressed", true}
+    };
+
+    std::vector<uint8_t> level_bytes = {0x10, 0x11}; // expected 3 bytes -> mismatch
+    std::vector<uint8_t> value_bytes = {0x21, 0x22, 0x23};
+
+    EXPECT_THROW(
+        CompressAndJoin(level_bytes, value_bytes, CompressionCodec::SNAPPY, attribs),
+        InvalidInputException);
+}
+
+TEST(ParquetUtils, CompressAndJoin_DictionaryPage) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DICTIONARY_PAGE")}
+    };
+
+    std::vector<uint8_t> level_bytes; // must be empty
+    std::vector<uint8_t> value_bytes = {0x31, 0x32, 0x33};
+
+    auto joined = CompressAndJoin(level_bytes, value_bytes, CompressionCodec::UNCOMPRESSED, attribs);
+    EXPECT_EQ(joined, value_bytes);
+}
+
+TEST(ParquetUtils, CompressAndJoin_UnsupportedCompression) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(1)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"data_page_max_definition_level", int32_t(0)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    std::vector<uint8_t> level_bytes;
+    std::vector<uint8_t> value_bytes = {0x40};
+
+    EXPECT_THROW(
+        CompressAndJoin(level_bytes, value_bytes, CompressionCodec::LZO, attribs),
+        DBPSUnsupportedException);
+}

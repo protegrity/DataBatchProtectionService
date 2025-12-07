@@ -77,13 +77,14 @@ LevelAndValueBytes DecompressAndSplit(
     const AttributesMap& encoding_attributes);
 
 /**
- * Merges level and value bytes and compresses them into plaintext.
- * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
- * Returns the joined and compressed plaintext.
+ * Reverse of DecompressAndSplit: joins level/value bytes and applies compression
+ * based on page type and encoding attributes.
  */
 std::vector<uint8_t> CompressAndJoin(
     const std::vector<uint8_t>& level_bytes,
-    const std::vector<uint8_t>& value_bytes);
+    const std::vector<uint8_t>& value_bytes,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes);
 
 /**
  * Parse the value bytes into a typed list based on the data type and format.
