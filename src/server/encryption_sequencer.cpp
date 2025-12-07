@@ -140,9 +140,6 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
 
-        // TODO: Remove this once the per-value decryption implementation is complete.
-        throw DBPSUnsupportedException("Per-value encryption implementation is not complete.");
-
     } catch (const DBPSUnsupportedException& e) {
         // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
         // (as opposed to per-value)

@@ -22,6 +22,7 @@
 #include <map>
 #include <cstring>
 #include <optional>
+#include <stdexcept>
 #include <cxxopts.hpp>
 
 // Include the necessary headers from the project
@@ -29,6 +30,7 @@
 #include "../client/httplib_client.h"
 #include "../common/enums.h"
 #include "../server/compression_utils.h"
+#include "../common/bytes_utils.h"
 #include "tcb/span.hpp"
 
 using namespace dbps::external;
@@ -40,6 +42,57 @@ using span = tcb::span<T>;
 
 namespace {
     const std::string SEQUENCER_ENCRYPTION_METADATA_VERSION = "v0.01";
+
+    std::vector<uint8_t> MakeByteArrayPayload(const std::string& s) {
+        std::vector<uint8_t> out;
+        append_u32_le(out, static_cast<uint32_t>(s.size()));
+        out.insert(out.end(), s.begin(), s.end());
+        return out;
+    }
+
+    std::string ParseByteArrayPayload(const std::vector<uint8_t>& bytes) {
+        if (bytes.size() < 4) {
+            throw std::runtime_error("Invalid BYTE_ARRAY payload: too short for length prefix");
+        }
+        uint32_t len = read_u32_le(bytes, 0);
+        if (bytes.size() != 4 + len) {
+            throw std::runtime_error("Invalid BYTE_ARRAY payload: length mismatch");
+        }
+        return std::string(bytes.begin() + 4, bytes.end());
+    }
+
+    std::vector<uint8_t> MakeByteArrayListPayload(const std::vector<std::string>& items) {
+        std::vector<uint8_t> out;
+        size_t total = 0;
+        for (const auto& s : items) {
+            total += 4 + s.size();
+        }
+        out.reserve(total);
+        for (const auto& s : items) {
+            append_u32_le(out, static_cast<uint32_t>(s.size()));
+            out.insert(out.end(), s.begin(), s.end());
+        }
+        return out;
+    }
+
+    std::vector<std::string> ParseByteArrayListPayload(const std::vector<uint8_t>& bytes) {
+        std::vector<std::string> out;
+        size_t offset = 0;
+        while (offset < bytes.size()) {
+            if (offset + 4 > bytes.size()) {
+                throw std::runtime_error("Invalid BYTE_ARRAY list: incomplete length prefix");
+            }
+            uint32_t len = read_u32_le(bytes, static_cast<int>(offset));
+            offset += 4;
+            if (offset + len > bytes.size()) {
+                throw std::runtime_error("Invalid BYTE_ARRAY list: length exceeds remaining data");
+            }
+            out.emplace_back(bytes.begin() + static_cast<std::ptrdiff_t>(offset),
+                             bytes.begin() + static_cast<std::ptrdiff_t>(offset + len));
+            offset += len;
+        }
+        return out;
+    }
 }
 
 // Demo application class
@@ -88,10 +141,10 @@ public:
                 connection_config,             // connection_config
                 app_context,                   // app_context
                 "demo_key_001",                // column_key_id
-                Type::UNDEFINED,               // datatype
-                std::nullopt,                  // datatype_length (not needed for UNDEFINED)
-                CompressionCodec::UNCOMPRESSED, // compression_type
-                std::nullopt                    // column_encryption_metadata
+                Type::BYTE_ARRAY,              // datatype
+                std::nullopt,                  // datatype_length (not needed for BYTE_ARRAY)
+                CompressionCodec::SNAPPY,      // compression_type
+                std::nullopt                   // column_encryption_metadata
             );
             
             std::cout << "OK: Main DBPA agent initialized successfully" << std::endl;
@@ -117,8 +170,8 @@ public:
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
                 std::nullopt,                  // datatype_length (not needed for FLOAT)
-                CompressionCodec::UNCOMPRESSED, // compression_type
-                std::nullopt                    // column_encryption_metadata
+                CompressionCodec::SNAPPY,      // compression_type
+                std::nullopt                   // column_encryption_metadata
             );
             
             std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
@@ -142,10 +195,10 @@ public:
                 connection_config,             // connection_config
                 app_context,                   // app_context
                 "demo_fixed_len_key_001",      // column_key_id
-                Type::FIXED_LEN_BYTE_ARRAY,   // datatype
-                8,                            // datatype_length (8 bytes per element)
+                Type::FIXED_LEN_BYTE_ARRAY,    // datatype
+                8,                             // datatype_length (8 bytes per element)
                 CompressionCodec::SNAPPY,      // compression_type (input will be Snappy-compressed)
-                std::nullopt                    // column_encryption_metadata
+                std::nullopt                   // column_encryption_metadata
             );
             
             std::cout << "OK: Fixed-length DBPA agent initialized successfully" << std::endl;
@@ -174,7 +227,8 @@ public:
             "This is sample data for encryption",
             "Special chars: !@#$%^&*()",
             "Numbers: 1234567890",
-            // "Long text: " + std::string(50 * 1000 * 1000, 'B'),
+            "Long text: " + std::string(50 * 1000, 'B'),
+            u8"UTF-8 sample: café 🚀 树 🌍",
             "Sample data for decryption demo",
             "Another piece of data to decrypt",
             "Final sample data"
@@ -182,88 +236,91 @@ public:
         
         bool all_succeeded = true;
         
-        for (const auto& original_data : sample_data) {
-            std::cout << "\nEncrypting sample (" << original_data.length() << " bytes):" << std::endl;
-            std::cout << "  Original: " << (original_data.length() > 50 ? original_data.substr(0, 50) + "..." : original_data) << std::endl;
+        try {
+            auto plaintext = MakeByteArrayListPayload(sample_data);
+            auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             
-            try {
-                std::vector<uint8_t> plaintext(original_data.begin(), original_data.end());
-                
-                // First encrypt
-                std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
-                
-                if (!encrypt_result || !encrypt_result->success()) {
-                    std::cout << "  ERROR: Cannot demo decryption - encryption failed" << std::endl;
-                    if (encrypt_result) {
-                        std::cout << "    Error: " << encrypt_result->error_message() << std::endl;
-                    }
-                    all_succeeded = false;
-                    continue;
+            // Encrypt once for the combined payload
+            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+            auto encrypt_result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
+            
+            if (!encrypt_result || !encrypt_result->success()) {
+                std::cout << "  ERROR: Cannot demo decryption - encryption failed" << std::endl;
+                if (encrypt_result) {
+                    std::cout << "    Error: " << encrypt_result->error_message() << std::endl;
                 }
+                return false;
+            }
 
-                // Verify encryption metadata
-                auto encryption_metadata = encrypt_result->encryption_metadata();
-                if (!encryption_metadata || encryption_metadata->find("dbps_agent_version") == encryption_metadata->end()) {
-                    std::cout << "  ERROR: Encryption metadata verification failed" << std::endl;
-                    all_succeeded = false;
-                    continue;
-                }
-                if (encryption_metadata->at("dbps_agent_version") != SEQUENCER_ENCRYPTION_METADATA_VERSION) {
-                    std::cout << "  ERROR: Encryption metadata version mismatch" << std::endl;
-                    std::cout << "    Expected: " << SEQUENCER_ENCRYPTION_METADATA_VERSION << std::endl;
-                    std::cout << "    Got: " << encryption_metadata->at("dbps_agent_version") << std::endl;
-                    all_succeeded = false;
-                    continue;
-                }
-                std::cout << "  OK: Encryption metadata verified" << std::endl;
-                std::cout << "    dbps_agent_version: " << encryption_metadata->at("dbps_agent_version") << std::endl;
-                
-                std::cout << "  OK: Encrypted (" << encrypt_result->size() << " bytes)" << std::endl;
-                std::cout << "  OK: Ciphertext size: " << encrypt_result->size() << " bytes" << std::endl;
+            // Verify encryption metadata
+            auto encryption_metadata = encrypt_result->encryption_metadata();
+            if (!encryption_metadata || encryption_metadata->find("dbps_agent_version") == encryption_metadata->end()) {
+                std::cout << "  ERROR: Encryption metadata verification failed" << std::endl;
+                return false;
+            }
+            // Expect per-value encryption mode
+            auto enc_mode_it = encryption_metadata->find("encryption_mode");
+            if (enc_mode_it == encryption_metadata->end()) {
+                std::cout << "  ERROR: Encryption metadata missing encryption_mode" << std::endl;
+                return false;
+            }
+            if (enc_mode_it->second != "per_value") {
+                std::cout << "  ERROR: Unexpected encryption_mode: " << enc_mode_it->second << std::endl;
+                return false;
+            }
+            if (encryption_metadata->at("dbps_agent_version") != SEQUENCER_ENCRYPTION_METADATA_VERSION) {
+                std::cout << "  ERROR: Encryption metadata version mismatch" << std::endl;
+                std::cout << "    Expected: " << SEQUENCER_ENCRYPTION_METADATA_VERSION << std::endl;
+                std::cout << "    Got: " << encryption_metadata->at("dbps_agent_version") << std::endl;
+                return false;
+            }
+            std::cout << "  OK: Encryption metadata verified" << std::endl;
+            std::cout << "    dbps_agent_version: " << encryption_metadata->at("dbps_agent_version") << std::endl;
+            
+            std::cout << "  OK: Encrypted (" << encrypt_result->size() << " bytes)" << std::endl;
+            std::cout << "  OK: Ciphertext size: " << encrypt_result->size() << " bytes" << std::endl;
 
-                // Show some details about the encrypted data
-                auto ciphertext = encrypt_result->ciphertext();
-                std::cout << "  OK: Ciphertext (first 32 bytes): ";
-                for (size_t j = 0; j < std::min(size_t(32), ciphertext.size()); ++j) {
-                    printf("%02x", ciphertext[j]);
+            // Show some details about the encrypted data
+            auto ciphertext = encrypt_result->ciphertext();
+            std::cout << "  OK: Ciphertext (first 32 bytes): ";
+            for (size_t j = 0; j < std::min(size_t(32), ciphertext.size()); ++j) {
+                printf("%02x", ciphertext[j]);
+            }
+            if (ciphertext.size() > 32) {
+                std::cout << "...";
+            }
+            std::cout << std::endl;
+            
+            // Then decrypt
+            agent_->UpdateEncryptionMetadata(encryption_metadata);
+            auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
+            
+            if (!decrypt_result || !decrypt_result->success()) {
+                std::cout << "  ERROR: Decryption failed" << std::endl;
+                if (decrypt_result) {
+                    std::cout << "    Error: " << decrypt_result->error_message() << std::endl;
                 }
-                if (ciphertext.size() > 32) {
-                    std::cout << "...";
-                }
-                std::cout << std::endl;
-                
-                // Then decrypt
-                agent_->UpdateEncryptionMetadata(encryption_metadata);
-                auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
-                
-                if (!decrypt_result || !decrypt_result->success()) {
-                    std::cout << "  ERROR: Decryption failed" << std::endl;
-                    if (decrypt_result) {
-                        std::cout << "    Error: " << decrypt_result->error_message() << std::endl;
-                    }
-                    all_succeeded = false;
-                    continue;
-                }
-                
-                // Convert decrypted data back to string
-                std::string decrypted_string(decrypt_result->plaintext().begin(), 
-                                           decrypt_result->plaintext().end());
-                                
-                std::cout << "  OK: Decrypted: " << (decrypted_string.length() > 50 ? decrypted_string.substr(0, 50) + "..." : decrypted_string) << std::endl;
-                
-                // Verify data integrity
-                if (decrypted_string == original_data) {
-                    std::cout << "  OK: Data integrity verified" << std::endl;
-                } else {
-                    std::cout << "  ERROR: Data integrity check failed" << std::endl;
-                    all_succeeded = false;
-                }
-                
-            } catch (const std::exception& e) {
-                std::cout << "  ERROR: Exception: " << e.what() << std::endl;
+                return false;
+            }
+            
+            // Convert decrypted data back to string list
+            auto decrypted_compressed = decrypt_result->plaintext();
+            auto decrypted_plain = Decompress(
+                std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
+                CompressionCodec::SNAPPY);
+            auto decrypted_list = ParseByteArrayListPayload(decrypted_plain);
+                            
+            // Verify data integrity
+            if (decrypted_list == sample_data) {
+                std::cout << "  OK: Data integrity verified for combined payload (" << decrypted_list.size() << " items)" << std::endl;
+            } else {
+                std::cout << "  ERROR: Data integrity check failed for combined payload" << std::endl;
                 all_succeeded = false;
             }
+            
+        } catch (const std::exception& e) {
+            std::cout << "  ERROR: Exception: " << e.what() << std::endl;
+            all_succeeded = false;
         }
         
         return all_succeeded;
@@ -294,17 +351,29 @@ public:
             }
             
             try {
-                std::vector<uint8_t> plaintext(test_data.begin(), test_data.end());
+                auto plaintext = MakeByteArrayPayload(test_data);
+                auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
                 
                 // Encrypt
                 std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
+                auto encrypt_result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
                     std::cout << "  ERROR: Encryption failed" << std::endl;
                     continue;
                 }
                 
+                auto enc_meta = encrypt_result->encryption_metadata();
+                auto enc_mode_it = enc_meta->find("encryption_mode");
+                if (enc_mode_it == enc_meta->end()) {
+                    std::cout << "  ERROR: Encryption metadata missing encryption_mode" << std::endl;
+                    continue;
+                }
+                if (enc_mode_it->second != "per_value") {
+                    std::cout << "  ERROR: Unexpected encryption_mode: " << enc_mode_it->second << std::endl;
+                    continue;
+                }
+
                 // Decrypt
                 agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
                 auto decrypt_result = agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), encoding_attributes);
@@ -315,8 +384,11 @@ public:
                 }
                 
                 // Verify
-                std::string decrypted_string(decrypt_result->plaintext().begin(), 
-                                           decrypt_result->plaintext().end());
+                auto decrypted_compressed = decrypt_result->plaintext();
+                auto decrypted_plain = Decompress(
+                    std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
+                    CompressionCodec::SNAPPY);
+                std::string decrypted_string = ParseByteArrayPayload(decrypted_plain);
                 
                 if (decrypted_string == test_data) {
                     std::cout << "  OK: Round-trip successful" << std::endl;
@@ -370,9 +442,26 @@ public:
             std::cout << std::endl;
             std::cout << "Binary size: " << float_binary_data.size() << " bytes" << std::endl;
             
-            // Encrypt the float data
-            std::map<std::string, std::string> float_encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(float_binary_data), float_encoding_attributes);
+            // Build DATA_PAGE_V2 payload: level bytes (uncompressed) + compressed value bytes
+            const int32_t def_len = 2;
+            const int32_t rep_len = 1;
+            std::vector<uint8_t> level_bytes(static_cast<size_t>(def_len + rep_len), 0x00);
+            auto compressed_values = Compress(float_binary_data, CompressionCodec::SNAPPY);
+            auto joined_plaintext = Join(level_bytes, compressed_values);
+
+            std::map<std::string, std::string> float_encoding_attributes = {
+                {"page_type", "DATA_PAGE_V2"},
+                {"data_page_num_values", std::to_string(float_test_data.size())},
+                {"data_page_max_definition_level", "1"},
+                {"data_page_max_repetition_level", "0"},
+                {"page_v2_definition_levels_byte_length", std::to_string(def_len)},
+                {"page_v2_repetition_levels_byte_length", std::to_string(rep_len)},
+                {"page_v2_num_nulls", "0"},
+                {"page_v2_is_compressed", "true"},
+                {"page_encoding", "PLAIN"}
+            };
+
+            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(joined_plaintext), float_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: Float encryption failed" << std::endl;
@@ -383,6 +472,20 @@ public:
             }
             
             std::cout << "OK: Float data encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
+            auto float_enc_meta = encrypt_result->encryption_metadata();
+            if (!float_enc_meta) {
+                std::cout << "ERROR: Float encryption metadata missing" << std::endl;
+                return false;
+            }
+            auto enc_mode_it = float_enc_meta->find("encryption_mode");
+            if (enc_mode_it == float_enc_meta->end()) {
+                std::cout << "ERROR: Float encryption metadata missing encryption_mode" << std::endl;
+                return false;
+            }
+            if (enc_mode_it->second != "per_value") {
+                std::cout << "ERROR: Unexpected float encryption_mode: " << enc_mode_it->second << std::endl;
+                return false;
+            }
             
             // Decrypt the float data
             float_agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
@@ -398,8 +501,28 @@ public:
             
             std::cout << "OK: Float data decrypted successfully" << std::endl;
             
-            // Convert decrypted binary back to float values
-            auto decrypted_data = decrypt_result->plaintext();
+            // Compare payload as sent vs received
+            auto decrypted_plaintext = decrypt_result->plaintext();
+            if (decrypted_plaintext.size() != joined_plaintext.size() ||
+                !std::equal(decrypted_plaintext.begin(), decrypted_plaintext.end(), joined_plaintext.begin())) {
+                std::cout << "ERROR: Decrypted payload mismatch (joined plaintext bytes differ)" << std::endl;
+                return false;
+            }
+            
+            // Split level and value bytes, then decompress value bytes
+            if (decrypted_plaintext.size() < static_cast<size_t>(def_len + rep_len)) {
+                std::cout << "ERROR: Decrypted data too small for level bytes" << std::endl;
+                return false;
+            }
+            std::vector<uint8_t> dec_level_bytes(decrypted_plaintext.begin(),
+                                                 decrypted_plaintext.begin() + def_len + rep_len);
+            if (dec_level_bytes.size() != level_bytes.size()) {
+                std::cout << "ERROR: Decrypted level bytes size mismatch" << std::endl;
+                return false;
+            }
+            std::vector<uint8_t> dec_compressed_values(decrypted_plaintext.begin() + def_len + rep_len,
+                                                       decrypted_plaintext.end());
+            auto decrypted_data = Decompress(dec_compressed_values, CompressionCodec::SNAPPY);
             if (decrypted_data.size() != float_binary_data.size()) {
                 std::cout << "ERROR: Decrypted data size mismatch. Expected: " << float_binary_data.size() 
                          << ", Got: " << decrypted_data.size() << std::endl;
@@ -470,14 +593,26 @@ public:
             std::cout << "Test data: 3 fixed-length strings (8 bytes each)" << std::endl;
             std::cout << "Original size: " << fixed_length_data.size() << " bytes" << std::endl;
             
-            // Compress the test data using Snappy before sending to server
-            std::vector<uint8_t> fixed_length_data_compressed = Compress(fixed_length_data, CompressionCodec::SNAPPY);
-            std::cout << "Compressed size: " << fixed_length_data_compressed.size() << " bytes" << std::endl;
-
-            // Test encryption with FIXED_LEN_BYTE_ARRAY and datatype_length
-            // The server will decompress the fixed_length_data_compressed, encrypt it, and compress the encrypted result
-            std::map<std::string, std::string> fixed_len_encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(fixed_length_data_compressed), fixed_len_encoding_attributes);
+            // Build DATA_PAGE_V1 payload: level bytes use RLE blocks with length prefixes
+            std::vector<uint8_t> level_bytes;
+            append_u32_le(level_bytes, 1); // repetition level block length
+            level_bytes.push_back(0xAA);
+            append_u32_le(level_bytes, 2); // definition level block length
+            level_bytes.push_back(0xBB);
+            level_bytes.push_back(0xCC);
+            auto combined_uncompressed = Join(level_bytes, fixed_length_data);
+            auto joined_plaintext = Compress(combined_uncompressed, CompressionCodec::SNAPPY);
+            std::cout << "Compressed size: " << joined_plaintext.size() << " bytes" << std::endl;
+            std::map<std::string, std::string> fixed_len_encoding_attributes = {
+                {"page_type", "DATA_PAGE_V1"},
+                {"data_page_num_values", "3"},
+                {"data_page_max_repetition_level", "1"},
+                {"data_page_max_definition_level", "1"},
+                {"page_v1_repetition_level_encoding", "RLE"},
+                {"page_v1_definition_level_encoding", "RLE"},
+                {"page_encoding", "PLAIN"}
+            };
+            auto encrypt_result = fixed_len_agent_->Encrypt(span<const uint8_t>(joined_plaintext), fixed_len_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY encryption failed" << std::endl;
@@ -488,6 +623,20 @@ public:
             }
             
             std::cout << "OK: FIXED_LEN_BYTE_ARRAY encrypted successfully (" << encrypt_result->size() << " bytes)" << std::endl;
+            auto fixed_enc_meta = encrypt_result->encryption_metadata();
+            if (!fixed_enc_meta) {
+                std::cout << "ERROR: Fixed-length encryption metadata missing" << std::endl;
+                return false;
+            }
+            auto enc_mode_it = fixed_enc_meta->find("encryption_mode");
+            if (enc_mode_it == fixed_enc_meta->end()) {
+                std::cout << "ERROR: Fixed-length encryption metadata missing encryption_mode" << std::endl;
+                return false;
+            }
+            if (enc_mode_it->second != "per_value") {
+                std::cout << "ERROR: Unexpected fixed-length encryption_mode: " << enc_mode_it->second << std::endl;
+                return false;
+            }
             
             // Test decryption
             fixed_len_agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
@@ -503,22 +652,68 @@ public:
             
             std::cout << "OK: FIXED_LEN_BYTE_ARRAY decrypted successfully" << std::endl;
             
-            // The server returns compressed plaintext (same compression as input)
-            // Decompress it before comparing with original data
-            auto decrypted_compressed_span = decrypt_result->plaintext();
-            std::vector<uint8_t> decrypted_compressed(decrypted_compressed_span.begin(), decrypted_compressed_span.end());
-            std::vector<uint8_t> decrypted_data = Decompress(decrypted_compressed, CompressionCodec::SNAPPY);
-            std::cout << "Decrypted compressed size: " << decrypted_compressed.size() << " bytes" << std::endl;
-            std::cout << "Decrypted uncompressed size: " << decrypted_data.size() << " bytes" << std::endl;
+            // Compare payload as sent vs received
+            auto decrypted_plaintext = decrypt_result->plaintext();
+            if (decrypted_plaintext.size() != joined_plaintext.size() ||
+                !std::equal(decrypted_plaintext.begin(), decrypted_plaintext.end(), joined_plaintext.begin())) {
+                std::cout << "ERROR: Decrypted payload mismatch (joined plaintext bytes differ)" << std::endl;
+                return false;
+            }
+            
+            // Decompress combined payload, split level/value
+            auto decompressed_combined = Decompress(
+                std::vector<uint8_t>(decrypted_plaintext.begin(), decrypted_plaintext.end()),
+                CompressionCodec::SNAPPY);
+            size_t offset = 0;
+            if (offset + 4 > decompressed_combined.size()) {
+                std::cout << "ERROR: Decompressed payload too small for rep level length" << std::endl;
+                return false;
+            }
+            uint32_t rep_len = read_u32_le(decompressed_combined, static_cast<int>(offset));
+            offset += 4;
+            if (offset + rep_len > decompressed_combined.size()) {
+                std::cout << "ERROR: Decompressed payload too small for rep level bytes" << std::endl;
+                return false;
+            }
+            auto rep_bytes = std::vector<uint8_t>(decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset),
+                                                  decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset + rep_len));
+            offset += rep_len;
+
+            if (offset + 4 > decompressed_combined.size()) {
+                std::cout << "ERROR: Decompressed payload too small for def level length" << std::endl;
+                return false;
+            }
+            uint32_t def_len = read_u32_le(decompressed_combined, static_cast<int>(offset));
+            offset += 4;
+            if (offset + def_len > decompressed_combined.size()) {
+                std::cout << "ERROR: Decompressed payload too small for def level bytes" << std::endl;
+                return false;
+            }
+            auto def_bytes = std::vector<uint8_t>(decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset),
+                                                  decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset + def_len));
+            offset += def_len;
+
+            if (rep_bytes != std::vector<uint8_t>{0xAA} || def_bytes != std::vector<uint8_t>{0xBB, 0xCC}) {
+                std::cout << "ERROR: Level bytes content mismatch" << std::endl;
+                return false;
+            }
+
+            if (offset > decompressed_combined.size()) {
+                std::cout << "ERROR: Offset beyond decompressed payload" << std::endl;
+                return false;
+            }
+            auto value_bytes = std::vector<uint8_t>(decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset),
+                                                    decompressed_combined.end());
+            std::cout << "Decompressed value size: " << value_bytes.size() << " bytes" << std::endl;
             
             // Verify data integrity
-            if (decrypted_data.size() == fixed_length_data.size() && 
-                std::equal(decrypted_data.begin(), decrypted_data.end(), fixed_length_data.begin(), fixed_length_data.end())) {
+            if (value_bytes.size() == fixed_length_data.size() && 
+                std::equal(value_bytes.begin(), value_bytes.end(), fixed_length_data.begin(), fixed_length_data.end())) {
                 std::cout << "OK: FIXED_LEN_BYTE_ARRAY data integrity verified" << std::endl;
             } else {
                 std::cout << "ERROR: FIXED_LEN_BYTE_ARRAY data integrity check failed" << std::endl;
                 std::cout << "  Expected size: " << fixed_length_data.size() << " bytes" << std::endl;
-                std::cout << "  Got size: " << decrypted_data.size() << " bytes" << std::endl;
+                std::cout << "  Got size: " << value_bytes.size() << " bytes" << std::endl;
                 return false;
             }
             
@@ -538,9 +733,10 @@ public:
         // Test with empty data
         std::cout << "\nTesting empty data handling:" << std::endl;
         try {
-            std::vector<uint8_t> empty_data;
+            auto empty_data = MakeByteArrayPayload("");
+            auto compressed_empty = Compress(empty_data, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-            auto result = agent_->Encrypt(span<const uint8_t>(empty_data), encoding_attributes);
+            auto result = agent_->Encrypt(span<const uint8_t>(compressed_empty), encoding_attributes);
             
             if (result && result->success()) {
                 std::cout << "  OK: Empty data handled successfully" << std::endl;
@@ -557,9 +753,10 @@ public:
         std::cout << "\nTesting large data handling:" << std::endl;
         try {
             std::string large_data(1000, 'X');  // 1KB of data
-            std::vector<uint8_t> plaintext(large_data.begin(), large_data.end());
+            auto plaintext = MakeByteArrayPayload(large_data);
+            auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
-            auto result = agent_->Encrypt(span<const uint8_t>(plaintext), encoding_attributes);
+            auto result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
             
             if (result && result->success()) {
                 std::cout << "  OK: Large data (" << plaintext.size() << " bytes) encrypted successfully" << std::endl;
