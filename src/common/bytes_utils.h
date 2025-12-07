@@ -21,9 +21,14 @@
 #include <cstdint>
 #include <limits>
 #include <cstring>
+#include <map>
+#include <string>
+#include <variant>
+#include <cassert>
 #include "exceptions.h"
 
-// Little-endian helpers reused across modules
+// Utility functions for little-endian number reading and writing.
+
 inline void append_u32_le(std::vector<uint8_t>& out, uint32_t v) {
     out.push_back(static_cast<uint8_t>(v & 0xFF));
     out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
@@ -68,6 +73,8 @@ inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
         (static_cast<uint32_t>(in[offset + 2]) << 16) |
         (static_cast<uint32_t>(in[offset + 3]) << 24);
 }
+
+// Utility functions for splitting and joining byte vectors.
 
 struct SplitBytesPair {
     std::vector<uint8_t> leading;
@@ -170,4 +177,62 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
     result.trailing = std::vector<uint8_t>(bytes.begin() + 4 + leading_length, bytes.end());
     
     return result;
+}
+
+// Utility functions for creating an AttributesMap
+
+// Common alias for converted encoding attributes used across modules.
+// Numeric values are captured as int32_t.
+using AttributesMap = std::map<std::string, std::variant<int32_t, bool, std::string>>;
+
+inline const std::string& GetRequiredAttribute(
+    const std::map<std::string, std::string>& attributes,
+    const std::string& key) {
+    auto it = attributes.find(key);
+    if (it == attributes.end()) {
+        throw InvalidInputException("Required encoding attribute [" + key + "] is missing");
+    }
+    return it->second;
+}
+
+inline int32_t AddIntAttribute(
+    AttributesMap& out,
+    const std::map<std::string, std::string>& attributes,
+    const std::string& key) {
+    const std::string& value = GetRequiredAttribute(attributes, key);
+    try {
+        int32_t value_int = static_cast<int32_t>(std::stol(value));
+        assert(value_int >= 0);
+        out[key] = value_int;
+        return value_int;
+    } catch (const std::exception& e) {
+        throw InvalidInputException(
+            "Failed to convert [" + key + "] with value [" + value + "] to int: " + e.what());
+    }
+}
+
+inline bool AddBoolAttribute(
+    AttributesMap& out,
+    const std::map<std::string, std::string>& attributes,
+    const std::string& key) {
+    const std::string& value = GetRequiredAttribute(attributes, key);
+    if (value == "true") {
+        out[key] = true;
+        return true;
+    } else if (value == "false") {
+        out[key] = false;
+        return false;
+    } else {
+        throw InvalidInputException(
+            "Failed to convert [" + key + "] with value [" + value + "] to bool");
+    }
+}
+
+inline std::string AddStringAttribute(
+    AttributesMap& out,
+    const std::map<std::string, std::string>& attributes,
+    const std::string& key) {
+    const std::string& value = GetRequiredAttribute(attributes, key);
+    out[key] = value;
+    return value;
 }

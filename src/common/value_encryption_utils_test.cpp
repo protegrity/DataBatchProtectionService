@@ -21,7 +21,6 @@
 #include <stdexcept>
 #include <vector>
 #include <cstdint>
-#include <variant>
 #include <string>
 #include <array>
 #include <limits>

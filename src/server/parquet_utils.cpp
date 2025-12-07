@@ -15,16 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "decoding_utils.h"
+#include "parquet_utils.h"
 #include "enum_utils.h"
+#include "compression_utils.h"
 #include <cstring>
 #include <iostream>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
+using namespace dbps::compression;
 
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
-    const std::map<std::string, std::variant<int32_t, bool, std::string>>& encoding_attribs) {
+    const AttributesMap& encoding_attribs) {
     
     // Helper function to skip V1 RLE level data in raw bytes
     // Returns number of bytes consumed: [4-byte len] + [level bytes indicated by `len`]
@@ -34,7 +36,7 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
                 "Invalid RLE level data: offset + 4 exceeds data size (offset=" + 
                 std::to_string(offset) + ", size=" + std::to_string(raw.size()) + ")");
         }
-        uint32_t len = *reinterpret_cast<const uint32_t*>(raw.data() + offset);
+        uint32_t len = read_u32_le(raw, offset);
         if (offset + 4 + len > raw.size()) {
             throw InvalidInputException(
                 "Invalid RLE level data: length field overflows (offset=" + 
@@ -223,6 +225,60 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
+}
+
+LevelAndValueBytes DecompressAndSplit(
+    const std::vector<uint8_t>& plaintext,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes) {
+
+    // Get the page type from the encoding attributes.
+    auto page_type = std::get<std::string>(encoding_attributes.at("page_type"));
+
+    // On DATA_PAGE_V1, the whole payload is compressed.
+    // So the split of level and value byte requires to
+    // (1) decompress the whole payload, (2) calculate length of level bytes, (3) split into level and value bytes.
+    if (page_type == "DATA_PAGE_V1") {
+        auto decompressed_bytes = Decompress(plaintext, compression);
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            decompressed_bytes, encoding_attributes);
+        auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
+        return LevelAndValueBytes{level_bytes, value_bytes};
+    }
+
+    // On DATA_PAGE_V2, only the value bytes are compressed.
+    // So the split of level and value byte requires to
+    // (1) calculate length of level bytes, (2) split into level, (3) decompress only the value bytes.
+    if (page_type == "DATA_PAGE_V2") {
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            plaintext, encoding_attributes);
+        auto [level_bytes, compressed_value_bytes] = Split(plaintext, leading_bytes_to_strip);
+
+        bool page_v2_is_compressed = std::get<bool>(
+            encoding_attributes.at("page_v2_is_compressed"));
+        std::vector<uint8_t> value_bytes;
+        if (page_v2_is_compressed) {
+            value_bytes = Decompress(compressed_value_bytes, compression);
+        } else {
+            value_bytes = compressed_value_bytes;
+        }
+        return LevelAndValueBytes{level_bytes, value_bytes};
+    }
+
+    // DICTIONARY_PAGE has no level bytes.
+    if (page_type == "DICTIONARY_PAGE") {
+        auto level_bytes = std::vector<uint8_t>();
+        auto value_bytes = Decompress(plaintext, compression);
+        return LevelAndValueBytes{level_bytes, value_bytes};
+    }
+
+    throw InvalidInputException("Unexpected page type: " + page_type);
+}
+
+std::vector<uint8_t> CompressAndJoin(
+    const std::vector<uint8_t>& level_bytes,
+    const std::vector<uint8_t>& value_bytes) {
+    throw DBPSUnsupportedException("CompressAndJoin not implemented");
 }
 
 TypedListValues ParseValueBytesIntoTypedList(

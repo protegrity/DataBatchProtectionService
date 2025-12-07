@@ -27,7 +27,8 @@
 #include <vector>
 
 #include "enums.h"
-#include "decoding_utils.h"
+#include "parquet_utils.h"
+#include "../common/bytes_utils.h"
 #include "encryptors/dbps_encryptor.h"
 #include <memory>
 
@@ -121,23 +122,8 @@ protected:
     // Encryptor instance for performing encryption/decryption operations
     std::unique_ptr<DBPSEncryptor> encryptor_;
 
-    /**
-     * Decompresses and splits the plaintext into level and value bytes.
-     * Returns the level and value bytes.
-     */
-     LevelAndValueBytes DecompressAndSplit(const std::vector<uint8_t>& plaintext);
-
-     /**
-      * Merges level and value bytes and compresses them into plaintext.
-      * This is the reverse operation of DecompressAndSplit.
-      * Handles different page types (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE) appropriately.
-      * Returns the joined and compressed plaintext.
-      */
-     std::vector<uint8_t> CompressAndJoin(const std::vector<uint8_t>& level_bytes, const std::vector<uint8_t>& value_bytes);
- 
-
     // Converted encoding attributes values to corresponding types
-    std::map<std::string, std::variant<int32_t, bool, std::string>> encoding_attributes_converted_;
+    AttributesMap encoding_attributes_converted_;
     
     /**
      * Converts encoding attributes string values to corresponding typed values.

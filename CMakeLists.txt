@@ -139,7 +139,7 @@ target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 add_library(dbps_server_lib STATIC 
   src/server/encryption_sequencer.cpp
   src/server/auth_utils.cpp
-  src/server/decoding_utils.cpp
+  src/server/parquet_utils.cpp
   src/server/compression_utils.cpp
   src/server/encryptors/basic_encryptor.cpp
 )
@@ -278,14 +278,14 @@ if(BUILD_TESTS)
     gtest_main
   )
 
-  # Decoding utils tests
-  add_executable(decoding_utils_test src/server/decoding_utils_test.cpp)
-  target_link_libraries(decoding_utils_test
+  # Parquet utils tests
+  add_executable(parquet_utils_test src/server/parquet_utils_test.cpp)
+  target_link_libraries(parquet_utils_test
     dbps_server_lib
     dbps_common_lib
     gtest_main
   )
-  target_include_directories(decoding_utils_test PRIVATE src/server)
+  target_include_directories(parquet_utils_test PRIVATE src/server)
 
   # Bytes utils tests
   add_executable(bytes_utils_test src/common/bytes_utils_test.cpp)
@@ -484,7 +484,7 @@ if(BUILD_TESTS)
       value_encryption_utils_test
       typed_list_values_test
       encryption_sequencer_test
-      decoding_utils_test
+      parquet_utils_test
       bytes_utils_test
       compression_utils_test
       basic_encryptor_test
@@ -505,7 +505,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(value_encryption_utils_test)
   gtest_discover_tests(typed_list_values_test)
   gtest_discover_tests(encryption_sequencer_test)
-  gtest_discover_tests(decoding_utils_test)
+  gtest_discover_tests(parquet_utils_test)
   gtest_discover_tests(bytes_utils_test)
   gtest_discover_tests(compression_utils_test)
   gtest_discover_tests(basic_encryptor_test)
