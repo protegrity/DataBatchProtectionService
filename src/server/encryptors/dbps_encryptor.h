@@ -70,7 +70,6 @@ public:
      * @param data The plaintext data to encrypt as a vector of bytes
      * @return The encrypted data as a vector of bytes
      * @throws InvalidInputException if the input data is invalid or empty
-     * @throws DBPSUnsupportedException if the encryption operation is not supported
      */
     virtual std::vector<uint8_t> EncryptBlock(const std::vector<uint8_t>& data) = 0;
 
@@ -80,7 +79,6 @@ public:
      * @param data The ciphertext data to decrypt as a vector of bytes
      * @return The decrypted data as a vector of bytes
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
-     * @throws DBPSUnsupportedException if the decryption operation is not supported
      */
     virtual std::vector<uint8_t> DecryptBlock(const std::vector<uint8_t>& data) = 0;
 
@@ -95,7 +93,6 @@ public:
      * @param typed_list The typed list of values to encrypt (variant type supporting multiple data types)
      * @return The encrypted data as a vector of bytes containing the encrypted typed list values
      * @throws InvalidInputException if the input data is invalid or empty
-     * @throws DBPSUnsupportedException if the encryption operation is not supported
      */
     virtual std::vector<uint8_t> EncryptValueList(
         const TypedListValues& typed_list) = 0;
@@ -108,7 +105,6 @@ public:
      * @param encrypted_bytes The encrypted data as a vector of bytes containing only the encrypted typed list
      * @return The decrypted TypedListValues
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
-     * @throws DBPSUnsupportedException if the decryption operation is not supported
      */
     virtual TypedListValues DecryptValueList(
         const std::vector<uint8_t>& encrypted_bytes) = 0;
