@@ -140,24 +140,49 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
 
-    } catch (const DBPSUnsupportedException& e) {
-        // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
-        // (as opposed to per-value)
+    }
+    // If the sequence was interrupted by a DBPSUnsupportedException, allow fallback to per-block encryption
+    // but only for explicitly unsupported conditions.
+    // Any conditions that are already supported should not fallback. In those cases, the exception is re-thrown.
+    catch (const DBPSUnsupportedException& e) {
+
+        // Compression: Only UNCOMPRESSED and SNAPPY are supported
+        // TODO(Issue #188): Add support for other compressions.
+        const bool compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
+                                            compression_ == CompressionCodec::SNAPPY);
+        
+        // Format: Only PLAIN is supported
+        // TODO(Issue #187): Add support for other encodings.
+        const bool format_supported = (format_ == Format::PLAIN);
+        
+        // Page type: All are supported (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE)
+        const bool page_supported = true;
+        
+        // Datatype: All datatypes are supported.
+        const bool datatype_supported = true;
+
+        if (compression_supported && format_supported && page_supported && datatype_supported) {
+            // All conditions are supported, therefore an DBPSUnsupportedException exception should not have happened. 
+            // Re-throw the exception.
+            throw;
+        }
+
+        // Fallback: Use per-block encryption for unsupported combinations.
         encrypted_result_ = encryptor_->EncryptBlock(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
             error_message_ = "Failed to encrypt data";
             return false;
         }
-        // If the sequence was interrupted by a DBPSUnsupportedException at any point, use per block encryption.
-        // Set the encryption type to per block.
         encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_BLOCK;
         encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         return true;
+
     } catch (const InvalidInputException& e) {
         // Throw the exception so it can be caught by the caller.
         throw;
     }
+
     // If the sequencer got here, it means the encryption of the values in the typed list finished successfully.
     // Set the encryption type to per value
     encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
