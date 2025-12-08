@@ -148,20 +148,20 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
 
         // Compression: Only UNCOMPRESSED and SNAPPY are supported
         // TODO(Issue #188): Add support for other compressions.
-        const bool compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
-                                            compression_ == CompressionCodec::SNAPPY);
+        const bool is_compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
+                                               compression_ == CompressionCodec::SNAPPY);
         
         // Format: Only PLAIN is supported
         // TODO(Issue #187): Add support for other encodings.
-        const bool format_supported = (format_ == Format::PLAIN);
+        const bool is_format_supported = (format_ == Format::PLAIN);
         
         // Page type: All are supported (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE)
-        const bool page_supported = true;
+        const bool is_page_supported = true;
         
         // Datatype: All datatypes are supported.
-        const bool datatype_supported = true;
+        const bool is_datatype_supported = true;
 
-        if (compression_supported && format_supported && page_supported && datatype_supported) {
+        if (is_compression_supported && is_format_supported && is_page_supported && is_datatype_supported) {
             // All conditions are supported, therefore an DBPSUnsupportedException exception should not have happened. 
             // Re-throw the exception.
             throw;
