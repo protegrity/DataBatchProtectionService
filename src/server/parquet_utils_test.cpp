@@ -120,7 +120,7 @@ TEST(ParquetUtils, CalculateLevelBytesLength_UnknownPageType) {
     AttributesMap attribs = {
         {"page_type", std::string("UNKNOWN_PAGE_TYPE")}
     };
-    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), DBPSUnsupportedException);
+    EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
 TEST(ParquetUtils, CalculateLevelBytesLength_InvalidTotalSize) {
