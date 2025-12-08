@@ -23,7 +23,6 @@ using namespace dbps::enum_utils;
 
 namespace dbps::compression {
 
-// TODO(Issue #188): Add support for other compressions.
 std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
     if (compression == CompressionCodec::UNCOMPRESSED) {
         return bytes;

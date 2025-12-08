@@ -149,7 +149,6 @@ std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
         throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
     }
 
-    // TODO(Issue #187): Add support for other encodings.
     if (format != Format::PLAIN) {
         throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported format: " + std::string(to_string(format)));
     }
@@ -208,7 +207,6 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
         throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
     }
 
-    // TODO(Issue #187): Add support for other encodings.
     if (format != Format::PLAIN) {
         throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported format: " + std::string(to_string(format)));
     }
