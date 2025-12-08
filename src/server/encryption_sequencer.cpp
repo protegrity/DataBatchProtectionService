@@ -124,13 +124,15 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return false;
     }
 
-    // Note on try-catch block:
-    // - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
-    // - This try-catch block is transitional to allow features to be developed incrementally until all features are
-    //   complete: Compressions, Encodings, Page types, Datatypes.
-    // - During development if a feature is not yet supported, UnsupportedExceptions are caught and the fallback to
-    //   per-block encryption is used.
-    // - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
+    /*
+     * Note on try-catch block:
+     * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
+     * - This try-catch block is transitional to allow features to be developed incrementally until all features are
+     *   complete: Compressions, Encodings, Page types, Datatypes.
+     * - During development if a feature is not yet supported, UnsupportedExceptions are caught and the fallback to
+     *   per-block encryption is used.
+     * - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
+     */
     try {
         // Decompress and split plaintext into level and value bytes
         auto [level_bytes, value_bytes] = DecompressAndSplit(
