@@ -124,6 +124,13 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return false;
     }
 
+    // Note on try-catch block:
+    // - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
+    // - This try-catch block is transitional to allow features to be developed incrementally until all features are
+    //   complete: Compressions, Encodings, Page types, Datatypes.
+    // - During development if a feature is not yet supported, UnsupportedExceptions are caught and the fallback to
+    //   per-block encryption is used.
+    // - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
     try {
         // Decompress and split plaintext into level and value bytes
         auto [level_bytes, value_bytes] = DecompressAndSplit(
@@ -140,10 +147,12 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
 
+        // Set the encryption type to per-value
+        encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+        return true;
     }
-    // If the sequence was interrupted by a DBPSUnsupportedException, allow fallback to per-block encryption
-    // but only for explicitly unsupported conditions.
-    // Any conditions that are already supported should not fallback. In those cases, the exception is re-thrown.
+    // Allow fallback to per-block encryption, only for explicitly unsupported conditions. See note above.
     catch (const DBPSUnsupportedException& e) {
 
         // Compression: Only UNCOMPRESSED and SNAPPY are supported
@@ -165,7 +174,6 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
             throw;
         }
 
-        // Fallback: Use per-block encryption for unsupported combinations.
         encrypted_result_ = encryptor_->EncryptBlock(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
@@ -177,15 +185,9 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return true;
 
     } catch (const InvalidInputException& e) {
-        // Throw the exception so it can be caught by the caller.
+        // InvalidInputException is treated as any other exception and is re-thrown to be handled by the caller.
         throw;
     }
-
-    // If the sequencer got here, it means the encryption of the values in the typed list finished successfully.
-    // Set the encryption type to per value
-    encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
-    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
-    return true;
 }
 
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
