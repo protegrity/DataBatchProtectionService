@@ -124,6 +124,15 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return false;
     }
 
+    /*
+     * Note on try-catch block:
+     * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
+     * - This try-catch block is transitional to allow features to be developed incrementally until all features are
+     *   complete: Compressions, Encodings, Page types, Datatypes.
+     * - During development if a feature is not yet supported, UnsupportedExceptions are caught and the fallback to
+     *   per-block encryption is used.
+     * - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
+     */
     try {
         // Decompress and split plaintext into level and value bytes
         auto [level_bytes, value_bytes] = DecompressAndSplit(
@@ -140,29 +149,47 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // Compress the joined encrypted bytes
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
 
-    } catch (const DBPSUnsupportedException& e) {
-        // If any stage is as of yet unsupported, default to whole payload (per-block) encryption
-        // (as opposed to per-value)
+        // Set the encryption type to per-value
+        encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+        return true;
+    }
+    // Allow fallback to per-block encryption, only for explicitly unsupported conditions. See note above.
+    catch (const DBPSUnsupportedException& e) {
+
+        // Compression: Only UNCOMPRESSED and SNAPPY are supported
+        const bool is_compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
+                                               compression_ == CompressionCodec::SNAPPY);
+        
+        // Format: Only PLAIN is supported
+        const bool is_format_supported = (format_ == Format::PLAIN);
+        
+        // Page type: All are supported (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE)
+        const bool is_page_supported = true;
+        
+        // Datatype: All datatypes are supported.
+        const bool is_datatype_supported = true;
+
+        if (is_compression_supported && is_format_supported && is_page_supported && is_datatype_supported) {
+            // All conditions are supported, therefore an DBPSUnsupportedException exception should not have happened. 
+            // Re-throw the exception.
+            throw;
+        }
+
         encrypted_result_ = encryptor_->EncryptBlock(plaintext);
         if (encrypted_result_.empty()) {
             error_stage_ = "encryption";
             error_message_ = "Failed to encrypt data";
             return false;
         }
-        // If the sequence was interrupted by a DBPSUnsupportedException at any point, use per block encryption.
-        // Set the encryption type to per block.
         encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_BLOCK;
         encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         return true;
+
     } catch (const InvalidInputException& e) {
-        // Throw the exception so it can be caught by the caller.
+        // InvalidInputException is treated as any other exception and is re-thrown to be handled by the caller.
         throw;
     }
-    // If the sequencer got here, it means the encryption of the values in the typed list finished successfully.
-    // Set the encryption type to per value
-    encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
-    encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
-    return true;
 }
 
 // TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.

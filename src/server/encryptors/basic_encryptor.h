@@ -28,7 +28,6 @@
  * 
  * This implementation provides:
  * - Block encryption/decryption using XOR with key_id hash (same as current encryption_sequencer)
- * - Value encryption/decryption currently throws DBPSUnsupportedException (same as current encryption_sequencer)
  * 
  * This is a simple, default encryption implementation that can be replaced with more
  * sophisticated encryption providers (e.g., Protegrity) in the future.

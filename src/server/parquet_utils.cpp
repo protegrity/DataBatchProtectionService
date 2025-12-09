@@ -92,8 +92,8 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         total_level_bytes = 0;
 
     } else {
-        // Unknown page type
-        throw DBPSUnsupportedException("Unsupported page type: " + page_type);
+        // Invalid page type
+        throw InvalidInputException("Invalid page type: " + page_type);
     }
 
     // Validate that the total level bytes before returning.
@@ -130,10 +130,10 @@ inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::opt
         case Type::UNDEFINED:
             return 1;
         case Type::BYTE_ARRAY:
-            throw DBPSUnsupportedException("BYTE_ARRAY is variable-length; not fixed-size");
+            throw InvalidInputException("BYTE_ARRAY is variable-length; not fixed-size");
         default:
-            throw DBPSUnsupportedException(
-                "Unsupported datatype: " + std::string(to_string(datatype)));
+            throw InvalidInputException(
+                "Invalid datatype. Only fixed-size types are supported: " + std::string(to_string(datatype)));
     }
 }
 
@@ -142,8 +142,15 @@ std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Format::type format) {
+
+    // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
+    // only references to them.
+    if (format == Format::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
+    }
+
     if (format != Format::PLAIN) {
-        throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format)));
+        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported format: " + std::string(to_string(format)));
     }
 
     // Variable-length BYTE_ARRAY: parse [4-byte len][bytes...] elements in order.
@@ -193,8 +200,15 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Format::type format) {
+
+    // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
+    // only references to them.
+    if (format == Format::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
+    }
+
     if (format != Format::PLAIN) {
-        throw DBPSUnsupportedException("Unsupported format: " + std::string(to_string(format)));
+        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported format: " + std::string(to_string(format)));
     }
 
     if (datatype == Type::BYTE_ARRAY) {
