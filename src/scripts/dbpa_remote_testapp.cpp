@@ -258,10 +258,10 @@ public:
                 std::cout << "  ERROR: Encryption metadata verification failed" << std::endl;
                 return false;
             }
-            // Expect per-value encryption mode
-            auto enc_mode_it = encryption_metadata->find("encryption_mode");
+            // Expect per-value encryption mode (DICTIONARY_PAGE uses encrypt_mode_dict_page)
+            auto enc_mode_it = encryption_metadata->find("encrypt_mode_dict_page");
             if (enc_mode_it == encryption_metadata->end()) {
-                std::cout << "  ERROR: Encryption metadata missing encryption_mode" << std::endl;
+                std::cout << "  ERROR: Encryption metadata missing encrypt_mode_dict_page" << std::endl;
                 return false;
             }
             if (enc_mode_it->second != "per_value") {
@@ -364,9 +364,9 @@ public:
                 }
                 
                 auto enc_meta = encrypt_result->encryption_metadata();
-                auto enc_mode_it = enc_meta->find("encryption_mode");
+                auto enc_mode_it = enc_meta->find("encrypt_mode_dict_page");
                 if (enc_mode_it == enc_meta->end()) {
-                    std::cout << "  ERROR: Encryption metadata missing encryption_mode" << std::endl;
+                    std::cout << "  ERROR: Encryption metadata missing encrypt_mode_dict_page" << std::endl;
                     continue;
                 }
                 if (enc_mode_it->second != "per_value") {
@@ -477,9 +477,9 @@ public:
                 std::cout << "ERROR: Float encryption metadata missing" << std::endl;
                 return false;
             }
-            auto enc_mode_it = float_enc_meta->find("encryption_mode");
+            auto enc_mode_it = float_enc_meta->find("encrypt_mode_data_page");
             if (enc_mode_it == float_enc_meta->end()) {
-                std::cout << "ERROR: Float encryption metadata missing encryption_mode" << std::endl;
+                std::cout << "ERROR: Float encryption metadata missing encrypt_mode_data_page" << std::endl;
                 return false;
             }
             if (enc_mode_it->second != "per_value") {
@@ -628,9 +628,9 @@ public:
                 std::cout << "ERROR: Fixed-length encryption metadata missing" << std::endl;
                 return false;
             }
-            auto enc_mode_it = fixed_enc_meta->find("encryption_mode");
+            auto enc_mode_it = fixed_enc_meta->find("encrypt_mode_data_page");
             if (enc_mode_it == fixed_enc_meta->end()) {
-                std::cout << "ERROR: Fixed-length encryption metadata missing encryption_mode" << std::endl;
+                std::cout << "ERROR: Fixed-length encryption metadata missing encrypt_mode_data_page" << std::endl;
                 return false;
             }
             if (enc_mode_it->second != "per_value") {
