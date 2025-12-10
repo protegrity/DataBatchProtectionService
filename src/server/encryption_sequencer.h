@@ -156,5 +156,10 @@ protected:
      * otherwise returns empty string.
      */
     std::optional<std::string> SafeGetEncryptionMode();
+
+    /**
+     * Returns the encryption mode metadata key based on the page type in encoding_attributes_converted_.
+     */
+    const char* GetEncryptionModeKey();
     
 };

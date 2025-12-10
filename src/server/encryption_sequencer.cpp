@@ -38,9 +38,10 @@ using namespace dbps::compression;
 namespace {
     constexpr const char* DBPS_VERSION_KEY = "dbps_agent_version";
     constexpr const char* DBPS_VERSION = "v0.01";
-    constexpr const char* ENCRYPTION_MODE = "encryption_mode";
-    constexpr const char* ENCRYPTION_PER_BLOCK = "per_block";
-    constexpr const char* ENCRYPTION_PER_VALUE = "per_value";
+    constexpr const char* ENCRYPTION_MODE_KEY_DICTIONARY_PAGE = "encrypt_mode_dict_page";
+    constexpr const char* ENCRYPTION_MODE_KEY_DATA_PAGE = "encrypt_mode_data_page";
+    constexpr const char* ENCRYPTION_MODE_PER_BLOCK = "per_block";
+    constexpr const char* ENCRYPTION_MODE_PER_VALUE = "per_value";
 }
 
 // Helper function to create encryptor instance
@@ -124,6 +125,8 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         return false;
     }
 
+    auto encryption_mode_key = GetEncryptionModeKey();
+    
     /*
      * Note on try-catch block:
      * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
@@ -150,7 +153,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
 
         // Set the encryption type to per-value
-        encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_VALUE;
+        encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_VALUE;
         encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         return true;
     }
@@ -182,7 +185,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
             error_message_ = "Failed to encrypt data";
             return false;
         }
-        encryption_metadata_[ENCRYPTION_MODE] = ENCRYPTION_PER_BLOCK;
+        encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_BLOCK;
         encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
         return true;
 
@@ -224,7 +227,7 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     std::string encryption_mode = encryption_mode_opt.value();
     
     // Per-value encryption
-    if (encryption_mode == ENCRYPTION_PER_VALUE) {
+    if (encryption_mode == ENCRYPTION_MODE_PER_VALUE) {
         // Decompress the encrypted bytes
         auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
         
@@ -242,7 +245,7 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
     }
     
     // Per-block encryption
-    else if (encryption_mode == ENCRYPTION_PER_BLOCK) {
+    else if (encryption_mode == ENCRYPTION_MODE_PER_BLOCK) {
         // Simple XOR decryption (same operation as encryption) for per-block encryption
         decrypted_result_ = encryptor_->DecryptBlock(ciphertext);
         if (decrypted_result_.empty()) {
@@ -276,6 +279,8 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
             add_int("data_page_max_definition_level");
             add_int("data_page_max_repetition_level");
         }
+
+        // Check specific attributes for each page type.
         if (page_type == "DATA_PAGE_V1") {
             add_str("page_v1_definition_level_encoding");
             add_str("page_v1_repetition_level_encoding");
@@ -287,7 +292,10 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
             add_bool("page_v2_is_compressed");
         } else if (page_type == "DICTIONARY_PAGE") {
             // DICTIONARY_PAGE has no specific encoding attributes
+        } else {
+            throw InvalidInputException("Unexpected page type: " + page_type);
         }
+
         return true;
         
     } catch (const InvalidInputException& e) {
@@ -340,14 +348,19 @@ std::string DataBatchEncryptionSequencer::ValidateDecryptionVersion() {
     return "";
 }
 
+const char* DataBatchEncryptionSequencer::GetEncryptionModeKey() {
+    auto page_type = std::get<std::string>(encoding_attributes_converted_.at("page_type"));
+    return (page_type == "DICTIONARY_PAGE") ? ENCRYPTION_MODE_KEY_DICTIONARY_PAGE : ENCRYPTION_MODE_KEY_DATA_PAGE;
+}
+
 std::optional<std::string> DataBatchEncryptionSequencer::SafeGetEncryptionMode() {
-    auto it = encryption_metadata_.find(ENCRYPTION_MODE);
+    auto it = encryption_metadata_.find(GetEncryptionModeKey());
     if (it == encryption_metadata_.end()) {
         // The metadata key for encryption mode is missing.
         return std::nullopt;
     }
     const std::string& encryption_mode = it->second;
-    if (encryption_mode != ENCRYPTION_PER_BLOCK && encryption_mode != ENCRYPTION_PER_VALUE) {
+    if (encryption_mode != ENCRYPTION_MODE_PER_BLOCK && encryption_mode != ENCRYPTION_MODE_PER_VALUE) {
         // The value for encryption mode is not valid.
         return std::nullopt;
     }
