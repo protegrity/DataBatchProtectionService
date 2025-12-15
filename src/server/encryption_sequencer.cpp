@@ -129,8 +129,9 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     
     /*
      * Note on try-catch block:
-     * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases.
-     * - This try-catch block is transitional to allow features to be developed incrementally until all features are
+     * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases, except for
+     *   (1) BOOLEAN datatype and (2) RLE_DICTIONARY encoding.
+     * - This try-catch block allows features to be developed incrementally until all features are
      *   complete: Compressions, Encodings, Page types, Datatypes.
      * - During development if a feature is not yet supported, UnsupportedExceptions are caught and the fallback to
      *   per-block encryption is used.
@@ -160,18 +161,21 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     // Allow fallback to per-block encryption, only for explicitly unsupported conditions. See note above.
     catch (const DBPSUnsupportedException& e) {
 
-        // Compression: Only UNCOMPRESSED and SNAPPY are supported
+        // Compression: Only UNCOMPRESSED and SNAPPY are currently supported
         const bool is_compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
                                                compression_ == CompressionCodec::SNAPPY);
         
-        // Format: Only PLAIN is supported
-        const bool is_format_supported = (format_ == Format::PLAIN);
+        // Format: Only PLAIN is currently supported
+        // RLE_DICTIONARY is not supported for per-value encryption since the values are not present in the 
+        // `plaintext` data, only references to them.
+        const bool is_format_supported = (format_ == Format::PLAIN && format_ != Format::RLE_DICTIONARY);
         
         // Page type: All are supported (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE)
         const bool is_page_supported = true;
-        
-        // Datatype: All datatypes are supported.
-        const bool is_datatype_supported = true;
+
+        // Datatype: All datatypes are supported except BOOLEAN.
+        // BOOLEAN is not supported for per-value encryption and always defaults to per-block encryption.
+        const bool is_datatype_supported = (datatype_ != Type::BOOLEAN);
 
         if (is_compression_supported && is_format_supported && is_page_supported && is_datatype_supported) {
             // All conditions are supported, therefore an DBPSUnsupportedException exception should not have happened. 

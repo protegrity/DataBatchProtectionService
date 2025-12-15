@@ -222,6 +222,13 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_UnsupportedFormat) {
                  DBPSUnsupportedException);
 }
 
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_BOOLEAN_Throws) {
+    // BOOLEAN type is not supported for per-value parsing
+    std::vector<uint8_t> bytes = {0xB4};  // 8 boolean values bit-packed
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+                 DBPSUnsupportedException);
+}
+
 TEST(ParquetUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // 3 bytes, not divisible by sizeof(int32_t)
     EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN), 
@@ -234,6 +241,22 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT32) {
     ASSERT_EQ(out.size(), 2u);
     EXPECT_EQ(out[0], (std::vector<uint8_t>{0x04,0x03,0x02,0x01}));
     EXPECT_EQ(out[1], (std::vector<uint8_t>{0x0D,0x0C,0x0B,0x0A}));
+}
+
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BOOLEAN_Throws) {
+    // BOOLEAN is bit-packed and not supported for per-value slicing
+    std::vector<uint8_t> bytes = {0xB4};  // 8 boolean values bit-packed
+    EXPECT_THROW(
+        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BOOLEAN_MultipleBytes_Throws) {
+    // Multiple bytes of boolean data
+    std::vector<uint8_t> bytes = {0xFF, 0x00, 0xAA, 0x55};  // 32 boolean values
+    EXPECT_THROW(
+        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT96) {
@@ -288,6 +311,25 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_INT32) {
     };
     auto out = CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Format::PLAIN);
     EXPECT_EQ(out, (std::vector<uint8_t>{0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A}));
+}
+
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BOOLEAN_Throws) {
+    // BOOLEAN is bit-packed and not supported for per-value combining
+    std::vector<RawValueBytes> elems = {
+        {0x01},  // single byte representing boolean value(s)
+        {0x00}
+    };
+    EXPECT_THROW(
+        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BOOLEAN_EmptyInput_Throws) {
+    // Even empty input should throw for BOOLEAN type
+    std::vector<RawValueBytes> elems;
+    EXPECT_THROW(
+        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
