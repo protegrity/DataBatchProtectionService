@@ -166,7 +166,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
                                                compression_ == CompressionCodec::SNAPPY);
         
         // Format: Only PLAIN is currently supported
-        // RLE_DICTIONARY is permanently unsupported for per-value encryption since the values are not present in the 
+        // RLE_DICTIONARY is not supported for per-value encryption since the values are not present in the 
         // `plaintext` data, only references to them.
         const bool is_format_supported = (format_ == Format::PLAIN && format_ != Format::RLE_DICTIONARY);
         
@@ -174,7 +174,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         const bool is_page_supported = true;
 
         // Datatype: All datatypes are supported except BOOLEAN.
-        // BOOLEAN is permanently unsupported for per-value encryption and always defaults to per-block encryption.
+        // BOOLEAN is not supported for per-value encryption and always defaults to per-block encryption.
         const bool is_datatype_supported = (datatype_ != Type::BOOLEAN);
 
         if (is_compression_supported && is_format_supported && is_page_supported && is_datatype_supported) {

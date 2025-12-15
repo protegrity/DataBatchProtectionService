@@ -419,8 +419,7 @@ TEST(EncryptionSequencer, ResultStorage) {
 
 // Test BOOLEAN type uses per-block encryption (not per-value)
 TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
-    // BOOLEAN is permanently unsupported for per-value operations
-    // and always defaults to per-block encryption
+    // BOOLEAN is not supported for per-value encryption and always defaults to per-block encryption
     std::vector<uint8_t> boolean_data = {0xB4, 0xFF, 0x00};  // some boolean bit-packed data
     
     DataBatchEncryptionSequencer sequencer(
@@ -440,8 +439,8 @@ TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
     bool result = sequencer.ConvertAndEncrypt(boolean_data);
     ASSERT_TRUE(result) << "BOOLEAN encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     
-    // Verify it used per-block encryption mode
-    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") > 0);
+    // Verify per-block encryption mode as used.
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") == 1);
     EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
     
     // Verify round-trip works
@@ -452,8 +451,7 @@ TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
 
 // Test RLE_DICTIONARY format uses per-block encryption (not per-value)
 TEST(EncryptionSequencer, RleDictionaryFormatUsesPerBlockEncryption) {
-    // RLE_DICTIONARY is permanently unsupported for per-value operations
-    // since the values are not present in the data, only references to them
+    // RLE_DICTIONARY is not supported for per-value encryption since the values are not present in the data, only references to them
     std::vector<uint8_t> rle_dict_data = {0x02, 0x00, 0x00, 0x00, 0x01};  // some RLE dictionary encoded data
     
     DataBatchEncryptionSequencer sequencer(
@@ -474,7 +472,7 @@ TEST(EncryptionSequencer, RleDictionaryFormatUsesPerBlockEncryption) {
     ASSERT_TRUE(result) << "RLE_DICTIONARY encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     
     // Verify it used per-block encryption mode
-    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") > 0);
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") == 1);
     EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
     
     // Verify round-trip works
