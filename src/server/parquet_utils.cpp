@@ -129,6 +129,8 @@ inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::opt
         }
         case Type::UNDEFINED:
             return 1;
+        case Type::BOOLEAN:
+            throw InvalidInputException("BOOLEAN is bit-sized; not fixed byte-sized");
         case Type::BYTE_ARRAY:
             throw InvalidInputException("BYTE_ARRAY is variable-length; not fixed-size");
         default:
@@ -146,11 +148,17 @@ std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
     // only references to them.
     if (format == Format::RLE_DICTIONARY) {
-        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
+        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations "
+            "since values are not present in the data, only references to them.");
     }
 
     if (format != Format::PLAIN) {
         throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported format: " + std::string(to_string(format)));
+    }
+
+    // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
+    if (datatype == Type::BOOLEAN) {
+        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, BOOLEAN datatype is not supported for converting to bytes.");
     }
 
     // Variable-length BYTE_ARRAY: parse [4-byte len][bytes...] elements in order.
@@ -209,6 +217,11 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
 
     if (format != Format::PLAIN) {
         throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported format: " + std::string(to_string(format)));
+    }
+
+    // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
+    if (datatype == Type::BOOLEAN) {
+        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, BOOLEAN datatype is not supported for converting to bytes.");
     }
 
     if (datatype == Type::BYTE_ARRAY) {

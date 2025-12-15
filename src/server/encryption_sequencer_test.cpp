@@ -417,6 +417,72 @@ TEST(EncryptionSequencer, ResultStorage) {
     
 }
 
+// Test BOOLEAN type uses per-block encryption (not per-value)
+TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
+    // BOOLEAN is permanently unsupported for per-value operations
+    // and always defaults to per-block encryption
+    std::vector<uint8_t> boolean_data = {0xB4, 0xFF, 0x00};  // some boolean bit-packed data
+    
+    DataBatchEncryptionSequencer sequencer(
+        "bool_column",
+        Type::BOOLEAN,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Format::PLAIN,
+        {{"page_type", "DICTIONARY_PAGE"}},
+        CompressionCodec::UNCOMPRESSED,
+        "test_key",
+        "test_user",
+        "{}",
+        {}
+    );
+    
+    bool result = sequencer.ConvertAndEncrypt(boolean_data);
+    ASSERT_TRUE(result) << "BOOLEAN encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    
+    // Verify it used per-block encryption mode
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") > 0);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
+    
+    // Verify round-trip works
+    bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+    ASSERT_TRUE(decrypt_result) << "BOOLEAN decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, boolean_data);
+}
+
+// Test RLE_DICTIONARY format uses per-block encryption (not per-value)
+TEST(EncryptionSequencer, RleDictionaryFormatUsesPerBlockEncryption) {
+    // RLE_DICTIONARY is permanently unsupported for per-value operations
+    // since the values are not present in the data, only references to them
+    std::vector<uint8_t> rle_dict_data = {0x02, 0x00, 0x00, 0x00, 0x01};  // some RLE dictionary encoded data
+    
+    DataBatchEncryptionSequencer sequencer(
+        "dict_column",
+        Type::INT32,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Format::RLE_DICTIONARY,
+        {{"page_type", "DICTIONARY_PAGE"}},
+        CompressionCodec::UNCOMPRESSED,
+        "test_key",
+        "test_user",
+        "{}",
+        {}
+    );
+    
+    bool result = sequencer.ConvertAndEncrypt(rle_dict_data);
+    ASSERT_TRUE(result) << "RLE_DICTIONARY encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    
+    // Verify it used per-block encryption mode
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_dict_page") > 0);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
+    
+    // Verify round-trip works
+    bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+    ASSERT_TRUE(decrypt_result) << "RLE_DICTIONARY decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, rle_dict_data);
+}
+
 // Test FIXED_LEN_BYTE_ARRAY validation
 TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
     
