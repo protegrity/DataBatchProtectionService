@@ -18,6 +18,7 @@
 #pragma once
 
 #include <string>
+#include <httplib.h>
 
 /**
  * Interface for HTTP client implementations.
@@ -28,6 +29,11 @@
 class HttpClientInterface {
 public:
     virtual ~HttpClientInterface() = default;
+
+    using HeaderList = httplib::Headers;
+
+    static constexpr const char* kJsonContentType = "application/json";
+    static constexpr const char* kDefaultUserAgent = "DBPSApiClient/1.0";
     
     struct HttpResponse {
         int status_code;
@@ -43,6 +49,21 @@ public:
             : status_code(code), result(std::move(response_result)), error_message(std::move(error)) {}
     };
     
+    static HeaderList DefaultJsonGetHeaders() {
+        HeaderList headers;
+        headers.insert({"Accept", kJsonContentType});
+        headers.insert({"User-Agent", kDefaultUserAgent});
+        return headers;
+    }
+
+    static HeaderList DefaultJsonPostHeaders() {
+        HeaderList headers;
+        headers.insert({"Content-Type", kJsonContentType});
+        headers.insert({"Accept", kJsonContentType});
+        headers.insert({"User-Agent", kDefaultUserAgent});
+        return headers;
+    }
+
     virtual HttpResponse Get(const std::string& endpoint) = 0;
     virtual HttpResponse Post(const std::string& endpoint, const std::string& json_body) = 0;
 };

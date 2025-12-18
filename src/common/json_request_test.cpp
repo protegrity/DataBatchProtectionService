@@ -940,3 +940,64 @@ TEST(JsonRequest, DecryptJsonResponseInvalidDatatypeLength) {
     std::string error = response.GetValidationError();
     ASSERT_TRUE(error.find("data_batch.datatype_info.length (invalid integer value)") != std::string::npos);
 }
+
+// Token request and response tests (simplified)
+TEST(JsonRequest, TokenRequestParse) {
+    {
+        TokenRequest req;
+        req.Parse(R"({"client_id":"client1","api_key":"key1"})");
+        ASSERT_FALSE(req.error_message.has_value());
+        ASSERT_EQ(req.client_id, "client1");
+        ASSERT_EQ(req.api_key, "key1");
+    }
+    {
+        TokenRequest req;
+        req.Parse(R"({"api_key":"key1"})");
+        ASSERT_TRUE(req.error_message.has_value());
+    }
+    {
+        TokenRequest req;
+        req.Parse("{ invalid json }");
+        ASSERT_TRUE(req.error_message.has_value());
+    }
+}
+
+TEST(JsonRequest, TokenRequestToJson) {
+    TokenRequest req;
+    req.client_id = "clientA";
+    req.api_key = "keyA";
+
+    auto json = crow::json::load(req.ToJson());
+    ASSERT_TRUE(json);
+    ASSERT_EQ(std::string(json["client_id"]), "clientA");
+    ASSERT_EQ(std::string(json["api_key"]), "keyA");
+}
+
+TEST(JsonRequest, TokenResponseRoundTrip) {
+    TokenResponse resp;
+    resp.token = "token123";
+    resp.expires_at = 1234567890;
+
+    auto json = crow::json::load(resp.ToJson());
+    ASSERT_TRUE(json);
+    ASSERT_EQ(std::string(json["token"]), "token123");
+    ASSERT_EQ(std::string(json["token_type"]), "Bearer");
+
+    auto expires_at_str = SafeGetFromJsonPath(json, {"expires_at"});
+    ASSERT_TRUE(expires_at_str.has_value());
+    ASSERT_EQ(std::stoll(*expires_at_str), 1234567890);
+
+    TokenResponse parsed;
+    parsed.Parse(resp.ToJson());
+    ASSERT_FALSE(parsed.error_message.has_value());
+    ASSERT_TRUE(parsed.token.has_value());
+    ASSERT_TRUE(parsed.expires_at.has_value());
+    ASSERT_EQ(parsed.token.value(), "token123");
+    ASSERT_EQ(parsed.expires_at.value(), 1234567890);
+}
+
+TEST(JsonRequest, TokenResponseParseError) {
+    TokenResponse resp;
+    resp.Parse(R"({"error":"unauthorized"})");
+    ASSERT_TRUE(resp.error_message.has_value());
+}

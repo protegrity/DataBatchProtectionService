@@ -108,12 +108,7 @@ int main(int argc, char* argv[]) {
         }
         
         // Create success response
-        crow::json::wvalue response;
-        response["token"] = token_response.token.value();
-        response["token_type"] = "Bearer";
-        response["expires_in"] = 14400;  // 4 hours in seconds
-        
-        return crow::response(200, response);
+        return crow::response(200, token_response.ToJson());
     });
 
     // Encryption endpoint - POST /encrypt

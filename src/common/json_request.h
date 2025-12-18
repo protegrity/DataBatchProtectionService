@@ -22,6 +22,7 @@
 #include <optional>
 #include <map>
 #include <cstdint>
+#include <utility>
 #include "enums.h"
 #include "enum_utils.h"
 
@@ -326,4 +327,29 @@ protected:
      * @return String representation of the JSON
      */
     std::string ToJsonString() const override;
+};
+
+/**
+ * Structure to hold parsed token request data.
+ */
+struct TokenRequest {
+    std::string client_id;
+    std::string api_key;
+    std::optional<std::string> error_message;
+
+    void Parse(const std::string& request_body);
+    std::string ToJson() const;
+};
+
+/**
+ * Structure to hold token generation result.
+ */
+struct TokenResponse {
+    std::optional<std::string> token;
+    std::optional<std::int64_t> expires_at;
+    std::optional<std::string> error_message;
+    int error_status_code = 400;
+
+    void Parse(const std::string& response_body);
+    std::string ToJson() const;
 };

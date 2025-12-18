@@ -129,6 +129,110 @@ std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
     }
 }
 
+void TokenRequest::Parse(const std::string& request_body) {
+    client_id.clear();
+    api_key.clear();
+    error_message = std::nullopt;
+
+    auto json_body_opt = SafeLoadJsonBody(request_body);
+    if (!json_body_opt) {
+        error_message = "Invalid JSON in request body. Invalid format.";
+        return;
+    }
+
+    auto json_body = *json_body_opt;
+    if (json_body.t() != crow::json::type::Object) {
+        error_message = "Invalid JSON in request body. Invalid format.";
+        return;
+    }
+
+    if (json_body.has("client_id") && json_body["client_id"].t() == crow::json::type::String) {
+        client_id = std::string(json_body["client_id"]);
+    } else {
+        error_message = "Missing required field: client_id";
+        return;
+    }
+
+    if (json_body.has("api_key") && json_body["api_key"].t() == crow::json::type::String) {
+        api_key = std::string(json_body["api_key"]);
+    } else {
+        error_message = "Missing required field: api_key";
+        return;
+    }
+}
+
+std::string TokenRequest::ToJson() const {
+    crow::json::wvalue json;
+    if (error_message.has_value()) {
+        json["error"] = error_message.value();
+        return PrettyPrintJson(json.dump());
+    }
+
+    json["client_id"] = client_id;
+    json["api_key"] = api_key;
+    return PrettyPrintJson(json.dump());
+}
+
+void TokenResponse::Parse(const std::string& response_body) {
+    token = std::nullopt;
+    expires_at = std::nullopt;
+    error_message = std::nullopt;
+    error_status_code = 400;
+
+    auto json_body_opt = SafeLoadJsonBody(response_body);
+    if (!json_body_opt) {
+        error_message = "Invalid JSON in response body. Invalid format.";
+        return;
+    }
+
+    auto json_body = *json_body_opt;
+    if (json_body.t() != crow::json::type::Object) {
+        error_message = "Invalid JSON in response body. Invalid format.";
+        return;
+    }
+
+    if (json_body.has("error")) {
+        error_message = std::string(json_body["error"]);
+        return;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"token"})) {
+        token = *parsed_value;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"expires_at"})) {
+        try {
+            expires_at = std::stoll(*parsed_value);
+        } catch (const std::exception&) {
+            error_message = "Invalid expires_at field";
+            return;
+        }
+    }
+}
+
+std::string TokenResponse::ToJson() const {
+    crow::json::wvalue json;
+
+    if (error_message.has_value()) {
+        json["error"] = error_message.value();
+        return json.dump();
+    }
+
+    if (!token.has_value()) {
+        json["error"] = "Invalid token response";
+        return json.dump();
+    }
+
+    json["token"] = token.value();
+    json["token_type"] = "Bearer";
+
+    if (expires_at.has_value()) {
+        json["expires_at"] = expires_at.value();
+    }
+
+    return PrettyPrintJson(json.dump());
+}
+
 // JsonRequest implementation
 void JsonRequest::ParseCommon(const std::string& request_body) {
     // Load and validate JSON first

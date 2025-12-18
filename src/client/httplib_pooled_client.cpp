@@ -170,24 +170,13 @@ void HttplibPooledClient::WorkerLoop() {
         auto perform_once = [&](RequestTask& t) -> std::pair<bool, HttpResponse> {
             try {
                 if (t.kind == RequestTask::Kind::Get) {
-                    //TODO: these are hardcoded and copied from  httplib_client.cpp
-                    // we should move them to a common place (header file).
-                    httplib::Headers headers = {
-                        {"Accept", "application/json"},
-                        {"User-Agent", "DBPSApiClient/1.0"}
-                    };
+                    auto headers = HttpClientInterface::DefaultJsonGetHeaders();
                     auto res = client->Get(t.endpoint, headers);
                     if (!res) return {false, HttpResponse(0, "", "HTTP GET failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 } else {
-                    //TODO: these are hardcoded and copied from  httplib_client.cpp
-                    // we should move them to a common place (header file).
-                    httplib::Headers headers = {
-                        {"Content-Type", "application/json"},
-                        {"Accept", "application/json"},
-                        {"User-Agent", "DBPSApiClient/1.0"}
-                    };
-                    auto res = client->Post(t.endpoint, headers, t.json_body, "application/json");
+                    auto headers = HttpClientInterface::DefaultJsonPostHeaders();
+                    auto res = client->Post(t.endpoint, headers, t.json_body, HttpClientInterface::kJsonContentType);
                     if (!res) return {false, HttpResponse(0, "", "HTTP POST failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 }

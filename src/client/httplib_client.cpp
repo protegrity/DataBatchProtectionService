@@ -29,10 +29,7 @@ HttpClientInterface::HttpResponse HttplibClient::Get(const std::string& endpoint
         client.set_read_timeout(30);
         
         // Set headers to indicate JSON responses
-        httplib::Headers headers = {
-            {"Accept", "application/json"},
-            {"User-Agent", "DBPSApiClient/1.0"}
-        };
+        auto headers = HttpClientInterface::DefaultJsonGetHeaders();
         
         // Make the GET request
         auto result = client.Get(endpoint, headers);
@@ -56,14 +53,10 @@ HttpClientInterface::HttpResponse HttplibClient::Post(const std::string& endpoin
         client.set_read_timeout(30);
         
         // Set headers for JSON content
-        httplib::Headers headers = {
-            {"Content-Type", "application/json"},
-            {"Accept", "application/json"},
-            {"User-Agent", "DBPSApiClient/1.0"}
-        };
+        auto headers = HttpClientInterface::DefaultJsonPostHeaders();
         
         // Make the POST request
-        auto result = client.Post(endpoint, headers, json_body, "application/json");
+        auto result = client.Post(endpoint, headers, json_body, HttpClientInterface::kJsonContentType);
         
         if (!result) {
             return HttpResponse(0, "", "HTTP POST request failed: no response received");

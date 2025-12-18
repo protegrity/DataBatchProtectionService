@@ -35,24 +35,28 @@ TEST(AuthUtilsTest, InitWithMap) {
     auto response1 = store.ProcessTokenRequest(valid_json1);
     EXPECT_TRUE(response1.token.has_value());
     EXPECT_FALSE(response1.token.value().empty());
+    EXPECT_TRUE(response1.expires_at.has_value());
     EXPECT_FALSE(response1.error_message.has_value());
     
     std::string valid_json2 = R"({"client_id": "client2", "api_key": "key2"})";
     auto response2 = store.ProcessTokenRequest(valid_json2);
     EXPECT_TRUE(response2.token.has_value());
     EXPECT_FALSE(response2.token.value().empty());
+    EXPECT_TRUE(response2.expires_at.has_value());
     EXPECT_FALSE(response2.error_message.has_value());
     
     // Test ProcessTokenRequest with invalid credentials
     std::string invalid_json1 = R"({"client_id": "client1", "api_key": "wrong_key"})";
     auto response3 = store.ProcessTokenRequest(invalid_json1);
     EXPECT_FALSE(response3.token.has_value());
+    EXPECT_FALSE(response3.expires_at.has_value());
     EXPECT_TRUE(response3.error_message.has_value());
     EXPECT_EQ(response3.error_status_code, 401);
     
     std::string invalid_json2 = R"({"client_id": "nonexistent", "api_key": "key1"})";
     auto response4 = store.ProcessTokenRequest(invalid_json2);
     EXPECT_FALSE(response4.token.has_value());
+    EXPECT_FALSE(response4.expires_at.has_value());
     EXPECT_TRUE(response4.error_message.has_value());
     EXPECT_EQ(response4.error_status_code, 401);
 }
@@ -67,12 +71,14 @@ TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
     std::string valid_json = R"({"client_id": "test_client", "api_key": "test_key"})";
     auto response = store.ProcessTokenRequest(valid_json);
     EXPECT_TRUE(response.token.has_value());
+    EXPECT_TRUE(response.expires_at.has_value());
     EXPECT_FALSE(response.error_message.has_value());
     
     // Missing client_id
     std::string missing_client_id = R"({"api_key": "test_key"})";
     response = store.ProcessTokenRequest(missing_client_id);
     EXPECT_FALSE(response.token.has_value());
+    EXPECT_FALSE(response.expires_at.has_value());
     EXPECT_TRUE(response.error_message.has_value());
     EXPECT_TRUE(response.error_message.value().find("client_id") != std::string::npos);
     EXPECT_EQ(response.error_status_code, 400);
@@ -81,6 +87,7 @@ TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
     std::string missing_api_key = R"({"client_id": "test_client"})";
     response = store.ProcessTokenRequest(missing_api_key);
     EXPECT_FALSE(response.token.has_value());
+    EXPECT_FALSE(response.expires_at.has_value());
     EXPECT_TRUE(response.error_message.has_value());
     EXPECT_TRUE(response.error_message.value().find("api_key") != std::string::npos);
     EXPECT_EQ(response.error_status_code, 400);
@@ -89,6 +96,7 @@ TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
     std::string invalid_json = "{invalid json}";
     response = store.ProcessTokenRequest(invalid_json);
     EXPECT_FALSE(response.token.has_value());
+    EXPECT_FALSE(response.expires_at.has_value());
     EXPECT_TRUE(response.error_message.has_value());
     EXPECT_EQ(response.error_status_code, 400);
 }
@@ -102,6 +110,7 @@ TEST(AuthUtilsTest, ProcessTokenRequestEmptyClientId) {
     std::string empty_client_id_json = R"({"client_id": "", "api_key": "key1"})";
     auto response = store.ProcessTokenRequest(empty_client_id_json);
     EXPECT_FALSE(response.token.has_value());
+    EXPECT_FALSE(response.expires_at.has_value());
     EXPECT_TRUE(response.error_message.has_value());
     EXPECT_EQ(response.error_status_code, 401);
 }
@@ -122,6 +131,7 @@ TEST(AuthUtilsTest, InitWithEnableCredentialCheck) {
     auto response1 = store.ProcessTokenRequest(wrong_key_json);
     EXPECT_TRUE(response1.token.has_value());
     EXPECT_FALSE(response1.token.value().empty());
+    EXPECT_TRUE(response1.expires_at.has_value());
     EXPECT_FALSE(response1.error_message.has_value());
     
     // Should succeed even with nonexistent client_id when skipping credential check
@@ -129,6 +139,7 @@ TEST(AuthUtilsTest, InitWithEnableCredentialCheck) {
     auto response2 = store.ProcessTokenRequest(nonexistent_json);
     EXPECT_TRUE(response2.token.has_value());
     EXPECT_FALSE(response2.token.value().empty());
+    EXPECT_TRUE(response2.expires_at.has_value());
     EXPECT_FALSE(response2.error_message.has_value());
     
     // Test with enable_credential_check = true (enable checking)
@@ -137,6 +148,7 @@ TEST(AuthUtilsTest, InitWithEnableCredentialCheck) {
     // Should fail with wrong api_key when checking credentials
     auto response3 = store.ProcessTokenRequest(wrong_key_json);
     EXPECT_FALSE(response3.token.has_value());
+    EXPECT_FALSE(response3.expires_at.has_value());
     EXPECT_TRUE(response3.error_message.has_value());
     EXPECT_EQ(response3.error_status_code, 401);
     
@@ -145,6 +157,7 @@ TEST(AuthUtilsTest, InitWithEnableCredentialCheck) {
     auto response4 = store.ProcessTokenRequest(correct_json);
     EXPECT_TRUE(response4.token.has_value());
     EXPECT_FALSE(response4.token.value().empty());
+    EXPECT_TRUE(response4.expires_at.has_value());
     EXPECT_FALSE(response4.error_message.has_value());
 }
 

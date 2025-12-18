@@ -110,7 +110,9 @@ bool ClientCredentialStore::HasClientId(const std::string& client_id) const {
 }
 
 // GenerateJWT implementation
-std::optional<std::string> ClientCredentialStore::GenerateJWT(const std::string& client_id, const std::string& api_key) const {
+std::optional<std::pair<std::string, std::int64_t>> ClientCredentialStore::GenerateJWT(
+    const std::string& client_id,
+    const std::string& api_key) const {
     // Validate that client_id is not empty
     if (client_id.empty()) {
         std::cout << "Error generating JWT: client_id cannot be empty" << std::endl;
@@ -143,50 +145,10 @@ std::optional<std::string> ClientCredentialStore::GenerateJWT(const std::string&
             .set_expires_at(std::chrono::system_clock::from_time_t(exp_seconds))
             .sign(jwt::algorithm::hs256{jwt_secret_key_});
         
-        return token;
+        return std::make_pair(token, static_cast<std::int64_t>(exp_seconds));
     } catch (const std::exception& e) {
         std::cerr << "Error generating JWT: " << e.what() << std::endl;
         return std::nullopt;
-    }
-}
-
-// ParseTokenRequest implementation
-TokenRequest ParseTokenRequest(const std::string& request_body) {
-    TokenRequest token_req;
-    
-    try {
-        // Parse JSON request body using nlohmann::json
-        nlohmann::json json_body = nlohmann::json::parse(request_body);
-        
-        // Validate that it's an object
-        if (!json_body.is_object()) {
-            token_req.error_message = "Invalid JSON in request body. Invalid format.";
-            return token_req;
-        }
-        
-        // Extract client_id from request
-        if (json_body.contains("client_id") && json_body["client_id"].is_string()) {
-            token_req.client_id = json_body["client_id"].get<std::string>();
-        } else {
-            token_req.error_message = "Missing required field: client_id";
-            return token_req;
-        }
-        
-        // Extract api_key from request
-        if (json_body.contains("api_key") && json_body["api_key"].is_string()) {
-            token_req.api_key = json_body["api_key"].get<std::string>();
-        } else {
-            token_req.error_message = "Missing required field: api_key";
-            return token_req;
-        }
-        
-        return token_req;
-    } catch (const nlohmann::json::exception& e) {
-        token_req.error_message = "Invalid JSON in request body: " + std::string(e.what());
-        return token_req;
-    } catch (const std::exception& e) {
-        token_req.error_message = "Error parsing request: " + std::string(e.what());
-        return token_req;
     }
 }
 
@@ -195,7 +157,8 @@ TokenResponse ClientCredentialStore::ProcessTokenRequest(const std::string& requ
     TokenResponse response;
     
     // Parse token request
-    TokenRequest token_req = ParseTokenRequest(request_body);
+    TokenRequest token_req;
+    token_req.Parse(request_body);
     
     // Check if parsing resulted in an error
     if (token_req.error_message.has_value()) {
@@ -218,7 +181,8 @@ TokenResponse ClientCredentialStore::ProcessTokenRequest(const std::string& requ
         return response;
     }
     
-    response.token = token.value();
+    response.token = token->first;
+    response.expires_at = token->second;
     
     std::cout << "=== ProcessTokenRequest (Success) ===" << std::endl;
     std::cout << "Token generated for client_id: " << token_req.client_id << std::endl;

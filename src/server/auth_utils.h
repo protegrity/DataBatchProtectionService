@@ -27,39 +27,24 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <utility>
+#include <cstdint>
+#include "json_request.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
 
 /**
- * Structure to hold parsed token request data.
+ * ClientCredentialStore manages client_id to api_key mappings for authentication.
+ * 
+ * - Loads client credentials from a Json file and stores them in-memory.
+ * - Generates a JWT token for a given client_id.
  *
  * Integration point for Protegrity:
  * - This request can be updated with a production configuration for authentication or credentials checking.
  * - The specific fields are transparent to the library users. The API call payload of the token request is passed as-is to the module,
  *   so library users don't parse the request payload.
- */
- struct DBPS_EXPORT TokenRequest {
-    std::string client_id;
-    std::string api_key;
-    std::optional<std::string> error_message;  // Error message if parsing failed
-};
-
-/**
- * Structure to hold token generation result.
- */
-struct DBPS_EXPORT TokenResponse {
-    std::optional<std::string> token;
-    std::optional<std::string> error_message;
-    int error_status_code = 400;  // HTTP status code for error response
-};
-
-/**
- * ClientCredentialStore manages client_id to api_key mappings for authentication.
- * 
- * - Loads client credentials from a Json file and stores them in-memory.
- * - Generates a JWT token for a given client_id.
  */
 class DBPS_EXPORT ClientCredentialStore {
 public:
@@ -134,9 +119,11 @@ private:
      * 
      * @param client_id The client identifier to validate and include in the JWT
      * @param api_key The API key to validate against the stored credential
-     * @return The JWT token as a string if credentials are valid, or std::nullopt on error or invalid credentials
+     * @return Pair of (token, expires_at epoch seconds) if credentials are valid, or std::nullopt on error or invalid credentials
      */
-     std::optional<std::string> GenerateJWT(const std::string& client_id, const std::string& api_key) const;
+     std::optional<std::pair<std::string, std::int64_t>> GenerateJWT(
+         const std::string& client_id,
+         const std::string& api_key) const;
     
     // In-memory storage: client_id -> api_key
     std::map<std::string, std::string> credentials_;
