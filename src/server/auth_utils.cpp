@@ -22,9 +22,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-// JWT expiration time: 4 hours in seconds
-static const int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
-
 // ClientCredentialStore implementation
 
 // Constructor
@@ -110,7 +107,7 @@ bool ClientCredentialStore::HasClientId(const std::string& client_id) const {
 }
 
 // GenerateJWT implementation
-std::optional<std::pair<std::string, std::int64_t>> ClientCredentialStore::GenerateJWT(
+std::optional<ClientCredentialStore::TokenWithExpiration> ClientCredentialStore::GenerateJWT(
     const std::string& client_id,
     const std::string& api_key) const {
     // Validate that client_id is not empty
@@ -145,7 +142,7 @@ std::optional<std::pair<std::string, std::int64_t>> ClientCredentialStore::Gener
             .set_expires_at(std::chrono::system_clock::from_time_t(exp_seconds))
             .sign(jwt::algorithm::hs256{jwt_secret_key_});
         
-        return std::make_pair(token, static_cast<std::int64_t>(exp_seconds));
+        return TokenWithExpiration{token, static_cast<std::int64_t>(exp_seconds)};
     } catch (const std::exception& e) {
         std::cerr << "Error generating JWT: " << e.what() << std::endl;
         return std::nullopt;
@@ -161,31 +158,32 @@ TokenResponse ClientCredentialStore::ProcessTokenRequest(const std::string& requ
     token_req.Parse(request_body);
     
     // Check if parsing resulted in an error
-    if (token_req.error_message.has_value()) {
-        response.error_message = token_req.error_message.value();
-        response.error_status_code = 400;
+    if (!token_req.IsValid()) {
+        response.SetErrorStatusCodeAndClearToken(400);
+        response.error_message_ = token_req.GetValidationError();
         return response;
     }
     
     // Log the request for debugging
     std::cout << "=== ProcessTokenRequest ===" << std::endl;
-    std::cout << "client_id: " << token_req.client_id << std::endl;
+    std::cout << "client_id: " << token_req.client_id_ << std::endl;
     std::cout << "====================" << std::endl;
     
     // Generate JWT token (validates credentials internally)
-    auto token = GenerateJWT(token_req.client_id, token_req.api_key);
+    auto token = GenerateJWT(token_req.client_id_, token_req.api_key_);
     
     if (!token.has_value()) {
-        response.error_message = "Invalid credentials";
-        response.error_status_code = 401;
+        response.SetErrorStatusCodeAndClearToken(401);
+        response.error_message_ = "Invalid credentials";
         return response;
     }
     
-    response.token = token->first;
-    response.expires_at = token->second;
+    response.token_ = token->token;
+    response.expires_at_ = token->expires_at;
+    response.error_status_code_ = 200;
     
     std::cout << "=== ProcessTokenRequest (Success) ===" << std::endl;
-    std::cout << "Token generated for client_id: " << token_req.client_id << std::endl;
+    std::cout << "Token generated for client_id: " << token_req.client_id_ << std::endl;
     std::cout << "=================================" << std::endl;
     
     return response;

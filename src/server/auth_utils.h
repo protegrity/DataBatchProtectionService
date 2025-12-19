@@ -27,13 +27,15 @@
 #include <map>
 #include <string>
 #include <optional>
-#include <utility>
 #include <cstdint>
 #include "json_request.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
+
+// JWT expiration time: 4 hours in seconds
+inline constexpr int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
 
 /**
  * ClientCredentialStore manages client_id to api_key mappings for authentication.
@@ -86,7 +88,7 @@ public:
      * of TokenRequest structure from the caller.
      * 
      * @param request_body The raw JSON request body string
-     * @return TokenResponse with token if successful, or error_message and error_status_code if failed
+     * @return TokenResponse with token if successful, or GetValidationError() and error_status_code if failed
      */
      TokenResponse ProcessTokenRequest(const std::string& request_body) const;
 
@@ -98,6 +100,11 @@ public:
     std::optional<std::string> VerifyTokenForEndpoint(const std::string& authorization_header) const;
     
 private:
+    struct TokenWithExpiration {
+        std::string token;
+        std::int64_t expires_at;
+    };
+
     // Adds a client credential to the in-memory storage.
     void AddCredential(const std::string& client_id, const std::string& api_key);
     
@@ -119,9 +126,9 @@ private:
      * 
      * @param client_id The client identifier to validate and include in the JWT
      * @param api_key The API key to validate against the stored credential
-     * @return Pair of (token, expires_at epoch seconds) if credentials are valid, or std::nullopt on error or invalid credentials
+     * @return TokenWithExpiration if credentials are valid, or std::nullopt on error or invalid credentials
      */
-     std::optional<std::pair<std::string, std::int64_t>> GenerateJWT(
+     std::optional<TokenWithExpiration> GenerateJWT(
          const std::string& client_id,
          const std::string& api_key) const;
     

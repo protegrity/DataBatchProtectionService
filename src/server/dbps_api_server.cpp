@@ -74,7 +74,11 @@ int main(int argc, char* argv[]) {
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
     } else {
         // No credentials file provided, disable credential checking
-        credential_store.init(false);
+
+        // +++++ test credentials -- remove before merging +++++
+        // credential_store.init(false);
+        credential_store.init({{"test_client_AAAA", "test_key_AAAA"}});
+        
         std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
     }
 
@@ -103,8 +107,9 @@ int main(int argc, char* argv[]) {
         TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
         
         // Check if processing resulted in an error
-        if (token_response.error_message.has_value()) {
-            return CreateErrorResponse(token_response.error_message.value(), token_response.error_status_code);
+        auto validation_error = token_response.GetValidationError();
+        if (!validation_error.empty()) {
+            return CreateErrorResponse(validation_error, token_response.error_status_code_);
         }
         
         // Create success response

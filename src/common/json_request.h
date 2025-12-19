@@ -22,7 +22,6 @@
 #include <optional>
 #include <map>
 #include <cstdint>
-#include <utility>
 #include "enums.h"
 #include "enum_utils.h"
 
@@ -332,24 +331,35 @@ protected:
 /**
  * Structure to hold parsed token request data.
  */
-struct TokenRequest {
-    std::string client_id;
-    std::string api_key;
-    std::optional<std::string> error_message;
+class TokenRequest {
+public:
+    TokenRequest() = default;
+
+    std::string client_id_;
+    std::string api_key_;
 
     void Parse(const std::string& request_body);
+    bool IsValid() const;
+    std::string GetValidationError() const;
     std::string ToJson() const;
 };
 
 /**
  * Structure to hold token generation result.
  */
-struct TokenResponse {
-    std::optional<std::string> token;
-    std::optional<std::int64_t> expires_at;
-    std::optional<std::string> error_message;
-    int error_status_code = 400;
+class TokenResponse {
+public:
+    TokenResponse() = default;
+
+    std::optional<std::string> token_;
+    std::optional<std::int64_t> expires_at_;
+    std::string error_message_;
+    int error_status_code_ = 0;
 
     void Parse(const std::string& response_body);
+    bool IsValid() const;
+    std::string GetValidationError() const;
     std::string ToJson() const;
+
+    void SetErrorStatusCodeAndClearToken(int status_code);
 };

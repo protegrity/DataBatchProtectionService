@@ -946,26 +946,28 @@ TEST(JsonRequest, TokenRequestParse) {
     {
         TokenRequest req;
         req.Parse(R"({"client_id":"client1","api_key":"key1"})");
-        ASSERT_FALSE(req.error_message.has_value());
-        ASSERT_EQ(req.client_id, "client1");
-        ASSERT_EQ(req.api_key, "key1");
+        ASSERT_TRUE(req.IsValid());
+        ASSERT_EQ(req.client_id_, "client1");
+        ASSERT_EQ(req.api_key_, "key1");
     }
     {
         TokenRequest req;
         req.Parse(R"({"api_key":"key1"})");
-        ASSERT_TRUE(req.error_message.has_value());
+        ASSERT_FALSE(req.IsValid());
+        ASSERT_FALSE(req.GetValidationError().empty());
     }
     {
         TokenRequest req;
         req.Parse("{ invalid json }");
-        ASSERT_TRUE(req.error_message.has_value());
+        ASSERT_FALSE(req.IsValid());
+        ASSERT_FALSE(req.GetValidationError().empty());
     }
 }
 
 TEST(JsonRequest, TokenRequestToJson) {
     TokenRequest req;
-    req.client_id = "clientA";
-    req.api_key = "keyA";
+    req.Parse(R"({"client_id":"clientA","api_key":"keyA"})");
+    ASSERT_TRUE(req.IsValid());
 
     auto json = crow::json::load(req.ToJson());
     ASSERT_TRUE(json);
@@ -975,8 +977,8 @@ TEST(JsonRequest, TokenRequestToJson) {
 
 TEST(JsonRequest, TokenResponseRoundTrip) {
     TokenResponse resp;
-    resp.token = "token123";
-    resp.expires_at = 1234567890;
+    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    ASSERT_TRUE(resp.IsValid());
 
     auto json = crow::json::load(resp.ToJson());
     ASSERT_TRUE(json);
@@ -989,15 +991,27 @@ TEST(JsonRequest, TokenResponseRoundTrip) {
 
     TokenResponse parsed;
     parsed.Parse(resp.ToJson());
-    ASSERT_FALSE(parsed.error_message.has_value());
-    ASSERT_TRUE(parsed.token.has_value());
-    ASSERT_TRUE(parsed.expires_at.has_value());
-    ASSERT_EQ(parsed.token.value(), "token123");
-    ASSERT_EQ(parsed.expires_at.value(), 1234567890);
+    ASSERT_TRUE(parsed.IsValid());
+    ASSERT_EQ(parsed.token_.value(), "token123");
+    ASSERT_EQ(parsed.expires_at_.value(), 1234567890);
 }
 
 TEST(JsonRequest, TokenResponseParseError) {
     TokenResponse resp;
     resp.Parse(R"({"error":"unauthorized"})");
-    ASSERT_TRUE(resp.error_message.has_value());
+    ASSERT_FALSE(resp.IsValid());
+    ASSERT_FALSE(resp.GetValidationError().empty());
+}
+
+TEST(JsonRequest, TokenResponseSetErrorStatusCodeAndClearToken) {
+    TokenResponse resp;
+    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    ASSERT_TRUE(resp.IsValid());
+
+    resp.SetErrorStatusCodeAndClearToken(401);
+    ASSERT_FALSE(resp.IsValid());
+    ASSERT_FALSE(resp.token_.has_value());
+    ASSERT_FALSE(resp.expires_at_.has_value());
+    ASSERT_EQ(resp.error_status_code_, 401);
+    ASSERT_TRUE(resp.GetValidationError().find("Invalid credentials") != std::string::npos);
 }
