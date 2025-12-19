@@ -103,17 +103,13 @@ int main(int argc, char* argv[]) {
         TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
         
         // Check if processing resulted in an error
-        if (token_response.error_message.has_value()) {
-            return CreateErrorResponse(token_response.error_message.value(), token_response.error_status_code);
+        auto validation_error = token_response.GetValidationError();
+        if (!validation_error.empty()) {
+            return CreateErrorResponse(validation_error, token_response.error_status_code_);
         }
         
         // Create success response
-        crow::json::wvalue response;
-        response["token"] = token_response.token.value();
-        response["token_type"] = "Bearer";
-        response["expires_in"] = 14400;  // 4 hours in seconds
-        
-        return crow::response(200, response);
+        return crow::response(200, token_response.ToJson());
     });
 
     // Encryption endpoint - POST /encrypt

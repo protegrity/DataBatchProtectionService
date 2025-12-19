@@ -27,39 +27,26 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <cstdint>
+#include "json_request.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
 
-/**
- * Structure to hold parsed token request data.
- *
- * Integration point for Protegrity:
- * - This request can be updated with a production configuration for authentication or credentials checking.
- * - The specific fields are transparent to the library users. The API call payload of the token request is passed as-is to the module,
- *   so library users don't parse the request payload.
- */
- struct DBPS_EXPORT TokenRequest {
-    std::string client_id;
-    std::string api_key;
-    std::optional<std::string> error_message;  // Error message if parsing failed
-};
-
-/**
- * Structure to hold token generation result.
- */
-struct DBPS_EXPORT TokenResponse {
-    std::optional<std::string> token;
-    std::optional<std::string> error_message;
-    int error_status_code = 400;  // HTTP status code for error response
-};
+// JWT expiration time: 4 hours in seconds
+inline constexpr int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
 
 /**
  * ClientCredentialStore manages client_id to api_key mappings for authentication.
  * 
  * - Loads client credentials from a Json file and stores them in-memory.
  * - Generates a JWT token for a given client_id.
+ *
+ * Integration point for Protegrity:
+ * - This request can be updated with a production configuration for authentication or credentials checking.
+ * - The specific fields are transparent to the library users. The API call payload of the token request is passed as-is to the module,
+ *   so library users don't parse the request payload.
  */
 class DBPS_EXPORT ClientCredentialStore {
 public:
@@ -101,7 +88,7 @@ public:
      * of TokenRequest structure from the caller.
      * 
      * @param request_body The raw JSON request body string
-     * @return TokenResponse with token if successful, or error_message and error_status_code if failed
+     * @return TokenResponse with token if successful, or GetValidationError() and error_status_code if failed
      */
      TokenResponse ProcessTokenRequest(const std::string& request_body) const;
 
@@ -113,6 +100,11 @@ public:
     std::optional<std::string> VerifyTokenForEndpoint(const std::string& authorization_header) const;
     
 private:
+    struct TokenWithExpiration {
+        std::string token;
+        std::int64_t expires_at;
+    };
+
     // Adds a client credential to the in-memory storage.
     void AddCredential(const std::string& client_id, const std::string& api_key);
     
@@ -134,9 +126,11 @@ private:
      * 
      * @param client_id The client identifier to validate and include in the JWT
      * @param api_key The API key to validate against the stored credential
-     * @return The JWT token as a string if credentials are valid, or std::nullopt on error or invalid credentials
+     * @return TokenWithExpiration if credentials are valid, or std::nullopt on error or invalid credentials
      */
-     std::optional<std::string> GenerateJWT(const std::string& client_id, const std::string& api_key) const;
+     std::optional<TokenWithExpiration> GenerateJWT(
+         const std::string& client_id,
+         const std::string& api_key) const;
     
     // In-memory storage: client_id -> api_key
     std::map<std::string, std::string> credentials_;

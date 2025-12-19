@@ -65,6 +65,20 @@ std::optional<int> SafeParseToInt(const std::string& str) {
     }
 }
 
+// Helper function to safely parse a string to 64-bit integer
+std::optional<std::int64_t> SafeParseToInt64(const std::string& str) {
+    try {
+        std::size_t idx = 0;
+        long long value = std::stoll(str, &idx);
+        if (idx != str.size()) {
+            return std::nullopt;
+        }
+        return static_cast<std::int64_t>(value);
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 // Helper function to safely load JSON body and return nullopt if invalid or null
 static std::optional<crow::json::rvalue> SafeLoadJsonBody(const std::string& json_string) {
     auto json_body = crow::json::load(json_string);
@@ -127,6 +141,126 @@ std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
         // Return empty string on encoding failure
         return std::string();
     }
+}
+
+void TokenRequest::Parse(const std::string& request_body) {
+    client_id_.clear();
+    api_key_.clear();
+
+    auto json_body_opt = SafeLoadJsonBody(request_body);
+    if (!json_body_opt) {
+        return;
+    }
+
+    auto json_body = *json_body_opt;
+    if (json_body.t() != crow::json::type::Object) {
+        return;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"client_id"})) {
+        client_id_ = *parsed_value;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"api_key"})) {
+        api_key_ = *parsed_value;
+    }
+}
+
+std::string TokenRequest::ToJson() const {
+    crow::json::wvalue json;
+    if (!IsValid()) {
+        json["error"] = GetValidationError();
+        return PrettyPrintJson(json.dump());
+    }
+
+    json["client_id"] = client_id_;
+    json["api_key"] = api_key_;
+    return PrettyPrintJson(json.dump());
+}
+
+bool TokenRequest::IsValid() const {
+    return !client_id_.empty() && !api_key_.empty();
+}
+
+std::string TokenRequest::GetValidationError() const {
+    if (IsValid()) {
+        return "";
+    }
+    std::vector<std::string> missing_fields;
+    if (client_id_.empty()) missing_fields.push_back("client_id");
+    if (api_key_.empty()) missing_fields.push_back("api_key");
+    return BuildValidationError(missing_fields);
+}
+
+void TokenResponse::Parse(const std::string& response_body) {
+    token_ = std::nullopt;
+    expires_at_ = std::nullopt;
+    error_message_.clear();
+    error_status_code_ = 0;
+
+    auto json_body_opt = SafeLoadJsonBody(response_body);
+    if (!json_body_opt) {
+        return;
+    }
+
+    auto json_body = *json_body_opt;
+    if (json_body.t() != crow::json::type::Object) {
+        return;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"error"})) {
+        error_message_ = *parsed_value;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"token"})) {
+        token_ = *parsed_value;
+    }
+
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"expires_at"})) {
+        expires_at_ = SafeParseToInt64(*parsed_value);
+    }
+}
+
+bool TokenResponse::IsValid() const {
+    return error_message_.empty() &&
+           token_.has_value() &&
+           !token_.value().empty() &&
+           expires_at_.has_value();
+}
+
+std::string TokenResponse::GetValidationError() const {
+    if (IsValid()) {
+        return "";
+    }
+    if (!error_message_.empty()) {
+        return error_message_;
+    }
+    std::vector<std::string> missing_fields;
+    if (!token_.has_value() || token_.value().empty()) missing_fields.push_back("token");
+    if (!expires_at_.has_value()) missing_fields.push_back("expires_at");
+    return BuildValidationError(missing_fields);
+}
+
+void TokenResponse::SetErrorStatusCodeAndClearToken(int status_code) {
+    token_ = std::nullopt;
+    expires_at_ = std::nullopt;
+    error_message_.clear();
+    error_status_code_ = status_code;
+}
+
+std::string TokenResponse::ToJson() const {
+    crow::json::wvalue json;
+
+    if (!IsValid()) {
+        json["error"] = GetValidationError();
+        return json.dump();
+    }
+
+    json["token"] = token_.value();
+    json["token_type"] = "Bearer";
+    json["expires_at"] = expires_at_.value();
+
+    return PrettyPrintJson(json.dump());
 }
 
 // JsonRequest implementation

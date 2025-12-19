@@ -53,6 +53,7 @@ std::string BinaryToString(const std::vector<uint8_t>& binary_data) {
 
 // Forward declarations for internal functions from json_request.cpp
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
+std::optional<std::int64_t> SafeParseToInt64(const std::string& str);
 std::optional<int> SafeParseToInt(const std::string& str);
 
 // Test-specific derived class to access protected methods
@@ -440,6 +441,24 @@ TEST(JsonRequest, SafeGetFromJsonPathInvalidPath) {
     
     result = SafeGetFromJsonPath(json_body, {"column_reference", "nonexistent"});
     ASSERT_FALSE(result.has_value());
+}
+
+TEST(JsonRequest, SafeParseToInt64StrictParsing) {
+    // Valid numeric string
+    auto v1 = SafeParseToInt64("123");
+    ASSERT_TRUE(v1.has_value());
+    ASSERT_EQ(v1.value(), 123);
+
+    // Typical epoch-seconds value
+    auto epoch = SafeParseToInt64("1766138275");
+    ASSERT_TRUE(epoch.has_value());
+    ASSERT_EQ(epoch.value(), 1766138275);
+
+    // Invalid: numeric prefix + junk
+    ASSERT_FALSE(SafeParseToInt64("123abc").has_value());
+
+    // Invalid: trailing whitespace
+    ASSERT_FALSE(SafeParseToInt64("123 ").has_value());
 }
 
 // Test JSON generation functionality
@@ -939,4 +958,78 @@ TEST(JsonRequest, DecryptJsonResponseInvalidDatatypeLength) {
     ASSERT_FALSE(response.IsValid());
     std::string error = response.GetValidationError();
     ASSERT_TRUE(error.find("data_batch.datatype_info.length (invalid integer value)") != std::string::npos);
+}
+
+// Token request and response tests (simplified)
+TEST(JsonRequest, TokenRequestParse) {
+    {
+        TokenRequest req;
+        req.Parse(R"({"client_id":"client1","api_key":"key1"})");
+        ASSERT_TRUE(req.IsValid());
+        ASSERT_EQ(req.client_id_, "client1");
+        ASSERT_EQ(req.api_key_, "key1");
+    }
+    {
+        TokenRequest req;
+        req.Parse(R"({"api_key":"key1"})");
+        ASSERT_FALSE(req.IsValid());
+        ASSERT_FALSE(req.GetValidationError().empty());
+    }
+    {
+        TokenRequest req;
+        req.Parse("{ invalid json }");
+        ASSERT_FALSE(req.IsValid());
+        ASSERT_FALSE(req.GetValidationError().empty());
+    }
+}
+
+TEST(JsonRequest, TokenRequestToJson) {
+    TokenRequest req;
+    req.Parse(R"({"client_id":"clientA","api_key":"keyA"})");
+    ASSERT_TRUE(req.IsValid());
+
+    auto json = crow::json::load(req.ToJson());
+    ASSERT_TRUE(json);
+    ASSERT_EQ(std::string(json["client_id"]), "clientA");
+    ASSERT_EQ(std::string(json["api_key"]), "keyA");
+}
+
+TEST(JsonRequest, TokenResponseRoundTrip) {
+    TokenResponse resp;
+    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    ASSERT_TRUE(resp.IsValid());
+
+    auto json = crow::json::load(resp.ToJson());
+    ASSERT_TRUE(json);
+    ASSERT_EQ(std::string(json["token"]), "token123");
+    ASSERT_EQ(std::string(json["token_type"]), "Bearer");
+
+    auto expires_at_str = SafeGetFromJsonPath(json, {"expires_at"});
+    ASSERT_TRUE(expires_at_str.has_value());
+    ASSERT_EQ(std::stoll(*expires_at_str), 1234567890);
+
+    TokenResponse parsed;
+    parsed.Parse(resp.ToJson());
+    ASSERT_TRUE(parsed.IsValid());
+    ASSERT_EQ(parsed.token_.value(), "token123");
+    ASSERT_EQ(parsed.expires_at_.value(), 1234567890);
+}
+
+TEST(JsonRequest, TokenResponseParseError) {
+    TokenResponse resp;
+    resp.Parse(R"({"error":"unauthorized"})");
+    ASSERT_FALSE(resp.IsValid());
+    ASSERT_FALSE(resp.GetValidationError().empty());
+}
+
+TEST(JsonRequest, TokenResponseSetErrorStatusCodeAndClearToken) {
+    TokenResponse resp;
+    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    ASSERT_TRUE(resp.IsValid());
+
+    resp.SetErrorStatusCodeAndClearToken(401);
+    ASSERT_FALSE(resp.IsValid());
+    ASSERT_FALSE(resp.token_.has_value());
+    ASSERT_FALSE(resp.expires_at_.has_value());
+    ASSERT_EQ(resp.error_status_code_, 401);
 }

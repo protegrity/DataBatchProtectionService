@@ -327,3 +327,39 @@ protected:
      */
     std::string ToJsonString() const override;
 };
+
+/**
+ * Structure to hold parsed token request data.
+ */
+class TokenRequest {
+public:
+    TokenRequest() = default;
+
+    std::string client_id_;
+    std::string api_key_;
+
+    void Parse(const std::string& request_body);
+    bool IsValid() const;
+    std::string GetValidationError() const;
+    std::string ToJson() const;
+};
+
+/**
+ * Structure to hold token generation result.
+ */
+class TokenResponse {
+public:
+    TokenResponse() = default;
+
+    std::optional<std::string> token_;
+    std::optional<std::int64_t> expires_at_;
+    std::string error_message_;
+    int error_status_code_ = 0;
+
+    void Parse(const std::string& response_body);
+    bool IsValid() const;
+    std::string GetValidationError() const;
+    std::string ToJson() const;
+
+    void SetErrorStatusCodeAndClearToken(int status_code);
+};
