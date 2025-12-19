@@ -65,6 +65,20 @@ std::optional<int> SafeParseToInt(const std::string& str) {
     }
 }
 
+// Helper function to safely parse a string to 64-bit integer
+std::optional<std::int64_t> SafeParseToInt64(const std::string& str) {
+    try {
+        std::size_t idx = 0;
+        long long value = std::stoll(str, &idx);
+        if (idx != str.size()) {
+            return std::nullopt;
+        }
+        return static_cast<std::int64_t>(value);
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 // Helper function to safely load JSON body and return nullopt if invalid or null
 static std::optional<crow::json::rvalue> SafeLoadJsonBody(const std::string& json_string) {
     auto json_body = crow::json::load(json_string);
@@ -145,14 +159,10 @@ void TokenRequest::Parse(const std::string& request_body) {
 
     if (json_body.has("client_id") && json_body["client_id"].t() == crow::json::type::String) {
         client_id_ = std::string(json_body["client_id"]);
-    } else {
-        return;
     }
 
     if (json_body.has("api_key") && json_body["api_key"].t() == crow::json::type::String) {
         api_key_ = std::string(json_body["api_key"]);
-    } else {
-        return;
     }
 }
 
@@ -198,9 +208,8 @@ void TokenResponse::Parse(const std::string& response_body) {
         return;
     }
 
-    if (json_body.has("error")) {
-        error_message_ = std::string(json_body["error"]);
-        return;
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"error"})) {
+        error_message_ = *parsed_value;
     }
 
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"token"})) {
@@ -208,11 +217,7 @@ void TokenResponse::Parse(const std::string& response_body) {
     }
 
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"expires_at"})) {
-        try {
-            expires_at_ = std::stoll(*parsed_value);
-        } catch (const std::exception&) {
-            return;
-        }
+        expires_at_ = SafeParseToInt64(*parsed_value);
     }
 }
 
@@ -224,14 +229,11 @@ bool TokenResponse::IsValid() const {
 }
 
 std::string TokenResponse::GetValidationError() const {
-    if (error_status_code_ == 401) {
-        return "Invalid credentials";
+    if (IsValid()) {
+        return "";
     }
     if (!error_message_.empty()) {
         return error_message_;
-    }
-    if (IsValid()) {
-        return "";
     }
     std::vector<std::string> missing_fields;
     if (!token_.has_value() || token_.value().empty()) missing_fields.push_back("token");

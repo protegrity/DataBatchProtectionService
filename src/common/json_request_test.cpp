@@ -53,6 +53,7 @@ std::string BinaryToString(const std::vector<uint8_t>& binary_data) {
 
 // Forward declarations for internal functions from json_request.cpp
 std::optional<std::string> SafeGetFromJsonPath(const crow::json::rvalue& json_body, const std::vector<std::string>& path);
+std::optional<std::int64_t> SafeParseToInt64(const std::string& str);
 std::optional<int> SafeParseToInt(const std::string& str);
 
 // Test-specific derived class to access protected methods
@@ -440,6 +441,24 @@ TEST(JsonRequest, SafeGetFromJsonPathInvalidPath) {
     
     result = SafeGetFromJsonPath(json_body, {"column_reference", "nonexistent"});
     ASSERT_FALSE(result.has_value());
+}
+
+TEST(JsonRequest, SafeParseToInt64StrictParsing) {
+    // Valid numeric string
+    auto v1 = SafeParseToInt64("123");
+    ASSERT_TRUE(v1.has_value());
+    ASSERT_EQ(v1.value(), 123);
+
+    // Typical epoch-seconds value
+    auto epoch = SafeParseToInt64("1766138275");
+    ASSERT_TRUE(epoch.has_value());
+    ASSERT_EQ(epoch.value(), 1766138275);
+
+    // Invalid: numeric prefix + junk
+    ASSERT_FALSE(SafeParseToInt64("123abc").has_value());
+
+    // Invalid: trailing whitespace
+    ASSERT_FALSE(SafeParseToInt64("123 ").has_value());
 }
 
 // Test JSON generation functionality
