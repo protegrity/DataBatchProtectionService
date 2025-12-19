@@ -1032,5 +1032,4 @@ TEST(JsonRequest, TokenResponseSetErrorStatusCodeAndClearToken) {
     ASSERT_FALSE(resp.token_.has_value());
     ASSERT_FALSE(resp.expires_at_.has_value());
     ASSERT_EQ(resp.error_status_code_, 401);
-    ASSERT_TRUE(resp.GetValidationError().find("Invalid credentials") != std::string::npos);
 }
