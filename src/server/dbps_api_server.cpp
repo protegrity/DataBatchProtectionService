@@ -74,11 +74,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
     } else {
         // No credentials file provided, disable credential checking
-
-        // +++++ test credentials -- remove before merging +++++
-        // credential_store.init(false);
-        credential_store.init({{"test_client_AAAA", "test_key_AAAA"}});
-        
+        credential_store.init(false);
         std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
     }
 
