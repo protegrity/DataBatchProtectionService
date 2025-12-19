@@ -157,12 +157,12 @@ void TokenRequest::Parse(const std::string& request_body) {
         return;
     }
 
-    if (json_body.has("client_id") && json_body["client_id"].t() == crow::json::type::String) {
-        client_id_ = std::string(json_body["client_id"]);
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"client_id"})) {
+        client_id_ = *parsed_value;
     }
 
-    if (json_body.has("api_key") && json_body["api_key"].t() == crow::json::type::String) {
-        api_key_ = std::string(json_body["api_key"]);
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"api_key"})) {
+        api_key_ = *parsed_value;
     }
 }
 
