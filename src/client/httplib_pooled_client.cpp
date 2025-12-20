@@ -57,7 +57,7 @@ std::shared_ptr<HttplibPooledClient> HttplibPooledClient::Acquire(
 HttplibPooledClient::HttplibPooledClient(const std::string& base_url,
                                          std::size_t num_worker_threads,
                                          ClientCredentials credentials)
-    : HttpClientInterface(base_url, std::move(credentials)) {
+    : HttpClientBase(base_url, std::move(credentials)) {
         
     // reserve the space for the worker_threads_ vector
     // this is more efficient than calling emplace_back multiple times
@@ -91,7 +91,7 @@ HttplibPooledClient::~HttplibPooledClient() noexcept {
     }
 }
 
-HttpClientInterface::HttpResponse HttplibPooledClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
+HttpClientBase::HttpResponse HttplibPooledClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
     std::unique_ptr<RequestTask> task(new RequestTask());
     task->kind = RequestTask::Kind::Get;
     task->endpoint = endpoint;
@@ -111,7 +111,7 @@ HttpClientInterface::HttpResponse HttplibPooledClient::DoGet(const std::string& 
     return response_future.get();
 }
 
-HttpClientInterface::HttpResponse HttplibPooledClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
+HttpClientBase::HttpResponse HttplibPooledClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
     std::unique_ptr<RequestTask> task(new RequestTask());
     task->kind = RequestTask::Kind::Post;
     task->endpoint = endpoint;
@@ -178,7 +178,7 @@ void HttplibPooledClient::WorkerLoop() {
                     if (!res) return {false, HttpResponse(0, "", "HTTP GET failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 } else {
-                    auto res = client->Post(t.endpoint, t.headers, t.json_body, HttpClientInterface::kJsonContentType);
+                    auto res = client->Post(t.endpoint, t.headers, t.json_body, HttpClientBase::kJsonContentType);
                     if (!res) return {false, HttpResponse(0, "", "HTTP POST failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 }

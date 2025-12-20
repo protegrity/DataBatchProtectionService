@@ -18,10 +18,10 @@
 #include "httplib_client.h"
 
 HttplibClient::HttplibClient(const std::string& base_url, ClientCredentials credentials)
-    : HttpClientInterface(base_url, std::move(credentials)) {
+    : HttpClientBase(base_url, std::move(credentials)) {
 }
 
-HttpClientInterface::HttpResponse HttplibClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
+HttpClientBase::HttpResponse HttplibClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
     try {
         httplib::Client client(base_url_);
         
@@ -42,7 +42,7 @@ HttpClientInterface::HttpResponse HttplibClient::DoGet(const std::string& endpoi
     }
 }
 
-HttpClientInterface::HttpResponse HttplibClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
+HttpClientBase::HttpResponse HttplibClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
     try {
         httplib::Client client(base_url_);
         
@@ -50,7 +50,7 @@ HttpClientInterface::HttpResponse HttplibClient::DoPost(const std::string& endpo
         client.set_read_timeout(30);
         
         // Make the POST request
-        auto result = client.Post(endpoint, headers, json_body, HttpClientInterface::kJsonContentType);
+        auto result = client.Post(endpoint, headers, json_body, HttpClientBase::kJsonContentType);
         
         if (!result) {
             return HttpResponse(0, "", "HTTP POST request failed: no response received");

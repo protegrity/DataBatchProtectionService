@@ -21,12 +21,12 @@
 #include <string>
 #include <vector>
 
-#include "http_client_interface.h"
+#include "http_client_base.h"
 
-class FakeHttpClient final : public HttpClientInterface {
+class FakeHttpClient final : public HttpClientBase {
 public:
     explicit FakeHttpClient(ClientCredentials credentials)
-        : HttpClientInterface("mock://", std::move(credentials)) {
+        : HttpClientBase("mock://", std::move(credentials)) {
     }
 
     void SetTokenResponse(std::string token, std::string token_type, std::int64_t expires_at) {
@@ -104,7 +104,7 @@ private:
     std::int64_t expires_at_ = 4102444800; // 2100-01-01T00:00:00Z
 };
 
-TEST(HttpClientInterfaceTest, AuthRequiredDefaultFetchesTokenAndAddsAuthorizationHeader) {
+TEST(HttpClientBaseTest, AuthRequiredDefaultFetchesTokenAndAddsAuthorizationHeader) {
     FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
     client.SetTokenResponse("abc", "Bearer", 4102444800);
 
@@ -112,7 +112,7 @@ TEST(HttpClientInterfaceTest, AuthRequiredDefaultFetchesTokenAndAddsAuthorizatio
     ASSERT_TRUE(r1.error_message.empty());
     ASSERT_EQ(r1.status_code, 200);
 
-    auto auth_it = client.last_get_headers.find(HttpClientInterface::kAuthorizationHeader);
+    auto auth_it = client.last_get_headers.find(HttpClientBase::kAuthorizationHeader);
     ASSERT_NE(auth_it, client.last_get_headers.end());
     ASSERT_EQ(auth_it->second, "Bearer abc");
 
@@ -124,7 +124,7 @@ TEST(HttpClientInterfaceTest, AuthRequiredDefaultFetchesTokenAndAddsAuthorizatio
     ASSERT_EQ(client.get_calls.load(), 2);
 }
 
-TEST(HttpClientInterfaceTest, AuthRequiredFalseDoesNotFetchTokenOrSendAuthorizationHeader) {
+TEST(HttpClientBaseTest, AuthRequiredFalseDoesNotFetchTokenOrSendAuthorizationHeader) {
     FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
 
     auto r = client.Get("/healthz", false);
@@ -132,23 +132,23 @@ TEST(HttpClientInterfaceTest, AuthRequiredFalseDoesNotFetchTokenOrSendAuthorizat
     ASSERT_EQ(r.status_code, 200);
     ASSERT_EQ(client.token_calls.load(), 0);
     ASSERT_EQ(client.get_calls.load(), 1);
-    ASSERT_EQ(client.last_get_headers.find(HttpClientInterface::kAuthorizationHeader),
+    ASSERT_EQ(client.last_get_headers.find(HttpClientBase::kAuthorizationHeader),
               client.last_get_headers.end());
 }
 
-TEST(HttpClientInterfaceTest, UsesTokenTypeFromTokenResponse) {
+TEST(HttpClientBaseTest, UsesTokenTypeFromTokenResponse) {
     FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
     client.SetTokenResponse("xyz", "JWT", 4102444800);
 
     auto r = client.Get("/statusz");
     ASSERT_TRUE(r.error_message.empty());
 
-    auto auth_it = client.last_get_headers.find(HttpClientInterface::kAuthorizationHeader);
+    auto auth_it = client.last_get_headers.find(HttpClientBase::kAuthorizationHeader);
     ASSERT_NE(auth_it, client.last_get_headers.end());
     ASSERT_EQ(auth_it->second, "JWT xyz");
 }
 
-TEST(HttpClientInterfaceTest, RetryOnceOn401FetchesNewTokenAndRetries) {
+TEST(HttpClientBaseTest, RetryOnceOn401FetchesNewTokenAndRetries) {
     FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
     client.SetTokenResponses({
         {"t1", "Bearer", 4102444800},
@@ -164,8 +164,8 @@ TEST(HttpClientInterfaceTest, RetryOnceOn401FetchesNewTokenAndRetries) {
     ASSERT_EQ(client.get_calls.load(), 2);
 
     ASSERT_GE(client.get_headers_history.size(), 2u);
-    auto auth1 = client.get_headers_history[0].find(HttpClientInterface::kAuthorizationHeader);
-    auto auth2 = client.get_headers_history[1].find(HttpClientInterface::kAuthorizationHeader);
+    auto auth1 = client.get_headers_history[0].find(HttpClientBase::kAuthorizationHeader);
+    auto auth2 = client.get_headers_history[1].find(HttpClientBase::kAuthorizationHeader);
     ASSERT_NE(auth1, client.get_headers_history[0].end());
     ASSERT_NE(auth2, client.get_headers_history[1].end());
     ASSERT_EQ(auth1->second, "Bearer t1");

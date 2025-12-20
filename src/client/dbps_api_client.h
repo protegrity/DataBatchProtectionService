@@ -26,7 +26,7 @@
 #include "../common/enum_utils.h"
 #include "../common/json_request.h"
 #include "tcb/span.hpp"
-#include "http_client_interface.h"
+#include "http_client_base.h"
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -143,7 +143,7 @@ public:
      * The HTTP client is expected to be thread-safe.
      * @param http_client Custom HTTP client implementation
      */
-    explicit DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client);
+    explicit DBPSApiClient(std::shared_ptr<HttpClientBase> http_client);
     
     /**
      * Destructor
@@ -223,5 +223,5 @@ public:
     );
 
 private:
-    const std::shared_ptr<HttpClientInterface> http_client_;
+    const std::shared_ptr<HttpClientBase> http_client_;
 };

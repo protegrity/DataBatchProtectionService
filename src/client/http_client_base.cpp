@@ -15,20 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "http_client_interface.h"
+#include "http_client_base.h"
 
 #include <chrono>
 
 #include "json_request.h"
 
-HttpClientInterface::HeaderList HttpClientInterface::DefaultJsonGetHeaders() {
+HttpClientBase::HeaderList HttpClientBase::DefaultJsonGetHeaders() {
     HeaderList headers;
     headers.insert({"Accept", kJsonContentType});
     headers.insert({"User-Agent", kDefaultUserAgent});
     return headers;
 }
 
-HttpClientInterface::HeaderList HttpClientInterface::DefaultJsonPostHeaders() {
+HttpClientBase::HeaderList HttpClientBase::DefaultJsonPostHeaders() {
     HeaderList headers;
     headers.insert({"Content-Type", kJsonContentType});
     headers.insert({"Accept", kJsonContentType});
@@ -36,7 +36,7 @@ HttpClientInterface::HeaderList HttpClientInterface::DefaultJsonPostHeaders() {
     return headers;
 }
 
-HttpClientInterface::HttpResponse HttpClientInterface::Get(const std::string& endpoint, bool auth_required) {
+HttpClientBase::HttpResponse HttpClientBase::Get(const std::string& endpoint, bool auth_required) {
     const auto attempt = [&]() -> HttpResponse {
         auto headers = DefaultJsonGetHeaders();
         if (auth_required) {
@@ -56,7 +56,7 @@ HttpClientInterface::HttpResponse HttpClientInterface::Get(const std::string& en
     return result;
 }
 
-HttpClientInterface::HttpResponse HttpClientInterface::Post(const std::string& endpoint,
+HttpClientBase::HttpResponse HttpClientBase::Post(const std::string& endpoint,
                                                             const std::string& json_body,
                                                             bool auth_required) {
     const auto attempt = [&]() -> HttpResponse {
@@ -78,7 +78,7 @@ HttpClientInterface::HttpResponse HttpClientInterface::Post(const std::string& e
     return result;
 }
 
-std::string HttpClientInterface::AddAuthorizationHeader(HeaderList& headers) {
+std::string HttpClientBase::AddAuthorizationHeader(HeaderList& headers) {
     std::string token_or_error;
     auto token_opt = EnsureValidToken(token_or_error);
     if (!token_opt.has_value()) {
@@ -95,7 +95,7 @@ std::string HttpClientInterface::AddAuthorizationHeader(HeaderList& headers) {
     return "";
 }
 
-std::optional<HttpClientInterface::CachedToken> HttpClientInterface::EnsureValidToken(std::string& error) {
+std::optional<HttpClientBase::CachedToken> HttpClientBase::EnsureValidToken(std::string& error) {
 
     const auto now_epoch_seconds = []() -> std::int64_t {
         const auto now = std::chrono::system_clock::now();
@@ -140,7 +140,7 @@ std::optional<HttpClientInterface::CachedToken> HttpClientInterface::EnsureValid
     return fetched;
 }
 
-std::optional<HttpClientInterface::CachedToken> HttpClientInterface::FetchToken(std::string& error) {
+std::optional<HttpClientBase::CachedToken> HttpClientBase::FetchToken(std::string& error) {
     error.clear();
     TokenRequest token_req;
     token_req.credential_values_ = credentials_;
@@ -169,7 +169,7 @@ std::optional<HttpClientInterface::CachedToken> HttpClientInterface::FetchToken(
     return result;
 }
 
-void HttpClientInterface::InvalidateCachedToken() {
+void HttpClientBase::InvalidateCachedToken() {
     std::lock_guard<std::mutex> lock(token_mutex_);
     cached_token_ = std::nullopt;
 }

@@ -17,16 +17,16 @@
 
 #pragma once
 
-#include "http_client_interface.h"
+#include "http_client_base.h"
 #include <httplib.h>
 
-class HttplibClient : public HttpClientInterface {
+class HttplibClient : public HttpClientBase {
 public:
     /**
      * Constructs an HTTP client for a given base URL.
      *
      * @param base_url The base URL (e.g., "http://127.0.0.1:18080")
-     * @param credentials Authentication key/value map used by HttpClientInterface to request JWTs from /token
+     * @param credentials Authentication key/value map used by HttpClientBase to request JWTs from /token
      */
     explicit HttplibClient(
         const std::string& base_url,
@@ -37,7 +37,7 @@ protected:
      * Transport implementation for an HTTP GET to the specified endpoint.
      *
      * @param endpoint The endpoint path to request (e.g., "/healthz")
-     * @param headers Fully prepared headers from HttpClientInterface (may include Authorization)
+     * @param headers Fully prepared headers from HttpClientBase (may include Authorization)
      * @return HttpResponse containing status code, response body, and any error message
      *
      * @note Connections are not reused - a new connection is established for each request
@@ -50,7 +50,7 @@ protected:
      *
      * @param endpoint The endpoint path to request (e.g., "/encrypt")
      * @param json_body The JSON payload to send in the request body
-     * @param headers Fully prepared headers from HttpClientInterface (may include Authorization)
+     * @param headers Fully prepared headers from HttpClientBase (may include Authorization)
      * @return HttpResponse containing status code, response body, and any error message
      *
      * @note Connections are not reused - a new connection is established for each request

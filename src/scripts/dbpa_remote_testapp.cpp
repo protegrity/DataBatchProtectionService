@@ -117,7 +117,7 @@ public:
     bool Initialize() {
         std::cout << "Initializing DBPA agents..." << std::endl;
         
-        HttpClientInterface::ClientCredentials credentials = {
+        HttpClientBase::ClientCredentials credentials = {
             {"client_id", "test_client_BBBB"},
             {"api_key", "test_key_BBBB"}
         };
@@ -139,7 +139,7 @@ public:
             // Initialize the agent
             agent_->init(
                 "demo_column",                 // column_name
-                {},                            // connection_config
+                {},                            // configuration_map, not needed since the HTTP client is provided
                 app_context,                   // app_context
                 "demo_key_001",                // column_key_id
                 Type::BYTE_ARRAY,              // datatype
@@ -166,7 +166,7 @@ public:
             // Initialize the agent
             float_agent_simple->init(
                 "demo_float_column",           // column_name
-                {},                            // connection_config
+                {},                            // configuration_map, not needed since the HTTP client is provided
                 app_context,                   // app_context
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
@@ -186,11 +186,29 @@ public:
         try {
             // Create the remote agent -- No injection of HTTP client, it will be built inside the agent on init()
             float_agent_pooled = std::make_unique<RemoteDataBatchProtectionAgent>();
+
+            // Create connection config JSON
+            nlohmann::json config_json;
+            config_json["server_url"] = server_url_;
+            config_json["credentials.client_id"] = "test_client_CCCC";
+            config_json["credentials.api_key"] = "test_key_CCCC";
+            std::string config_file_contents = config_json.dump(4);  // Pretty print with 4-space indent
+            
+            // Create a temporary connection config file
+            std::string config_file_name = "test_connection_config.json";
+            std::string config_file_path = std::filesystem::temp_directory_path() / config_file_name;
+            std::ofstream config_file(config_file_path);
+            config_file << config_file_contents;
+            config_file.close();
+
+            // Create the configuration map
+            std::map<std::string, std::string> configuration_map = {
+                {RemoteDataBatchProtectionAgent::k_connection_config_key_, config_file_path}};
             
             // Initialize the agent
             float_agent_pooled->init(
                 "demo_float_column",           // column_name
-                {},                            // connection_config
+                configuration_map,             // configuration_map
                 app_context,                   // app_context
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
@@ -218,7 +236,7 @@ public:
             // Initialize the agent
             fixed_len_agent_->init(
                 "demo_fixed_len_column",       // column_name
-                {},                            // connection_config
+                {},                            // configuration_map, not needed since the HTTP client is provided
                 app_context,                   // app_context
                 "demo_fixed_len_key_001",      // column_key_id
                 Type::FIXED_LEN_BYTE_ARRAY,    // datatype
@@ -434,12 +452,11 @@ public:
     }
     
     // Demo float data encryption/decryption
-    bool DemoFloatData() {
-        std::cout << "\n=== Float Data Demo ===" << std::endl;
+    bool DemoFloatDataWithAgent(RemoteDataBatchProtectionAgent* agent, const std::string& agent_name) {
+        std::cout << "\n--- Testing DemoFloatData with " << agent_name << " ---" << std::endl;
         
-        // Check if float agent is initialized
-        if (!float_agent_simple) {
-            std::cout << "ERROR: Float agent simple not initialized" << std::endl;
+        if (!agent) {
+            std::cout << "ERROR: " << agent_name << " not initialized" << std::endl;
             return false;
         }
         
@@ -487,7 +504,7 @@ public:
                 {"page_encoding", "PLAIN"}
             };
 
-            auto encrypt_result = float_agent_simple->Encrypt(span<const uint8_t>(joined_plaintext), float_encoding_attributes);
+            auto encrypt_result = agent->Encrypt(span<const uint8_t>(joined_plaintext), float_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: Float encryption failed" << std::endl;
@@ -514,8 +531,8 @@ public:
             }
             
             // Decrypt the float data
-            float_agent_simple->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
-            auto decrypt_result = float_agent_simple->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
+            agent->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
+            auto decrypt_result = agent->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {
                 std::cout << "ERROR: Float decryption failed" << std::endl;
@@ -581,15 +598,32 @@ public:
             }
             
             if (integrity_ok) {
-                std::cout << "OK: Float data integrity verified" << std::endl;
+                std::cout << "OK: Float data integrity verified with " << agent_name << std::endl;
                 return true;
             } else {
-                std::cout << "ERROR: Float data integrity check failed" << std::endl;
+                std::cout << "ERROR: Float data integrity check failed with " << agent_name << std::endl;
                 return false;
             }
             
         } catch (const std::exception& e) {
-            std::cout << "ERROR: Float demo exception: " << e.what() << std::endl;
+            std::cout << "ERROR: Float demo exception with " << agent_name << ": " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+    bool DemoFloatData() {
+        std::cout << "\n=== Float Data Demo ===" << std::endl;
+        
+        bool simple_ok = DemoFloatDataWithAgent(float_agent_simple.get(), "Simple HTTP Client");
+        bool pooled_ok = DemoFloatDataWithAgent(float_agent_pooled.get(), "Pooled HTTP Client");
+        
+        if (simple_ok && pooled_ok) {
+            std::cout << "\nOK: Float data demo passed with both agents" << std::endl;
+            return true;
+        } else {
+            std::cout << "\nERROR: Float data demo failed" << std::endl;
+            std::cout << "  Simple client: " << (simple_ok ? "PASS" : "FAIL") << std::endl;
+            std::cout << "  Pooled client: " << (pooled_ok ? "PASS" : "FAIL") << std::endl;
             return false;
         }
     }

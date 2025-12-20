@@ -151,7 +151,7 @@ TEST(HttplibPooledClientTest, ConcurrencyAndThroughput) {
     auto client = HttplibPooledClient::Acquire(base, 4, {});
 
     const int N = 24;
-    std::vector<std::future<HttpClientInterface::HttpResponse> > futures;
+    std::vector<std::future<HttpClientBase::HttpResponse> > futures;
     futures.reserve(N);
     for (int i = 0; i < N; ++i) {
         futures.emplace_back(std::async(std::launch::async, [client]{

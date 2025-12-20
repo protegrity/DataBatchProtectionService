@@ -31,9 +31,9 @@
  * Thread Safety: Implementations must be thread-safe for concurrent calls.
  * Multiple threads may call Get() and Post() methods simultaneously on the same instance.
  */
-class HttpClientInterface {
+class HttpClientBase {
 public:
-    virtual ~HttpClientInterface() = default;
+    virtual ~HttpClientBase() = default;
 
     using ClientCredentials = std::map<std::string, std::string>;
     using HeaderList = httplib::Headers;
@@ -61,7 +61,7 @@ public:
     HttpResponse Post(const std::string& endpoint, const std::string& json_body, bool auth_required = true);
 
 protected:
-    explicit HttpClientInterface(std::string base_url,
+    explicit HttpClientBase(std::string base_url,
                                  ClientCredentials credentials = {})
         : base_url_(std::move(base_url)),
           credentials_(std::move(credentials)) {

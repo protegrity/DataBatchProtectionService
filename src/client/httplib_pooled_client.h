@@ -27,11 +27,11 @@
 #include <thread>
 #include <vector>
 
-#include "http_client_interface.h"
+#include "http_client_base.h"
 
-// Implemenetation of the HttpClientInterface which uses a pool of connections for a given base_url.
+// Implemenetation of the HttpClientBase which uses a pool of connections for a given base_url.
 // This is a singleton, accessed via the Acquire() function.
-class HttplibPooledClient : public HttpClientInterface {
+class HttplibPooledClient : public HttpClientBase {
 public:
     // Factory that returns one pooled client per base_url.
     // If cfg is provided, it will be applied to the underlying pool for the base_url.
@@ -58,7 +58,7 @@ private:
         std::string endpoint;
         std::string json_body;
         HeaderList headers;
-        std::promise<HttpClientInterface::HttpResponse> promise;
+        std::promise<HttpClientBase::HttpResponse> promise;
     };
 
     void WorkerLoop();

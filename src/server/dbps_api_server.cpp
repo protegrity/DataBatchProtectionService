@@ -86,7 +86,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
     } else {
         // No credentials file provided, disable credential checking
-        // ++++++ credential_store.init(false);
+        // credential_store.init(false);
+        
+        // ++++++++ Remove this after testing ++++++
         credential_store.init({
             {"test_client_BBBB", "test_key_BBBB"},
             {"test_client_CCCC", "test_key_CCCC"}

@@ -159,7 +159,7 @@ void DecryptApiResponse::SetJsonRequest(const DecryptJsonRequest& request) { jso
 bool DecryptApiResponse::HasJsonRequest() const { return json_request_.has_value(); }
 const JsonRequest& DecryptApiResponse::GetJsonRequest() const { return json_request_.value(); }
 
-DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client)
+DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientBase> http_client)
     : http_client_(std::move(http_client)) {
 }
 

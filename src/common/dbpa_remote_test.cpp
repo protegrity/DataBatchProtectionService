@@ -35,7 +35,7 @@ public:
     TestableRemoteDataBatchProtectionAgent() = default;
     
     // Constructor that takes HTTP client
-    TestableRemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientInterface> http_client) 
+    TestableRemoteDataBatchProtectionAgent(std::unique_ptr<HttpClientBase> http_client) 
         : RemoteDataBatchProtectionAgent(std::move(http_client)) {}
     
     // Expose protected members for testing
@@ -61,10 +61,10 @@ public:
 };
 
 // Mock HTTP client for testing
-class MockHttpClient : public HttpClientInterface {
+class MockHttpClient : public HttpClientBase {
 public:
     MockHttpClient()
-        : HttpClientInterface(
+        : HttpClientBase(
               "mock://",
               ClientCredentials{{"client_id", "test_client_AAAA"}, {"api_key", "test_key_AAAA"}}) {
     }
@@ -149,18 +149,21 @@ protected:
     std::map<std::string, std::string> GetConfigurationMap(
       const std::string& file_contents, const std::string& file_name) {
         std::string tmp_file_path = std::filesystem::temp_directory_path() / file_name;
-        if (!std::filesystem::exists(tmp_file_path)) {
-            CreateTemporaryConnectionConfigFile(file_contents, file_name);
+        // Always recreate the file to ensure it has the correct contents
+        if (std::filesystem::exists(tmp_file_path)) {
+            std::filesystem::remove(tmp_file_path);
         }
+        CreateTemporaryConnectionConfigFile(file_contents, file_name);
         return {{TestableRemoteDataBatchProtectionAgent::k_connection_config_key_, tmp_file_path}};
     }
 
-    void TestConnectionConfigFailures(const std::map<std::string, std::string>& configuration_map) {
+    void TestConnectionConfigFailures(const std::map<std::string, std::string>& configuration_map,
+                                     const std::string& expected_error_fragment) {
         auto agent = TestableRemoteDataBatchProtectionAgent();
         
         std::string app_context = "{\"user_id\": \"test_user\"}";
         
-        // init() should throw DBPSException for missing server URL
+        // init() should throw DBPSException for config failure
         EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                 Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                      DBPSException);
@@ -168,7 +171,7 @@ protected:
         // Test that the initialized_ state reflects the failure
         EXPECT_TRUE(agent.get_initialized().has_value());
         EXPECT_FALSE(agent.get_initialized()->empty());
-        EXPECT_TRUE(agent.get_initialized()->find("server_url") != std::string::npos);
+        EXPECT_TRUE(agent.get_initialized()->find(expected_error_fragment) != std::string::npos);
         
         // Test that Encrypt() returns a failed result with the initialization error
         std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -181,7 +184,7 @@ protected:
         // Check that the error message contains expected content
         std::string error_msg = result->error_message();
         EXPECT_TRUE(error_msg.find("initialized") != std::string::npos);
-        EXPECT_TRUE(error_msg.find("server_url") != std::string::npos);
+        EXPECT_TRUE(error_msg.find(expected_error_fragment) != std::string::npos);
     }
     
     std::unique_ptr<MockHttpClient> mock_client_;
@@ -222,7 +225,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
 
     // Create a (temp) config file with a localhost URL to avoid external network
     auto configuration_map = GetConfigurationMap(
-        "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
+        "{\"server_url\": \"http://localhost:19999\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
 
     // init() should throw because health check will fail (we're using a real client with no server)
@@ -245,7 +248,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
         agent.get_configuration_map().at(TestableRemoteDataBatchProtectionAgent::k_connection_config_key_)));
 
     // Values extracted before health check
-    EXPECT_EQ(agent.get_server_url(), "http://localhost:8080");
+    EXPECT_EQ(agent.get_server_url(), "http://localhost:19999");
     EXPECT_EQ(agent.get_user_id(), "test_user");
 
     // Initialized status should indicate health check failure
@@ -372,15 +375,15 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptWithoutInit) {
 
 // Test initialization with bad connection configurations
 TEST_F(RemoteDataBatchProtectionAgentTest, EmptyConnectionConfig) {
-    TestConnectionConfigFailures(GetConfigurationMap("", "empty_connection_config.json"));
+    TestConnectionConfigFailures(GetConfigurationMap("", "empty_connection_config.json"), "is empty");
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, NonExistingConnectionConfigFile) {
-    TestConnectionConfigFailures({{TestableRemoteDataBatchProtectionAgent::k_connection_config_key_, "foo"}});
+    TestConnectionConfigFailures({{TestableRemoteDataBatchProtectionAgent::k_connection_config_key_, "foo"}}, "does not exist");
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, BadJsonConfigFile) {
-    TestConnectionConfigFailures(GetConfigurationMap("foo", "bad_json_connection_config.json"));
+    TestConnectionConfigFailures(GetConfigurationMap("foo", "bad_json_connection_config.json"), "not a valid JSON");
 }
 
 // Test initialization with missing user ID

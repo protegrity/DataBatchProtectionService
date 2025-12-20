@@ -22,7 +22,7 @@
 #include <algorithm>
 #include "tcb/span.hpp"
 #include "dbps_api_client.h"
-#include "http_client_interface.h"
+#include "http_client_base.h"
 #include "../common/enums.h"
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
@@ -56,10 +56,10 @@ bool CompareJsonStrings(const std::string& json1, const std::string& json2, cons
 }
 
 // Mock HTTP client for testing
-class MockHttpClient : public HttpClientInterface {
+class MockHttpClient : public HttpClientBase {
 public:
     MockHttpClient()
-        : HttpClientInterface(
+        : HttpClientBase(
               "mock://",
               ClientCredentials{{"client_id", "test_client_AAAA"}, {"api_key", "test_key_AAAA"}}) {
     }
@@ -310,7 +310,7 @@ TEST(DBPSApiClient, EncryptWithValidData) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -402,7 +402,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
     })";
     
     mock_client->SetMockPostResponse("/decrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -545,7 +545,7 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -611,7 +611,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
     })";
     
     mock_client->SetMockPostResponse("/decrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -688,7 +688,7 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));

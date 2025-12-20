@@ -102,8 +102,13 @@ public:
     RemoteDataBatchProtectionAgent() = default;
     
     // Constructor with HTTP client passed. Creates API_client immediately on the contructor.
-    explicit RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientInterface> http_client);
+    explicit RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientBase> http_client);
     
+    // TODO: Split credentials config file key and credentials file from connection config.
+    //   Currently these live on the same file, but should be separate as they may have different access permissions.
+    // Configuration map keys
+    inline static const std::string k_connection_config_key_ = "connection_config_file_path";
+
     // DataBatchProtectionAgentInterface implementation
     void init(
         std::string column_name,
@@ -135,12 +140,11 @@ protected:
     std::optional<std::string> initialized_;
     std::string server_url_;
     std::string user_id_;
-    inline static const std::string k_connection_config_key_ = "connection_config_file_path";
-    
+
     // Helper methods for configuration parsing
 
     // Load and parse the config file in the configuration_map.
-    std::optional<nlohmann::json> LoadConfigFile(const std::string& config_file_key) const;
+    std::optional<nlohmann::json> LoadConfigFile(const std::string& config_file_key, std::string& error_string) const;
 
     // Extract pool config from the connection_config json. Values are optional, and will use default values if not present.
     HttplibPoolRegistry::PoolConfig ExtractPoolConfig(const nlohmann::json& config_json);
@@ -152,11 +156,11 @@ protected:
     std::optional<std::string> ExtractServerUrl(const nlohmann::json& config_json) const;
 
     // Extract client credentials from parsed JSON config
-    HttpClientInterface::ClientCredentials ExtractClientCredentials(const nlohmann::json& config_json) const;
+    HttpClientBase::ClientCredentials ExtractClientCredentials(const nlohmann::json& config_json) const;
 
 private:    
     // Instantiate a new HTTP client using the connection config file
-    std::shared_ptr<HttpClientInterface> InstantiateHttpClient();
+    std::shared_ptr<HttpClientBase> InstantiateHttpClient();
 
     // Client instance
     std::unique_ptr<DBPSApiClient> api_client_;
