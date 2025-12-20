@@ -98,7 +98,7 @@ private:
  */
 class DBPS_EXPORT RemoteDataBatchProtectionAgent : public DataBatchProtectionAgentInterface {
 public:
-    // Constructor (default). Creates API_client during init() using server_url from connection_config
+    // Constructor (default). Creates API_client during init() using server_url from the connection_config file.
     RemoteDataBatchProtectionAgent() = default;
     
     // Constructor with HTTP client passed. Creates API_client immediately on the contructor.
@@ -107,7 +107,7 @@ public:
     // DataBatchProtectionAgentInterface implementation
     void init(
         std::string column_name,
-        std::map<std::string, std::string> connection_config,
+        std::map<std::string, std::string> configuration_map,
         std::string app_context,
         std::string column_key_id,
         Type::type datatype,
@@ -135,29 +135,26 @@ protected:
     std::optional<std::string> initialized_;
     std::string server_url_;
     std::string user_id_;
-    std::string k_connection_config_key_ = "connection_config_file_path";
-
-    // Extract pool config from connection_config
-    // assumes all values in connection_config are optional, and will use default values if any not present.
-    HttplibPoolRegistry::PoolConfig ExtractPoolConfig(const nlohmann::json& config_json);
-    // Extract number of worker threads for pooled client; defaults to 0 (auto)
-    std::size_t ExtractNumWorkerThreads(const nlohmann::json& config_json) const;
-
-private:
+    inline static const std::string k_connection_config_key_ = "connection_config_file_path";
+    
     // Helper methods for configuration parsing
 
-    // Load and parse the connection config file specified in connection_config
-    std::optional<nlohmann::json> LoadConnectionConfigFile(const std::map<std::string, std::string>& connection_config) const;
+    // Load and parse the config file in the configuration_map.
+    std::optional<nlohmann::json> LoadConfigFile(const std::string& config_file_key) const;
 
-    // Instantiate a new HTTP client using the connection config file
-    std::shared_ptr<HttpClientInterface> InstantiateHttpClient();
+    // Extract pool config from the connection_config json. Values are optional, and will use default values if not present.
+    HttplibPoolRegistry::PoolConfig ExtractPoolConfig(const nlohmann::json& config_json);
+
+    // Extract number of worker threads for pooled client; defaults to 0 (auto)
+    std::size_t ExtractNumWorkerThreads(const nlohmann::json& config_json) const;
 
     // Extract server_url from parsed JSON config such as {"server_url": "http://localhost:8080"}
     std::optional<std::string> ExtractServerUrl(const nlohmann::json& config_json) const;
 
-    std::optional<std::string> ExtractUserId(const std::string& app_context) const;
-    std::optional<Format::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const;
-    
+private:    
+    // Instantiate a new HTTP client using the connection config file
+    std::shared_ptr<HttpClientInterface> InstantiateHttpClient();
+
     // Client instance
     std::unique_ptr<DBPSApiClient> api_client_;
 };

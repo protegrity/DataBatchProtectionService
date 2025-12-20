@@ -41,10 +41,10 @@ protected:
 TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
     LocalDataBatchProtectionAgent agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"user_id": "test_user"})";
     
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -59,10 +59,10 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
 TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryptionCompressedDictionary) {
     LocalDataBatchProtectionAgent agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"user_id": "test_user"})";
     
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::GZIP, std::nullopt));
     
     // GZIP compressed data for strings "apple" and "banana"
@@ -84,10 +84,10 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryptionCompressedDictiona
 TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     LocalDataBatchProtectionAgent agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"user_id": "test_user"})";
     
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, DBPS_ENCRYPTION_METADATA));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -103,10 +103,10 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
 TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
     LocalDataBatchProtectionAgent encrypt_agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"user_id": "test_user"})";
     
-    EXPECT_NO_THROW(encrypt_agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(encrypt_agent.init("test_column", configuration_map, app_context, "test_key", 
                                        Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     // Original data to encrypt
@@ -132,7 +132,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
     
     // Create a new agent for decryption with the encryption_metadata from the encryption result
     LocalDataBatchProtectionAgent decrypt_agent;
-    EXPECT_NO_THROW(decrypt_agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(decrypt_agent.init("test_column", configuration_map, app_context, "test_key", 
                                        Type::UNDEFINED, std::nullopt, CompressionCodec::UNCOMPRESSED, encryption_metadata));
     
     // Decrypt the ciphertext
@@ -183,10 +183,10 @@ TEST_F(LocalDataBatchProtectionAgentTest, DecryptWithoutInit) {
 TEST_F(LocalDataBatchProtectionAgentTest, MissingUserId) {
     LocalDataBatchProtectionAgent agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"role": "admin"})";
     
-    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                             Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), DBPSException);
 }
 
@@ -194,10 +194,10 @@ TEST_F(LocalDataBatchProtectionAgentTest, MissingUserId) {
 TEST_F(LocalDataBatchProtectionAgentTest, MissingPageEncoding) {
     LocalDataBatchProtectionAgent agent;
     
-    std::map<std::string, std::string> connection_config;
+    std::map<std::string, std::string> configuration_map = {};
     std::string app_context = R"({"user_id": "test_user"})";
     
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};

@@ -104,7 +104,7 @@ public:
     // DataBatchProtectionAgentInterface implementation
     void init(
         std::string column_name,
-        std::map<std::string, std::string> connection_config,
+        std::map<std::string, std::string> configuration_map,
         std::string app_context,
         std::string column_key_id,
         Type::type datatype,

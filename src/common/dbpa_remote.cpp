@@ -19,6 +19,7 @@
 #include "../client/dbps_api_client.h"
 #include "../client/httplib_pool_registry.h"
 #include "../client/httplib_pooled_client.h"
+#include "dbpa_utils.h"
 #include "enum_utils.h"
 #include <iostream>
 
@@ -167,7 +168,7 @@ RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::shared_ptr<H
 
 void RemoteDataBatchProtectionAgent::init(
     std::string column_name,
-    std::map<std::string, std::string> connection_config,
+    std::map<std::string, std::string> configuration_map,
     std::string app_context,
     std::string column_key_id,
     Type::type datatype,
@@ -182,7 +183,7 @@ void RemoteDataBatchProtectionAgent::init(
         // Call the base class init to store the configuration
         DataBatchProtectionAgentInterface::init(
             std::move(column_name),
-            std::move(connection_config),
+            std::move(configuration_map),
             std::move(app_context),
             std::move(column_key_id),
             datatype,
@@ -212,7 +213,7 @@ void RemoteDataBatchProtectionAgent::init(
         // The API client constructor does not attempt a HTTP connection with the server. The first Get/Post call creates the HTTP connection.
         if (!api_client_) {
             // given that there is no API client, instantiate a new one with a new HTTP client.
-            auto http_client = InstantiateHttpClient(); //uses connection_config_
+            auto http_client = InstantiateHttpClient(); //uses configuration_map_
             api_client_ = std::make_unique<DBPSApiClient>(http_client);
         } else {
             std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - Using existing API client" << std::endl;
@@ -366,24 +367,24 @@ void RemoteDataBatchProtectionAgent::UpdateEncryptionMetadata(std::optional<std:
     column_encryption_metadata_ = std::move(encryption_metadata);
 }
 
-std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConnectionConfigFile(const std::map<std::string, std::string>& connection_config) const {
-    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::LoadConnectionConfigFile() - ";
-    auto config_file_it = connection_config.find(k_connection_config_key_);
-    if (config_file_it == connection_config.end()) {
+std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConfigFile(const std::string& config_file_key) const {
+    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::LoadConfigFile() - ";
+    auto config_file_it = configuration_map_.find(config_file_key);
+    if (config_file_it == configuration_map_.end()) {
         std::cerr << error_trace 
-                  << "connection_config does not provide " << k_connection_config_key_ << std::endl;
+                  << "configuration_map does not provide " << config_file_key << std::endl;
         return std::nullopt;
     }
     auto config_file_path = config_file_it->second;
     if (!std::filesystem::exists(config_file_path)) {
-        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
+        std::cerr << error_trace << config_file_key << " [" << config_file_path 
                   << "] does not exist" << std::endl;
         return std::nullopt;
     }
 
     std::ifstream config_file(config_file_path);
     if (!config_file.is_open()) {
-        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
+        std::cerr << error_trace << config_file_key << " [" << config_file_path 
                   << "] could not be opened" << std::endl;
         return std::nullopt;
     }
@@ -393,7 +394,7 @@ std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConnectionConf
     config_file.close();
 
     if (config_file_contents.empty()) {
-        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
+        std::cerr << error_trace << config_file_key << " [" << config_file_path 
                   << "] is empty" << std::endl;
         return std::nullopt;
     }
@@ -402,19 +403,19 @@ std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConnectionConf
         auto json = nlohmann::json::parse(config_file_contents);
         return json;
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << error_trace << k_connection_config_key_ << " [" << config_file_path 
+        std::cerr << error_trace << config_file_key << " [" << config_file_path 
                   << "] is not a valid JSON file: " << e.what() << std::endl;
         return std::nullopt;
     }
 }
 
 std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::InstantiateHttpClient() {
-    auto config_json_opt = LoadConnectionConfigFile(connection_config_);
+    auto config_json_opt = LoadConfigFile(k_connection_config_key_);
     auto server_url_opt = config_json_opt ? ExtractServerUrl(*config_json_opt) : std::nullopt;
     if (!server_url_opt || server_url_opt->empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - No server_url provided in connection_config." << std::endl;
+        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - No server_url provided in " << k_connection_config_key_ << "." << std::endl;
         initialized_ = "Agent not properly initialized - server_url missing";
-        throw DBPSException("No server_url provided in connection_config");
+        throw DBPSException("No server_url provided in " + k_connection_config_key_);
     }
     server_url_ = *server_url_opt;
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
@@ -475,7 +476,7 @@ static long long get_int_or_default(const nlohmann::json& config_json, const cha
     return val.get<long long>();
 }
 
-//Extract pool config from connection_config. Expected format is a set of key-values pairs which are top level in the file
+// Extract pool config from connection_config json. Expected format is a set of key-values pairs which are top level in the file
 // there is no nesting
 HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfig(const nlohmann::json& config_json) {
     HttplibPoolRegistry::PoolConfig pool_config;
@@ -510,36 +511,4 @@ HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfi
 std::size_t RemoteDataBatchProtectionAgent::ExtractNumWorkerThreads(const nlohmann::json& config_json) const {
     return static_cast<std::size_t>(
         get_int_or_default(config_json, "connection_pool.num_worker_threads", 0));
-}
-
-std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractUserId(const std::string& app_context) const {
-    try {
-        auto json = nlohmann::json::parse(app_context);
-        if (json.contains("user_id") && json["user_id"].is_string()) {
-            std::string user_id = json["user_id"];
-            if (!user_id.empty()) {
-                return user_id;
-            }
-        }
-    } catch (const nlohmann::json::exception& e) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractUserId() - Failed to parse app_context JSON: " << e.what() << std::endl;
-    }
-    return std::nullopt;
-}
-
-std::optional<Format::type> RemoteDataBatchProtectionAgent::ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) const {
-    auto it = encoding_attributes.find("page_encoding");
-    if (it != encoding_attributes.end()) {
-        const std::string& encoding_str = it->second;
-        auto format_opt = to_format_enum(encoding_str);
-        if (format_opt.has_value()) {
-            return format_opt.value();
-        } else {
-            std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - Unknown page_encoding: " << encoding_str << std::endl;
-            return std::nullopt;
-        }
-    }
-    // Return nullopt if page_encoding not found
-    std::cerr << "ERROR: RemoteDataBatchProtectionAgent::ExtractPageEncoding() - page_encoding not found." << std::endl;
-    return std::nullopt;
 }

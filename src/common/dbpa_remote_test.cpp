@@ -43,13 +43,20 @@ public:
     const std::string& get_column_key_id() const { return column_key_id_; }
     Type::type get_datatype() const { return datatype_; }
     CompressionCodec::type get_compression_type() const { return compression_type_; }
-    const std::map<std::string, std::string>& get_connection_config() const { return connection_config_; }
+    const std::map<std::string, std::string>& get_configuration_map() const { return configuration_map_; }
     const std::string& get_app_context() const { return app_context_; }
     
     // Expose private members for testing
     const std::string& get_server_url() const { return server_url_; }
     const std::string& get_user_id() const { return user_id_; }
     const std::optional<std::string>& get_initialized() const { return initialized_; }
+    
+    // Expose connection config key for testing
+    using RemoteDataBatchProtectionAgent::k_connection_config_key_;
+    
+    // Expose protected helper methods as public for testing
+    using RemoteDataBatchProtectionAgent::ExtractPoolConfig;
+    using RemoteDataBatchProtectionAgent::ExtractNumWorkerThreads;
 };
 
 // Mock HTTP client for testing
@@ -125,22 +132,22 @@ protected:
         }
     }
 
-    std::map<std::string, std::string> GetConnectionConfig(
+    std::map<std::string, std::string> GetConfigurationMap(
       const std::string& file_contents, const std::string& file_name) {
         std::string tmp_file_path = std::filesystem::temp_directory_path() / file_name;
         if (!std::filesystem::exists(tmp_file_path)) {
             CreateTemporaryConnectionConfigFile(file_contents, file_name);
         }
-        return {{"connection_config_file_path", tmp_file_path}};
+        return {{TestableRemoteDataBatchProtectionAgent::k_connection_config_key_, tmp_file_path}};
     }
 
-    void TestConnectionConfigFailures(const std::map<std::string, std::string>& connection_config) {
+    void TestConnectionConfigFailures(const std::map<std::string, std::string>& configuration_map) {
         auto agent = TestableRemoteDataBatchProtectionAgent();
         
         std::string app_context = "{\"user_id\": \"test_user\"}";
         
         // init() should throw DBPSException for missing server URL
-        EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+        EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                 Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                      DBPSException);
         
@@ -167,26 +174,19 @@ protected:
     std::vector<std::string> tmp_test_data_dir_;
 };
 
-// Expose ExtractPoolConfig via the test subclass
-class ExtractPoolConfigExposer : public TestableRemoteDataBatchProtectionAgent {
-public:
-    using TestableRemoteDataBatchProtectionAgent::ExtractPoolConfig;
-    using TestableRemoteDataBatchProtectionAgent::ExtractNumWorkerThreads;
-};
-
 // Test basic initialization with valid configuration
 TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthCheck) {
     // Use default constructor to ensure config is loaded from file and HTTP client is created internally
     auto agent = TestableRemoteDataBatchProtectionAgent();
 
     // Create a (temp) config file with a localhost URL to avoid external network
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
 
     // init() should throw because health check will fail (we're using a real client with no server)
     // but it must parse config and extract values first
-    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key",
+    EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key",
                             Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt),
                  DBPSException);
 
@@ -198,10 +198,10 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
     EXPECT_EQ(agent.get_app_context(), app_context);
 
     // Config path should be present and file exists
-    EXPECT_TRUE(agent.get_connection_config().find("connection_config_file_path")
-                != agent.get_connection_config().end());
+    EXPECT_TRUE(agent.get_configuration_map().find(TestableRemoteDataBatchProtectionAgent::k_connection_config_key_)
+                != agent.get_configuration_map().end());
     EXPECT_TRUE(std::filesystem::exists(
-        agent.get_connection_config().at("connection_config_file_path")));
+        agent.get_configuration_map().at(TestableRemoteDataBatchProtectionAgent::k_connection_config_key_)));
 
     // Values extracted before health check
     EXPECT_EQ(agent.get_server_url(), "http://localhost:8080");
@@ -214,7 +214,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthChec
 
 // Verify default pool configuration values are applied when not provided
 TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigDefaultsAreApplied) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const nlohmann::json json = nlohmann::json::parse("{\"server_url\": \"http://localhost:8080\"}");
     auto cfg = agent.ExtractPoolConfig(json);
     EXPECT_EQ(cfg.max_pool_size, HttplibPoolRegistry::kDefaultMaxPoolSize);
@@ -227,7 +227,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigDefaultsAreApplied) {
 
 // Verify custom pool configuration values from JSON are applied
 TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigCustomValuesAreApplied) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const std::string json_str =
         "{\n"
         "  \"server_url\": \"http://localhost:8080\",\n"
@@ -250,7 +250,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigCustomValuesAreApplied) {
 
 // Verify a mix of provided and missing values results in custom + defaults accordingly
 TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMixedDefaultsAndCustom) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const std::string json_str =
         "{\n"
         "  \"server_url\": \"http://localhost:8080\",\n"
@@ -274,7 +274,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMixedDefaultsAndCustom) {
 
 // Verify malformed (wrong-typed) values throw
 TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMalformedValuesThrow) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const std::string json_str =
         "{\n"
         "  \"server_url\": \"http://localhost:8080\",\n"
@@ -292,14 +292,14 @@ TEST_F(RemoteDataBatchProtectionAgentTest, PoolConfigMalformedValuesThrow) {
 
 // Verify num_worker_threads extraction (default/custom/malformed)
 TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsDefaultIsZero) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const nlohmann::json json = nlohmann::json::parse("{\"server_url\": \"http://localhost:8080\"}");
     auto n = agent.ExtractNumWorkerThreads(json);
     EXPECT_EQ(n, 0u);
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsCustomValue) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const nlohmann::json json = nlohmann::json::parse(
         "{\"server_url\": \"http://localhost:8080\", \"connection_pool.num_worker_threads\": 7}");
     auto n = agent.ExtractNumWorkerThreads(json);
@@ -307,7 +307,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsCustomValue) {
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, NumWorkerThreadsMalformedThrows) {
-    ExtractPoolConfigExposer agent;
+    TestableRemoteDataBatchProtectionAgent agent;
     const nlohmann::json json = nlohmann::json::parse(
         "{\"server_url\": \"http://localhost:8080\", \"connection_pool.num_worker_threads\": \"threads\"}");
     EXPECT_THROW(agent.ExtractNumWorkerThreads(json), DBPSException);
@@ -331,27 +331,27 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptWithoutInit) {
 
 // Test initialization with bad connection configurations
 TEST_F(RemoteDataBatchProtectionAgentTest, EmptyConnectionConfig) {
-    TestConnectionConfigFailures(GetConnectionConfig("", "empty_connection_config.json"));
+    TestConnectionConfigFailures(GetConfigurationMap("", "empty_connection_config.json"));
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, NonExistingConnectionConfigFile) {
-    TestConnectionConfigFailures({{"connection_config_file_path", "foo"}});
+    TestConnectionConfigFailures({{TestableRemoteDataBatchProtectionAgent::k_connection_config_key_, "foo"}});
 }
 
 TEST_F(RemoteDataBatchProtectionAgentTest, BadJsonConfigFile) {
-    TestConnectionConfigFailures(GetConnectionConfig("foo", "bad_json_connection_config.json"));
+    TestConnectionConfigFailures(GetConfigurationMap("foo", "bad_json_connection_config.json"));
 }
 
 // Test initialization with missing user ID
 TEST_F(RemoteDataBatchProtectionAgentTest, MissingUserId) {
     auto agent = TestableRemoteDataBatchProtectionAgent();
 
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{}"; // No user_id
     
     // init() should throw DBPSException for missing user ID
-    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                             Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                  DBPSException);
     
@@ -380,12 +380,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, HealthCheckFailure) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should throw DBPSException for health check failure
-    EXPECT_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                             Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt), 
                  DBPSException);
     
@@ -424,12 +424,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulEncryption) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -466,12 +466,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -536,12 +536,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
         
         auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client));
         
-        auto connection_config = GetConnectionConfig(
+        auto configuration_map = GetConfigurationMap(
             "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
         std::string app_context = "{\"user_id\": \"test_user\"}";
         
         // init() should not throw an exception for valid configuration
-        EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+        EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                    Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
         
         std::vector<uint8_t> test_data = {1, 2, 3, 4};
@@ -579,12 +579,12 @@ TEST_F(RemoteDataBatchProtectionAgentTest, EncryptionFieldMismatch) {
     
     auto agent = TestableRemoteDataBatchProtectionAgent(std::move(mock_client_));
     
-    auto connection_config = GetConnectionConfig(
+    auto configuration_map = GetConfigurationMap(
         "{\"server_url\": \"http://localhost:8080\"}", "test_connection_config.json");
     std::string app_context = "{\"user_id\": \"test_user\"}";
     
     // init() should not throw an exception for valid configuration
-    EXPECT_NO_THROW(agent.init("test_column", connection_config, app_context, "test_key", 
+    EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
