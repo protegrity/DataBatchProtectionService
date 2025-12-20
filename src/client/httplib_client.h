@@ -22,33 +22,39 @@
 
 class HttplibClient : public HttpClientInterface {
 public:
-    explicit HttplibClient(const std::string& base_url);
-    
     /**
-     * Performs an HTTP GET request to the specified endpoint
-     * 
-     * @param endpoint The endpoint path to request (e.g., "/healthz")
-     * @return HttpResponse containing status code, response body, and any error message
-     * 
-     * @note Connections are not reused - a new connection is established for each request
-     * @note Requests are not retried on failure
-     * @note Requests are not enqueued - they are sent immediately
+     * Constructs an HTTP client for a given base URL.
+     *
+     * @param base_url The base URL (e.g., "http://127.0.0.1:18080")
+     * @param credentials Authentication key/value map used by HttpClientInterface to request JWTs from /token
      */
-    HttpResponse Get(const std::string& endpoint) override;
+    explicit HttplibClient(
+        const std::string& base_url,
+        ClientCredentials credentials);
     
+protected:
     /**
-     * Performs an HTTP POST request to the specified endpoint with JSON body
-     * 
+     * Transport implementation for an HTTP GET to the specified endpoint.
+     *
+     * @param endpoint The endpoint path to request (e.g., "/healthz")
+     * @param headers Fully prepared headers from HttpClientInterface (may include Authorization)
+     * @return HttpResponse containing status code, response body, and any error message
+     *
+     * @note Connections are not reused - a new connection is established for each request
+     * @note Requests are not retried on failure and they are sent immediately
+     */
+    HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override;
+
+    /**
+     * Transport implementation for an HTTP POST to the specified endpoint with JSON body.
+     *
      * @param endpoint The endpoint path to request (e.g., "/encrypt")
      * @param json_body The JSON payload to send in the request body
+     * @param headers Fully prepared headers from HttpClientInterface (may include Authorization)
      * @return HttpResponse containing status code, response body, and any error message
-     * 
+     *
      * @note Connections are not reused - a new connection is established for each request
-     * @note Requests are not retried on failure
-     * @note Requests are not enqueued - they are sent immediately
+     * @note Requests are not retried on failure and they are sent immediately
      */
-    HttpResponse Post(const std::string& endpoint, const std::string& json_body) override;
-
-private:
-    const std::string base_url_;
+    HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) override;
 };

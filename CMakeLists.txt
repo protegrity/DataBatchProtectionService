@@ -160,6 +160,7 @@ target_link_libraries(dbps_server_lib PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 # Client components library (depends on httplib, nlohmann/json, and cppcodec)
 add_library(dbps_client_lib STATIC 
   src/client/dbps_api_client.cpp
+  src/client/http_client_interface.cpp
   src/client/httplib_client.cpp
   src/client/httplib_pool_registry.cpp
   src/client/httplib_pooled_client.cpp
@@ -364,6 +365,14 @@ if(BUILD_TESTS)
     gtest_main
   )
 
+  # Http client interface tests
+  add_executable(http_client_interface_test src/client/http_client_interface_test.cpp)
+  target_link_libraries(http_client_interface_test
+    dbps_client_lib
+    dbps_common_lib
+    gtest_main
+  )
+
   # Remote DBPA tests
   add_executable(dbpa_remote_test src/common/dbpa_remote_test.cpp)
   target_link_libraries(dbpa_remote_test 
@@ -393,6 +402,7 @@ if(BUILD_SHARED_LIBS)
     src/common/dbps_remote_shared_lib_wrapper.cpp
     src/common/dbpa_remote.cpp
     src/client/dbps_api_client.cpp
+    src/client/http_client_interface.cpp
     src/client/httplib_client.cpp
     src/common/json_request.cpp
   )
@@ -496,6 +506,7 @@ if(BUILD_TESTS)
       dbpa_local_test
       httplib_pool_registry_test
       httplib_pooled_client_test
+      http_client_interface_test
     COMMENT "Building all tests"
   )
 
@@ -517,6 +528,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(dbpa_local_test)
   gtest_discover_tests(httplib_pool_registry_test)
   gtest_discover_tests(httplib_pooled_client_test)
+  gtest_discover_tests(http_client_interface_test)
 endif()
 
 # All target (everything)

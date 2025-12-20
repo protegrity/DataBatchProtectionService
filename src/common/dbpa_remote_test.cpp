@@ -57,11 +57,18 @@ public:
     // Expose protected helper methods as public for testing
     using RemoteDataBatchProtectionAgent::ExtractPoolConfig;
     using RemoteDataBatchProtectionAgent::ExtractNumWorkerThreads;
+    using RemoteDataBatchProtectionAgent::ExtractClientCredentials;
 };
 
 // Mock HTTP client for testing
 class MockHttpClient : public HttpClientInterface {
 public:
+    MockHttpClient()
+        : HttpClientInterface(
+              "mock://",
+              ClientCredentials{{"client_id", "test_client_AAAA"}, {"api_key", "test_key_AAAA"}}) {
+    }
+
     struct MockResponse {
         int status_code;
         std::string result;
@@ -75,7 +82,9 @@ public:
     std::optional<MockResponse> encrypt_response;
     std::optional<MockResponse> decrypt_response;
     
-    HttpResponse Get(const std::string& endpoint) override {
+protected:
+    HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override {
+        (void)headers;
         if (endpoint == "/healthz") {
             if (!health_response.has_value()) {
                 return {500, "", "Wrong test setup: Mock health response not configured"};
@@ -85,7 +94,12 @@ public:
         return {404, "", "Endpoint not found"};
     }
     
-    HttpResponse Post(const std::string& endpoint, const std::string& json_body) override {
+    HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) override {
+        (void)headers;
+        (void)json_body;
+        if (endpoint == "/token") {
+            return HttpResponse(200, R"({"token":"mock_jwt","token_type":"Bearer","expires_at":1766138275})");
+        }
         if (endpoint == "/encrypt") {
             if (!encrypt_response.has_value()) {
                 return {500, "", "Wrong test setup: Mock encrypt response not configured"};
@@ -173,6 +187,33 @@ protected:
     std::unique_ptr<MockHttpClient> mock_client_;
     std::vector<std::string> tmp_test_data_dir_;
 };
+
+TEST(RemoteDataBatchProtectionAgentCredentialsTest, ExtractCredentialsEmptyWhenNoPrefixedKeys) {
+    TestableRemoteDataBatchProtectionAgent agent;
+    auto cfg = nlohmann::json::parse(R"({"server_url":"http://localhost:8080"})");
+    auto creds = agent.ExtractClientCredentials(cfg);
+    EXPECT_TRUE(creds.empty());
+}
+
+TEST(RemoteDataBatchProtectionAgentCredentialsTest, ExtractCredentialsStripsPrefix) {
+    TestableRemoteDataBatchProtectionAgent agent;
+    auto cfg = nlohmann::json::parse(
+        R"({"credentials.client_id":"client1","credentials.api_key":"key1","credentials.extra":"v","not_credentials.client_id":"ignored"})");
+    auto creds = agent.ExtractClientCredentials(cfg);
+    EXPECT_EQ(creds.at("client_id"), "client1");
+    EXPECT_EQ(creds.at("api_key"), "key1");
+    EXPECT_EQ(creds.at("extra"), "v");
+    EXPECT_FALSE(creds.count("credentials.client_id"));
+    EXPECT_FALSE(creds.count("not_credentials.client_id"));
+}
+
+TEST(RemoteDataBatchProtectionAgentCredentialsTest, ExtractCredentialsIgnoresEmptyStrippedKey) {
+    TestableRemoteDataBatchProtectionAgent agent;
+    auto cfg = nlohmann::json::parse(R"({"credentials.":"bad","credentials.client_id":"client1"})");
+    auto creds = agent.ExtractClientCredentials(cfg);
+    EXPECT_EQ(creds.at("client_id"), "client1");
+    EXPECT_FALSE(creds.count(""));
+}
 
 // Test basic initialization with valid configuration
 TEST_F(RemoteDataBatchProtectionAgentTest, LoadsConfigFromFileAndFailsHealthCheck) {

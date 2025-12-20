@@ -26,14 +26,14 @@
 #include "httplib_pool_registry.h"
 
 TEST(HttplibPooledClientTest, AcquireSingletonPerBaseUrl) {
-    auto a = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2);
-    auto b = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2);
+    auto a = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2, {});
+    auto b = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2, {});
     EXPECT_EQ(a.get(), b.get());
 }
 
 TEST(HttplibPooledClientTest, DifferentBaseUrlsYieldDifferentInstances) {
-    auto a = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2);
-    auto b = HttplibPooledClient::Acquire("http://127.0.0.1:18081", 2);
+    auto a = HttplibPooledClient::Acquire("http://127.0.0.1:18080", 2, {});
+    auto b = HttplibPooledClient::Acquire("http://127.0.0.1:18081", 2, {});
     EXPECT_NE(a.get(), b.get());
 }
 
@@ -60,8 +60,8 @@ TEST(HttplibPooledClientTest, BasicPostEcho) {
     cfg.write_timeout = std::chrono::seconds(1);
     HttplibPoolRegistry::Instance().SetPoolConfig(base, cfg);
 
-    auto client = HttplibPooledClient::Acquire(base, 2);
-    auto resp = client->Post("/echo", "{\"ok\":true}");
+    auto client = HttplibPooledClient::Acquire(base, 2, {});
+    auto resp = client->Post("/echo", "{\"ok\":true}", false);
     EXPECT_GE(resp.status_code, 200);
     EXPECT_LT(resp.status_code, 300);
     EXPECT_EQ(resp.result, "{\"ok\":true}");
@@ -94,7 +94,7 @@ TEST(HttplibPooledClientTest, RetryOnFirstTransportFailure) {
     cfg.write_timeout = std::chrono::seconds(1);
     HttplibPoolRegistry::Instance().SetPoolConfig(base, cfg);
 
-    auto client = HttplibPooledClient::Acquire(base, 2);
+    auto client = HttplibPooledClient::Acquire(base, 2, {});
 
     // Start listening shortly after to allow retry to succeed.
     std::thread server_thread([&]{
@@ -103,7 +103,7 @@ TEST(HttplibPooledClientTest, RetryOnFirstTransportFailure) {
     });
 
     auto start = std::chrono::steady_clock::now();
-    auto resp = client->Post("/echo", "{\"ok\":true}");
+    auto resp = client->Post("/echo", "{\"ok\":true}", false);
     auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start).count();
 
@@ -148,14 +148,14 @@ TEST(HttplibPooledClientTest, ConcurrencyAndThroughput) {
     cfg.write_timeout = std::chrono::seconds(1);
     HttplibPoolRegistry::Instance().SetPoolConfig(base, cfg);
 
-    auto client = HttplibPooledClient::Acquire(base, 4);
+    auto client = HttplibPooledClient::Acquire(base, 4, {});
 
     const int N = 24;
     std::vector<std::future<HttpClientInterface::HttpResponse> > futures;
     futures.reserve(N);
     for (int i = 0; i < N; ++i) {
         futures.emplace_back(std::async(std::launch::async, [client]{
-            return client->Post("/work", "{\"n\":1}");
+            return client->Post("/work", "{\"n\":1}", false);
         }));
     }
     int ok = 0;

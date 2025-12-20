@@ -58,6 +58,12 @@ bool CompareJsonStrings(const std::string& json1, const std::string& json2, cons
 // Mock HTTP client for testing
 class MockHttpClient : public HttpClientInterface {
 public:
+    MockHttpClient()
+        : HttpClientInterface(
+              "mock://",
+              ClientCredentials{{"client_id", "test_client_AAAA"}, {"api_key", "test_key_AAAA"}}) {
+    }
+
     // Mock responses for different endpoints
     void SetMockResponse(const std::string& endpoint, const HttpResponse& response) {
         mock_responses_[endpoint] = response;
@@ -67,8 +73,9 @@ public:
         mock_post_responses_[endpoint] = {expected_body, response};
     }
     
-    // Implement the interface methods
-    HttpResponse Get(const std::string& endpoint) override {
+protected:
+    HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override {
+        (void)headers;
         auto it = mock_responses_.find(endpoint);
         if (it != mock_responses_.end()) {
             return it->second;
@@ -76,7 +83,11 @@ public:
         return HttpResponse(404, "", "Mock endpoint not found: " + endpoint);
     }
     
-    HttpResponse Post(const std::string& endpoint, const std::string& json_body) override {
+    HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) override {
+        (void)headers;
+        if (endpoint == "/token") {
+            return HttpResponse(200, R"({"token":"mock_jwt","token_type":"Bearer","expires_at":1766138275})");
+        }
         auto it = mock_post_responses_.find(endpoint);
         if (it != mock_post_responses_.end()) {
             if (CompareJsonStrings(it->second.first, json_body, {"debug"})) {

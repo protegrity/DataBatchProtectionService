@@ -164,7 +164,7 @@ DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client)
 }
 
 std::string DBPSApiClient::HealthCheck() {
-    auto response = http_client_->Get("/healthz");
+    auto response = http_client_->Get("/healthz", false);
     
     if (!response.error_message.empty()) {
         return "Error: " + response.error_message;

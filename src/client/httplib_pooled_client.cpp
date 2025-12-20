@@ -25,7 +25,8 @@ std::map<std::string, std::weak_ptr<HttplibPooledClient> > HttplibPooledClient::
 
 std::shared_ptr<HttplibPooledClient> HttplibPooledClient::Acquire(
     const std::string& base_url,
-    std::size_t num_worker_threads) {
+    std::size_t num_worker_threads,
+    ClientCredentials credentials) {
 
     std::lock_guard<std::mutex> lock(url_to_instance_mutex_);
 
@@ -48,14 +49,15 @@ std::shared_ptr<HttplibPooledClient> HttplibPooledClient::Acquire(
     }
 
     auto instance = std::shared_ptr<HttplibPooledClient>(
-        new HttplibPooledClient(base_url, num_worker_threads));
+        new HttplibPooledClient(base_url, num_worker_threads, std::move(credentials)));
     url_to_instance_[base_url] = instance;
     return instance;
 }
 
 HttplibPooledClient::HttplibPooledClient(const std::string& base_url,
-                                         std::size_t num_worker_threads)
-    : base_url_(base_url) {
+                                         std::size_t num_worker_threads,
+                                         ClientCredentials credentials)
+    : HttpClientInterface(base_url, std::move(credentials)) {
         
     // reserve the space for the worker_threads_ vector
     // this is more efficient than calling emplace_back multiple times
@@ -89,10 +91,11 @@ HttplibPooledClient::~HttplibPooledClient() noexcept {
     }
 }
 
-HttpClientInterface::HttpResponse HttplibPooledClient::Get(const std::string& endpoint) {
+HttpClientInterface::HttpResponse HttplibPooledClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
     std::unique_ptr<RequestTask> task(new RequestTask());
     task->kind = RequestTask::Kind::Get;
     task->endpoint = endpoint;
+    task->headers = headers;
     std::future<HttpResponse> response_future = task->promise.get_future();
     {
         std::lock_guard<std::mutex> lock(request_queue_mutex_);
@@ -108,11 +111,12 @@ HttpClientInterface::HttpResponse HttplibPooledClient::Get(const std::string& en
     return response_future.get();
 }
 
-HttpClientInterface::HttpResponse HttplibPooledClient::Post(const std::string& endpoint, const std::string& json_body) {
+HttpClientInterface::HttpResponse HttplibPooledClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
     std::unique_ptr<RequestTask> task(new RequestTask());
     task->kind = RequestTask::Kind::Post;
     task->endpoint = endpoint;
     task->json_body = json_body;
+    task->headers = headers;
     std::future<HttpResponse> fut = task->promise.get_future();
     {
         std::lock_guard<std::mutex> lock(request_queue_mutex_);
@@ -170,13 +174,11 @@ void HttplibPooledClient::WorkerLoop() {
         auto perform_once = [&](RequestTask& t) -> std::pair<bool, HttpResponse> {
             try {
                 if (t.kind == RequestTask::Kind::Get) {
-                    auto headers = HttpClientInterface::DefaultJsonGetHeaders();
-                    auto res = client->Get(t.endpoint, headers);
+                    auto res = client->Get(t.endpoint, t.headers);
                     if (!res) return {false, HttpResponse(0, "", "HTTP GET failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 } else {
-                    auto headers = HttpClientInterface::DefaultJsonPostHeaders();
-                    auto res = client->Post(t.endpoint, headers, t.json_body, HttpClientInterface::kJsonContentType);
+                    auto res = client->Post(t.endpoint, t.headers, t.json_body, HttpClientInterface::kJsonContentType);
                     if (!res) return {false, HttpResponse(0, "", "HTTP POST failed")};
                     return {true, HttpResponse(res->status, res->body)};
                 }

@@ -17,6 +17,11 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <cstdint>
+#include <map>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <httplib.h>
 
@@ -30,10 +35,13 @@ class HttpClientInterface {
 public:
     virtual ~HttpClientInterface() = default;
 
+    using ClientCredentials = std::map<std::string, std::string>;
     using HeaderList = httplib::Headers;
 
     static constexpr const char* kJsonContentType = "application/json";
     static constexpr const char* kDefaultUserAgent = "DBPSApiClient/1.0";
+    static constexpr const char* kAuthorizationHeader = "Authorization";
+    static inline constexpr std::int64_t kTokenExpirySkewSeconds = 30;
     
     struct HttpResponse {
         int status_code;
@@ -49,21 +57,43 @@ public:
             : status_code(code), result(std::move(response_result)), error_message(std::move(error)) {}
     };
     
-    static HeaderList DefaultJsonGetHeaders() {
-        HeaderList headers;
-        headers.insert({"Accept", kJsonContentType});
-        headers.insert({"User-Agent", kDefaultUserAgent});
-        return headers;
+    HttpResponse Get(const std::string& endpoint, bool auth_required = true);
+    HttpResponse Post(const std::string& endpoint, const std::string& json_body, bool auth_required = true);
+
+protected:
+    explicit HttpClientInterface(std::string base_url,
+                                 ClientCredentials credentials = {})
+        : base_url_(std::move(base_url)),
+          credentials_(std::move(credentials)) {
     }
 
-    static HeaderList DefaultJsonPostHeaders() {
-        HeaderList headers;
-        headers.insert({"Content-Type", kJsonContentType});
-        headers.insert({"Accept", kJsonContentType});
-        headers.insert({"User-Agent", kDefaultUserAgent});
-        return headers;
-    }
+    virtual HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) = 0;
+    virtual HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) = 0;
 
-    virtual HttpResponse Get(const std::string& endpoint) = 0;
-    virtual HttpResponse Post(const std::string& endpoint, const std::string& json_body) = 0;
+    const std::string base_url_;
+    const ClientCredentials credentials_;
+
+private:
+    // Header list helpers
+    static HeaderList DefaultJsonGetHeaders();
+    static HeaderList DefaultJsonPostHeaders();
+    std::string AddAuthorizationHeader(HeaderList& headers);
+
+    // Token variable
+    struct CachedToken {
+        std::string token;
+        std::string token_type;
+        std::int64_t expires_at = 0;
+    };
+    std::optional<CachedToken> cached_token_;
+    
+    // Thread-safe synchronization variables while fetching token
+    std::mutex token_mutex_;
+    std::condition_variable token_cv_;
+    bool token_fetch_in_progress_ = false;
+
+    // Thread-safe synchronization functions while fetching token
+    std::optional<CachedToken> EnsureValidToken(std::string& error);
+    std::optional<CachedToken> FetchToken(std::string& error);
+    void InvalidateCachedToken();
 };

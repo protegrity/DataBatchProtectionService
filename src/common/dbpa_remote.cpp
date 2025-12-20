@@ -21,6 +21,7 @@
 #include "../client/httplib_pooled_client.h"
 #include "dbpa_utils.h"
 #include "enum_utils.h"
+#include <cstring>
 #include <iostream>
 
 using namespace dbps::external;
@@ -428,7 +429,9 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
 
     // get the client for the given server_url_ with configured number of worker threads
     std::size_t num_worker_threads = ExtractNumWorkerThreads(*config_json_opt);
-    std::shared_ptr<HttpClientInterface> http_client = HttplibPooledClient::Acquire(server_url_, num_worker_threads);
+    auto credentials = ExtractClientCredentials(*config_json_opt);
+    std::shared_ptr<HttpClientInterface> http_client =
+        HttplibPooledClient::Acquire(server_url_, num_worker_threads, std::move(credentials));
     if (!http_client) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - Failed to acquire HTTP client for server: " << server_url_ << std::endl;
         initialized_ = "Agent not properly initialized - failed to acquire HTTP client";
@@ -436,6 +439,32 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
     }
     
     return http_client;
+}
+
+HttpClientInterface::ClientCredentials RemoteDataBatchProtectionAgent::ExtractClientCredentials(
+    const nlohmann::json& config_json) const {
+
+    HttpClientInterface::ClientCredentials credentials;
+    static constexpr const char* kCredentialsPrefix = "credentials.";
+
+    for (const auto& item : config_json.items()) {
+        const std::string& key = item.key();
+        if (key.rfind(kCredentialsPrefix, 0) != 0) {
+            continue;
+        }
+        const std::string stripped_key = key.substr(std::strlen(kCredentialsPrefix));
+        if (stripped_key.empty()) {
+            continue;
+        }
+        const auto& val = item.value();
+        if (val.is_string()) {
+            credentials[stripped_key] = val.get<std::string>();
+        } else {
+            credentials[stripped_key] = val.dump();
+        }
+    }
+
+    return credentials;
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(const nlohmann::json& config_json) const {

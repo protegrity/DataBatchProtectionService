@@ -964,29 +964,39 @@ TEST(JsonRequest, DecryptJsonResponseInvalidDatatypeLength) {
 TEST(JsonRequest, TokenRequestParse) {
     {
         TokenRequest req;
-        req.Parse(R"({"client_id":"client1","api_key":"key1"})");
-        ASSERT_TRUE(req.IsValid());
-        ASSERT_EQ(req.client_id_, "client1");
-        ASSERT_EQ(req.api_key_, "key1");
+        auto error_opt = req.ParseWithError(R"({"client_id":"client1","api_key":"key1"})");
+        ASSERT_FALSE(error_opt.has_value());
+        ASSERT_EQ(req.credential_values_.at("client_id"), "client1");
+        ASSERT_EQ(req.credential_values_.at("api_key"), "key1");
     }
     {
         TokenRequest req;
-        req.Parse(R"({"api_key":"key1"})");
-        ASSERT_FALSE(req.IsValid());
-        ASSERT_FALSE(req.GetValidationError().empty());
+        // Missing required fields is not a parse error; credential validation is handled elsewhere.
+        auto error_opt = req.ParseWithError(R"({"api_key":"key1"})");
+        ASSERT_FALSE(error_opt.has_value());
+        ASSERT_EQ(req.credential_values_.at("api_key"), "key1");
+        ASSERT_FALSE(req.credential_values_.count("client_id"));
     }
     {
         TokenRequest req;
-        req.Parse("{ invalid json }");
-        ASSERT_FALSE(req.IsValid());
-        ASSERT_FALSE(req.GetValidationError().empty());
+        auto error_opt = req.ParseWithError("{ invalid json }");
+        ASSERT_TRUE(error_opt.has_value());
+    }
+    {
+        TokenRequest req;
+        // Non-string values are stored as JSON-dumped strings.
+        auto error_opt = req.ParseWithError(R"({"client_id":"client1","api_key":{"k":"v"}})");
+        ASSERT_FALSE(error_opt.has_value());
+        auto api_key_json = crow::json::load(req.credential_values_.at("api_key"));
+        ASSERT_TRUE(api_key_json);
+        ASSERT_EQ(std::string(api_key_json["k"]), "v");
     }
 }
 
 TEST(JsonRequest, TokenRequestToJson) {
     TokenRequest req;
-    req.Parse(R"({"client_id":"clientA","api_key":"keyA"})");
-    ASSERT_TRUE(req.IsValid());
+    auto error_opt = req.ParseWithError(R"({"client_id":"clientA","api_key":"keyA"})");
+    ASSERT_FALSE(error_opt.has_value());
 
     auto json = crow::json::load(req.ToJson());
     ASSERT_TRUE(json);
@@ -994,9 +1004,16 @@ TEST(JsonRequest, TokenRequestToJson) {
     ASSERT_EQ(std::string(json["api_key"]), "keyA");
 }
 
+TEST(JsonRequest, TokenRequestToJsonEmptyMapEmitsEmptyObject) {
+    TokenRequest req;
+    // No credentials set.
+    ASSERT_TRUE(req.credential_values_.empty());
+    ASSERT_EQ(req.ToJson(), "{}");
+}
+
 TEST(JsonRequest, TokenResponseRoundTrip) {
     TokenResponse resp;
-    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    resp.Parse(R"({"token":"token123","token_type":"Bearer","expires_at":1234567890})");
     ASSERT_TRUE(resp.IsValid());
 
     auto json = crow::json::load(resp.ToJson());
@@ -1012,6 +1029,7 @@ TEST(JsonRequest, TokenResponseRoundTrip) {
     parsed.Parse(resp.ToJson());
     ASSERT_TRUE(parsed.IsValid());
     ASSERT_EQ(parsed.token_.value(), "token123");
+    ASSERT_EQ(parsed.token_type_.value(), "Bearer");
     ASSERT_EQ(parsed.expires_at_.value(), 1234567890);
 }
 
@@ -1024,7 +1042,7 @@ TEST(JsonRequest, TokenResponseParseError) {
 
 TEST(JsonRequest, TokenResponseSetErrorStatusCodeAndClearToken) {
     TokenResponse resp;
-    resp.Parse(R"({"token":"token123","expires_at":1234567890})");
+    resp.Parse(R"({"token":"token123","token_type":"Bearer","expires_at":1234567890})");
     ASSERT_TRUE(resp.IsValid());
 
     resp.SetErrorStatusCodeAndClearToken(401);

@@ -151,6 +151,9 @@ protected:
     // Extract server_url from parsed JSON config such as {"server_url": "http://localhost:8080"}
     std::optional<std::string> ExtractServerUrl(const nlohmann::json& config_json) const;
 
+    // Extract client credentials from parsed JSON config
+    HttpClientInterface::ClientCredentials ExtractClientCredentials(const nlohmann::json& config_json) const;
+
 private:    
     // Instantiate a new HTTP client using the connection config file
     std::shared_ptr<HttpClientInterface> InstantiateHttpClient();

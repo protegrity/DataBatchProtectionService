@@ -100,7 +100,8 @@ class DBPARemoteTestApp {
 private:
     std::string server_url_;
     std::unique_ptr<RemoteDataBatchProtectionAgent> agent_;
-    std::unique_ptr<RemoteDataBatchProtectionAgent> float_agent_;
+    std::unique_ptr<RemoteDataBatchProtectionAgent> float_agent_simple;
+    std::unique_ptr<RemoteDataBatchProtectionAgent> float_agent_pooled;
     std::unique_ptr<RemoteDataBatchProtectionAgent> fixed_len_agent_;
     
 public:
@@ -116,9 +117,9 @@ public:
     bool Initialize() {
         std::cout << "Initializing DBPA agents..." << std::endl;
         
-        // Common configuration for all agents
-        std::map<std::string, std::string> connection_config = {
-            {"server_url", server_url_}
+        HttpClientInterface::ClientCredentials credentials = {
+            {"client_id", "test_client_BBBB"},
+            {"api_key", "test_key_BBBB"}
         };
         
         std::string app_context = "{\"user_id\": \"demo_user_123\"}";
@@ -130,7 +131,7 @@ public:
         // Initialize the main agent for string/byte array data
         try {
             // Create HTTP client with server URL
-            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            auto http_client = std::make_shared<HttplibClient>(server_url_, credentials);
             
             // Create the remote agent
             agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
@@ -138,7 +139,7 @@ public:
             // Initialize the agent
             agent_->init(
                 "demo_column",                 // column_name
-                connection_config,             // connection_config
+                {},                            // connection_config
                 app_context,                   // app_context
                 "demo_key_001",                // column_key_id
                 Type::BYTE_ARRAY,              // datatype
@@ -154,18 +155,18 @@ public:
             std::cerr << "ERROR: Failed to initialize main agent: " << e.what() << std::endl;
         }
         
-        // Initialize the float agent for numeric data
+        // Initialize the float agent for numeric data (Simpler http client)
         try {
             // Create HTTP client with server URL
-            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            auto http_client = std::make_shared<HttplibClient>(server_url_, credentials);
             
             // Create the remote agent
-            float_agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
+            float_agent_simple = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
             
             // Initialize the agent
-            float_agent_->init(
+            float_agent_simple->init(
                 "demo_float_column",           // column_name
-                connection_config,             // connection_config
+                {},                            // connection_config
                 app_context,                   // app_context
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
@@ -181,10 +182,35 @@ public:
             std::cerr << "ERROR: Failed to initialize float agent: " << e.what() << std::endl;
         }
         
+        // Initialize the float agent for numeric data (Using pooled HTTP client built inside RemoteDataBatchProtectionAgent)
+        try {
+            // Create the remote agent -- No injection of HTTP client, it will be built inside the agent on init()
+            float_agent_pooled = std::make_unique<RemoteDataBatchProtectionAgent>();
+            
+            // Initialize the agent
+            float_agent_pooled->init(
+                "demo_float_column",           // column_name
+                {},                            // connection_config
+                app_context,                   // app_context
+                "demo_float_key_001",          // column_key_id
+                Type::FLOAT,                   // datatype
+                std::nullopt,                  // datatype_length (not needed for FLOAT)
+                CompressionCodec::SNAPPY,      // compression_type
+                std::nullopt                   // column_encryption_metadata
+            );
+            
+            std::cout << "OK: Float DBPA agent initialized successfully" << std::endl;
+            float_agent_ok = true;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Failed to initialize float agent: " << e.what() << std::endl;
+        }
+
+
         // Initialize the fixed-length agent for FIXED_LEN_BYTE_ARRAY data
         try {
             // Create HTTP client with server URL
-            auto http_client = std::make_shared<HttplibClient>(server_url_);
+            auto http_client = std::make_shared<HttplibClient>(server_url_, credentials);
             
             // Create the remote agent
             fixed_len_agent_ = std::make_unique<RemoteDataBatchProtectionAgent>(http_client);
@@ -192,7 +218,7 @@ public:
             // Initialize the agent
             fixed_len_agent_->init(
                 "demo_fixed_len_column",       // column_name
-                connection_config,             // connection_config
+                {},                            // connection_config
                 app_context,                   // app_context
                 "demo_fixed_len_key_001",      // column_key_id
                 Type::FIXED_LEN_BYTE_ARRAY,    // datatype
@@ -412,8 +438,8 @@ public:
         std::cout << "\n=== Float Data Demo ===" << std::endl;
         
         // Check if float agent is initialized
-        if (!float_agent_) {
-            std::cout << "ERROR: Float agent not initialized" << std::endl;
+        if (!float_agent_simple) {
+            std::cout << "ERROR: Float agent simple not initialized" << std::endl;
             return false;
         }
         
@@ -461,7 +487,7 @@ public:
                 {"page_encoding", "PLAIN"}
             };
 
-            auto encrypt_result = float_agent_->Encrypt(span<const uint8_t>(joined_plaintext), float_encoding_attributes);
+            auto encrypt_result = float_agent_simple->Encrypt(span<const uint8_t>(joined_plaintext), float_encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
                 std::cout << "ERROR: Float encryption failed" << std::endl;
@@ -488,8 +514,8 @@ public:
             }
             
             // Decrypt the float data
-            float_agent_->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
-            auto decrypt_result = float_agent_->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
+            float_agent_simple->UpdateEncryptionMetadata(encrypt_result->encryption_metadata());
+            auto decrypt_result = float_agent_simple->Decrypt(span<const uint8_t>(encrypt_result->ciphertext()), float_encoding_attributes);
             
             if (!decrypt_result || !decrypt_result->success()) {
                 std::cout << "ERROR: Float decryption failed" << std::endl;

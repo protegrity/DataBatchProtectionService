@@ -16,12 +16,24 @@
 // under the License.
 
 #include <crow/app.h>
+#include <iostream>
 #include <string>
 #include <optional>
 #include <cxxopts.hpp>
 #include "json_request.h"
 #include "encryption_sequencer.h"
 #include "auth_utils.h"
+
+// +++++ Remove this after testing +++++
+static std::string SanitizeTokenResponseForLog(const TokenResponse& resp) {
+    crow::json::wvalue out;
+    out["error_status_code"] = resp.error_status_code_;
+    out["error_message"] = resp.error_message_;
+    if (resp.token_.has_value()) out["token"] = resp.token_.value();
+    if (resp.token_type_.has_value()) out["token_type"] = resp.token_type_.value();
+    if (resp.expires_at_.has_value()) out["expires_at"] = resp.expires_at_.value();
+    return out.dump();
+}
 
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
@@ -74,7 +86,11 @@ int main(int argc, char* argv[]) {
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
     } else {
         // No credentials file provided, disable credential checking
-        credential_store.init(false);
+        // ++++++ credential_store.init(false);
+        credential_store.init({
+            {"test_client_BBBB", "test_key_BBBB"},
+            {"test_client_CCCC", "test_key_CCCC"}
+        });
         std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
     }
 
@@ -99,8 +115,18 @@ int main(int argc, char* argv[]) {
 
     // Token authentication endpoint - POST /token
     CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
+        // +++++ Remove this after testing +++++
+        std::cout << "=== /token Request (Raw, Sanitized) ===" << std::endl;
+        std::cout << req.body << std::endl;
+        std::cout << "======================================" << std::endl;
+
         // Process token request
         TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
+
+        // +++++ Remove this after testing +++++
+        std::cout << "=== /token TokenResponse (Sanitized) ===" << std::endl;
+        std::cout << SanitizeTokenResponseForLog(token_response) << std::endl;
+        std::cout << "=======================================" << std::endl;
         
         // Check if processing resulted in an error
         auto validation_error = token_response.GetValidationError();

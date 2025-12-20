@@ -37,27 +37,27 @@ public:
     // If cfg is provided, it will be applied to the underlying pool for the base_url.
     static std::shared_ptr<HttplibPooledClient> Acquire(
         const std::string& base_url,
-        std::size_t num_worker_threads = 0);
+        std::size_t num_worker_threads,
+        ClientCredentials credentials);
 
     ~HttplibPooledClient() noexcept;
-
-    // HttpClientInterface
-    HttpResponse Get(const std::string& endpoint) override;
-    HttpResponse Post(const std::string& endpoint, const std::string& json_body) override;
 
     // disable the copy constructor
     HttplibPooledClient(const HttplibPooledClient&) = delete;
     HttplibPooledClient& operator=(const HttplibPooledClient&) = delete;
 
 private:
+    // private constructor
     explicit HttplibPooledClient(const std::string& base_url,
-                                 std::size_t num_worker_threads);
+                                 std::size_t num_worker_threads,
+                                 ClientCredentials credentials);
 
     struct RequestTask {
         enum class Kind { Get, Post };
         Kind kind;
         std::string endpoint;
         std::string json_body;
+        HeaderList headers;
         std::promise<HttpClientInterface::HttpResponse> promise;
     };
 
@@ -72,8 +72,9 @@ private:
     // Workers
     std::vector<std::thread> worker_threads_;
 
-    // Configuration
-    const std::string base_url_;
+protected:
+    HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override;
+    HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) override;
 
     // Static per-base_url registry
     static std::mutex url_to_instance_mutex_;
