@@ -111,7 +111,7 @@ const std::map<std::string, std::string>& LocalDecryptionResult::error_fields() 
 
 void LocalDataBatchProtectionAgent::init(
     std::string column_name,
-    std::map<std::string, std::string> connection_config,
+    std::map<std::string, std::string> configuration_map,
     std::string app_context,
     std::string column_key_id,
     Type::type datatype,
@@ -126,7 +126,7 @@ void LocalDataBatchProtectionAgent::init(
         // Call the base class init to store the configuration
         DataBatchProtectionAgentInterface::init(
             std::move(column_name),
-            std::move(connection_config),
+            std::move(configuration_map),
             std::move(app_context),
             std::move(column_key_id),
             datatype,

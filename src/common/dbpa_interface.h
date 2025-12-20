@@ -101,7 +101,7 @@ public:
     // (e.g., as a serialized map/JSON field).
     virtual void init(
         std::string column_name,
-        std::map<std::string, std::string> connection_config,
+        std::map<std::string, std::string> configuration_map,
         std::string app_context,
         std::string column_key_id,
         Type::type datatype,
@@ -110,7 +110,7 @@ public:
         std::optional<std::map<std::string, std::string>> column_encryption_metadata)
     {
         column_name_ = std::move(column_name);
-        connection_config_ = std::move(connection_config);
+        configuration_map_ = std::move(configuration_map);
         app_context_ = std::move(app_context);
         column_key_id_ = std::move(column_key_id);
         datatype_ = datatype;
@@ -150,7 +150,7 @@ public:
 
 protected:
     std::string column_name_;
-    std::map<std::string, std::string> connection_config_;
+    std::map<std::string, std::string> configuration_map_;
     std::string app_context_;  // includes user_id
     std::optional<std::map<std::string, std::string>> column_encryption_metadata_;
 

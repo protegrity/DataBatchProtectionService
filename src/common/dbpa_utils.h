@@ -25,30 +25,12 @@
 #include "enum_utils.h"
 #include <nlohmann/json.hpp>
 
-// TODO: Define all constant/literal (e.g. "server_url", "user_id", "page_encoding") as constants here.
-
 namespace dbps::external {
 
 /**
  * Shared utility functions for DataBatchProtectionAgent implementations
  * These functions are used by both RemoteDataBatchProtectionAgent and LocalDataBatchProtectionAgent
  */
-
-/**
- * Extract server_url from connection_config map
- * 
- * @param connection_config Map of connection configuration key-value pairs
- * @return server_url value if found, std::nullopt otherwise
- * 
- * Expected key: "server_url" with value as the server URL string
- */
-inline std::optional<std::string> ExtractServerUrl(const std::map<std::string, std::string>& connection_config) {
-    auto it = connection_config.find("server_url");
-    if (it != connection_config.end()) {
-        return it->second;
-    }
-    return std::nullopt;
-}
 
 /**
  * Extract user_id from app_context JSON string

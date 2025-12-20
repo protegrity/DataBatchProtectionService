@@ -22,53 +22,6 @@
 
 using namespace dbps::external;
 
-// Test ExtractServerUrl function
-TEST(DBPAUtilsTest, ExtractServerUrl_ValidUrl) {
-    std::map<std::string, std::string> connection_config = {{"server_url", "http://localhost:8080"}};
-    auto result = ExtractServerUrl(connection_config);
-    
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), "http://localhost:8080");
-}
-
-TEST(DBPAUtilsTest, ExtractServerUrl_ValidUrlWithOtherFields) {
-    std::map<std::string, std::string> connection_config = {
-        {"server_url", "https://example.com:443"},
-        // timeout and retry_count are for testing purposes only
-        {"timeout", "30"},
-        {"retry_count", "3"}
-    };
-    auto result = ExtractServerUrl(connection_config);
-    
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), "https://example.com:443");
-}
-
-TEST(DBPAUtilsTest, ExtractServerUrl_MissingServerUrl) {
-    std::map<std::string, std::string> connection_config = {
-        {"timeout", "30"},
-        {"retry_count", "3"}
-    };
-    auto result = ExtractServerUrl(connection_config);
-    
-    EXPECT_FALSE(result.has_value());
-}
-
-TEST(DBPAUtilsTest, ExtractServerUrl_EmptyMap) {
-    std::map<std::string, std::string> connection_config;
-    auto result = ExtractServerUrl(connection_config);
-    
-    EXPECT_FALSE(result.has_value());
-}
-
-TEST(DBPAUtilsTest, ExtractServerUrl_EmptyValue) {
-    std::map<std::string, std::string> connection_config = {{"server_url", ""}};
-    auto result = ExtractServerUrl(connection_config);
-    
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), "");
-}
-
 // Test ExtractUserId function
 TEST(DBPAUtilsTest, ExtractUserId_ValidJson) {
     std::string app_context = R"({"user_id": "test_user_123"})";
