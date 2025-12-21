@@ -208,7 +208,7 @@ public:
             // Initialize the agent
             float_agent_pooled->init(
                 "demo_float_column",           // column_name
-                configuration_map,             // configuration_map
+                configuration_map,             // configuration_map, needed so the pooled HTTP client can be instantiated internally by the agent.
                 app_context,                   // app_context
                 "demo_float_key_001",          // column_key_id
                 Type::FLOAT,                   // datatype
