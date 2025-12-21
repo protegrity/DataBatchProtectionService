@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
         options.add_options()
             (kCredentialsFileParamShort, "Path to credentials JSON file", cxxopts::value<std::string>())
             (kJwtSecretParamShort, "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>())
-            (kAllowMissingCredentialsParamShort, "Allow credentials checking to be skipped if the credentials file is not provided", cxxopts::value<bool>()->default_value("false"));
+            (kAllowMissingCredentialsParamShort, "Allow credentials checking to be skipped if the credentials file is not provided", cxxopts::value<bool>());
         auto result = options.parse(argc, argv);
         if (result.count(kCredentialsFileParam)) {
             credentials_file_path = result[kCredentialsFileParam].as<std::string>();
