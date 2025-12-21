@@ -29,7 +29,7 @@
 
 #include "http_client_base.h"
 
-// Implemenetation of the HttpClientBase which uses a pool of connections for a given base_url.
+// Implementation of the HttpClientBase which uses a pool of connections for a given base_url.
 // This is a singleton, accessed via the Acquire() function.
 class HttplibPooledClient : public HttpClientBase {
 public:

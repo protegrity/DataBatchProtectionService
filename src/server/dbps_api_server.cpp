@@ -24,17 +24,6 @@
 #include "encryption_sequencer.h"
 #include "auth_utils.h"
 
-// +++++ Remove this after testing +++++
-static std::string SanitizeTokenResponseForLog(const TokenResponse& resp) {
-    crow::json::wvalue out;
-    out["error_status_code"] = resp.error_status_code_;
-    out["error_message"] = resp.error_message_;
-    if (resp.token_.has_value()) out["token"] = resp.token_.value();
-    if (resp.token_type_.has_value()) out["token_type"] = resp.token_type_.value();
-    if (resp.expires_at_.has_value()) out["expires_at"] = resp.expires_at_.value();
-    return out.dump();
-}
-
 // Helper function to create error response
 crow::response CreateErrorResponse(const std::string& error_msg, int status_code = 400) {
     std::cout << "CreateErrorResponse: Status=" << status_code << ", Message=\"" << error_msg << "\"" << std::endl;
@@ -55,20 +44,33 @@ std::optional<std::string> VerifyJWTFromRequest(const crow::request& req, const 
 }
 
 int main(int argc, char* argv[]) {
+    // Command line parameter names
+    static constexpr const char* kCredentialsFileParam = "credentials_file";
+    static constexpr const char* kCredentialsFileParamShort = "c,credentials_file";
+    static constexpr const char* kJwtSecretParam = "jwt_secret";
+    static constexpr const char* kJwtSecretParamShort = "j,jwt_secret";
+    static constexpr const char* kAllowMissingCredentialsParam = "allow_missing_credentials";
+    static constexpr const char* kAllowMissingCredentialsParamShort = "m,allow_missing_credentials";
+    
     // Initialize credentials file path and JWT secret key with parsed command line options
     std::optional<std::string> credentials_file_path = std::nullopt;
     std::string jwt_secret_key = "default-secret-key-overwritten-by-command-line";
+    bool allow_missing_credentials = false;
     try {
         cxxopts::Options options("dbps_api_server", "Data Batch Protection Service API Server");
         options.add_options()
-            ("c,credentials", "Path to credentials JSON file", cxxopts::value<std::string>())
-            ("j,jwt-secret", "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>());
-            auto result = options.parse(argc, argv);        
-        if (result.count("credentials")) {
-            credentials_file_path = result["credentials"].as<std::string>();
+            (kCredentialsFileParamShort, "Path to credentials JSON file", cxxopts::value<std::string>())
+            (kJwtSecretParamShort, "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>())
+            (kAllowMissingCredentialsParamShort, "Allow credentials checking to be skipped if the credentials file is not provided", cxxopts::value<bool>()->default_value("false"));
+        auto result = options.parse(argc, argv);
+        if (result.count(kCredentialsFileParam)) {
+            credentials_file_path = result[kCredentialsFileParam].as<std::string>();
         }
-        if (result.count("jwt-secret")) {
-            jwt_secret_key = result["jwt-secret"].as<std::string>();
+        if (result.count(kJwtSecretParam)) {
+            jwt_secret_key = result[kJwtSecretParam].as<std::string>();
+        }
+        if (result.count(kAllowMissingCredentialsParam)) {
+            allow_missing_credentials = result[kAllowMissingCredentialsParam].as<bool>();
         }
     } catch (const std::exception& e) {
         std::cerr << "Error parsing command line options: " << e.what() << std::endl;
@@ -77,6 +79,8 @@ int main(int argc, char* argv[]) {
     
     // Initialize credential store with JWT secret key
     ClientCredentialStore credential_store(jwt_secret_key);
+
+    // If credentials file is provided, load credentials from file.
     if (credentials_file_path.has_value()) {
         // Load credentials from file
         if (!credential_store.init(credentials_file_path.value())) {
@@ -84,16 +88,16 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
-    } else {
-        // No credentials file provided, disable credential checking
-        // credential_store.init(false);
-        
-        // ++++++++ Remove this after testing ++++++
-        credential_store.init({
-            {"test_client_BBBB", "test_key_BBBB"},
-            {"test_client_CCCC", "test_key_CCCC"}
-        });
-        std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
+    }
+    // If no credentials file is provided, disable credential checking if allowed.
+    else if (allow_missing_credentials) {
+        credential_store.init(false);
+        std::cout << "No credentials file provided, but skipping credential checking is allowed by --allow_missing_credentials option." << std::endl;
+    }
+    // If no credentials file is provided and skipping credential checking is not allowed, return error.
+    else {
+        std::cerr << "Error: No credentials file provided and --allow_missing_credentials is not set." << std::endl;
+        return 1;
     }
 
     // Initialize API server
@@ -117,19 +121,9 @@ int main(int argc, char* argv[]) {
 
     // Token authentication endpoint - POST /token
     CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
-        // +++++ Remove this after testing +++++
-        std::cout << "=== /token Request (Raw, Sanitized) ===" << std::endl;
-        std::cout << req.body << std::endl;
-        std::cout << "======================================" << std::endl;
-
         // Process token request
         TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
 
-        // +++++ Remove this after testing +++++
-        std::cout << "=== /token TokenResponse (Sanitized) ===" << std::endl;
-        std::cout << SanitizeTokenResponseForLog(token_response) << std::endl;
-        std::cout << "=======================================" << std::endl;
-        
         // Check if processing resulted in an error
         auto validation_error = token_response.GetValidationError();
         if (!validation_error.empty()) {

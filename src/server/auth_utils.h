@@ -102,7 +102,7 @@ public:
     
 private:
     // Private struct to hold the token and expiration time during JWT generation requests.
-    // It is intentionally separated from the client-side authentication logic to avoid server<>client coupling.
+    // It is intentionally separate from the client-side authentication logic to avoid server<>client coupling.
     struct TokenWithExpiration {
         std::string token;
         std::int64_t expires_at;

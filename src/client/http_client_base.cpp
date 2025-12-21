@@ -37,6 +37,7 @@ HttpClientBase::HeaderList HttpClientBase::DefaultJsonPostHeaders() {
 }
 
 HttpClientBase::HttpResponse HttpClientBase::Get(const std::string& endpoint, bool auth_required) {
+    // Lambda to build the request and make the actual call.
     const auto attempt = [&]() -> HttpResponse {
         auto headers = DefaultJsonGetHeaders();
         if (auth_required) {
@@ -48,10 +49,14 @@ HttpClientBase::HttpResponse HttpClientBase::Get(const std::string& endpoint, bo
         return DoGet(endpoint, headers);
     };
 
+    // First attempt
     auto result = attempt();
+    
+    // If we got 401 Unauthorized and auth was required, invalidate token and retry once
+    // This handles cases where the cached token expired between validation and use
     if (auth_required && result.status_code == 401) {
         InvalidateCachedToken();
-        result = attempt();
+        result = attempt();  // Second (final) attempt with fresh token
     }
     return result;
 }
@@ -59,6 +64,7 @@ HttpClientBase::HttpResponse HttpClientBase::Get(const std::string& endpoint, bo
 HttpClientBase::HttpResponse HttpClientBase::Post(const std::string& endpoint,
                                                             const std::string& json_body,
                                                             bool auth_required) {
+    // Lambda to build the request and make the actual call.
     const auto attempt = [&]() -> HttpResponse {
         auto headers = DefaultJsonPostHeaders();
         if (auth_required) {
@@ -70,21 +76,28 @@ HttpClientBase::HttpResponse HttpClientBase::Post(const std::string& endpoint,
         return DoPost(endpoint, json_body, headers);
     };
 
+    // First attempt
     auto result = attempt();
+    
+    // If we got 401 Unauthorized and auth was required, invalidate token and retry once
+    // This handles cases where the cached token expired between validation and use
     if (auth_required && result.status_code == 401) {
         InvalidateCachedToken();
-        result = attempt();
+        result = attempt();  // Second (final) attempt with fresh token
     }
     return result;
 }
 
 std::string HttpClientBase::AddAuthorizationHeader(HeaderList& headers) {
+    // Get the valid token or an error message.
     std::string token_or_error;
     auto token_opt = EnsureValidToken(token_or_error);
     if (!token_opt.has_value()) {
         return token_or_error;
     }
 
+    // Replace any existing Authorization header with: "<token_type> <token>".
+    // Return an empty string if successful, otherwise return the error message.
     headers.erase(kAuthorizationHeader);
     std::string auth_value = token_opt->token_type;
     if (auth_value.back() != ' ') {
@@ -95,7 +108,7 @@ std::string HttpClientBase::AddAuthorizationHeader(HeaderList& headers) {
     return "";
 }
 
-std::optional<HttpClientBase::CachedToken> HttpClientBase::EnsureValidToken(std::string& error) {
+std::optional<HttpClientBase::TokenWithExpiration> HttpClientBase::EnsureValidToken(std::string& error) {
 
     const auto now_epoch_seconds = []() -> std::int64_t {
         const auto now = std::chrono::system_clock::now();
@@ -103,6 +116,7 @@ std::optional<HttpClientBase::CachedToken> HttpClientBase::EnsureValidToken(std:
         return static_cast<std::int64_t>(secs);
     };
 
+    // Adds padding to the expiration time to "expire" the token early and prevent going too close to the expiration time.
     const auto is_token_valid_at = [&](std::int64_t now) -> bool {
         return cached_token_.has_value() &&
                !cached_token_->token.empty() &&
@@ -124,10 +138,14 @@ std::optional<HttpClientBase::CachedToken> HttpClientBase::EnsureValidToken(std:
             }
         }
         token_fetch_in_progress_ = true;
-    }
+    }  // Release token_mutex_ here
 
-    // Fetch token without holding token_mutex_.
-    std::optional<CachedToken> fetched = FetchToken(error);
+    // Fetch token without holding token_mutex_
+    // - avoids blocking other threads from entering EnsureValidToken() and waiting on token_cv_
+    // - keeps the critical section small (network I/O can be slow)
+    // We re-acquire token_mutex_ below to update cached_token_, clear token_fetch_in_progress_, and notify waiters.
+
+    std::optional<TokenWithExpiration> fetched = FetchToken(error);
 
     {
         std::lock_guard<std::mutex> lock(token_mutex_);
@@ -140,7 +158,7 @@ std::optional<HttpClientBase::CachedToken> HttpClientBase::EnsureValidToken(std:
     return fetched;
 }
 
-std::optional<HttpClientBase::CachedToken> HttpClientBase::FetchToken(std::string& error) {
+std::optional<HttpClientBase::TokenWithExpiration> HttpClientBase::FetchToken(std::string& error) {
     error.clear();
     TokenRequest token_req;
     token_req.credential_values_ = credentials_;
@@ -162,7 +180,7 @@ std::optional<HttpClientBase::CachedToken> HttpClientBase::FetchToken(std::strin
         return std::nullopt;
     }
     
-    CachedToken result;
+    TokenWithExpiration result;
     result.token = token_resp.token_.value();
     result.token_type = token_resp.token_type_.value();
     result.expires_at = token_resp.expires_at_.value();

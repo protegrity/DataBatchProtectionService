@@ -41,6 +41,7 @@ public:
     static constexpr const char* kJsonContentType = "application/json";
     static constexpr const char* kDefaultUserAgent = "DBPSApiClient/1.0";
     static constexpr const char* kAuthorizationHeader = "Authorization";
+    // Token expiry skew in seconds. Adds padding to the expiration time to refresh it before expiration.
     static inline constexpr std::int64_t kTokenExpirySkewSeconds = 30;
     
     struct HttpResponse {
@@ -79,13 +80,14 @@ private:
     static HeaderList DefaultJsonPostHeaders();
     std::string AddAuthorizationHeader(HeaderList& headers);
 
-    // Token variable
-    struct CachedToken {
+    // Private struct to hold the token, token type, and expiration time.
+    // It is intentionally separate from the server-side authentication logic to avoid server<>client coupling.
+    struct TokenWithExpiration {
         std::string token;
         std::string token_type;
         std::int64_t expires_at = 0;
     };
-    std::optional<CachedToken> cached_token_;
+    std::optional<TokenWithExpiration> cached_token_;
     
     // Thread-safe synchronization variables while fetching token
     std::mutex token_mutex_;
@@ -93,7 +95,7 @@ private:
     bool token_fetch_in_progress_ = false;
 
     // Thread-safe synchronization functions while fetching token
-    std::optional<CachedToken> EnsureValidToken(std::string& error);
-    std::optional<CachedToken> FetchToken(std::string& error);
+    std::optional<TokenWithExpiration> EnsureValidToken(std::string& error);
+    std::optional<TokenWithExpiration> FetchToken(std::string& error);
     void InvalidateCachedToken();
 };

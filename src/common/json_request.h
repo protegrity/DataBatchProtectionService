@@ -336,7 +336,9 @@ public:
     TokenRequest() = default;
 
     // Stores top-level key/value pairs from the token request JSON payload containing the authentication credentials.
-    // This allows a generic payload to be passed as-is from the application layer to the server for authentication.
+    // - This allows a generic credentials payload to be passed as-is from the application layer to the API server for authentication.
+    // - Note that this is NOT the JWT token. These are input credentials used by the server to authenticate the client and
+    //   issue a token in the TokenResponse.
     std::map<std::string, std::string> credential_values_;
 
     std::optional<std::string> ParseWithError(const std::string& request_body);
