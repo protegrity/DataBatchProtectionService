@@ -22,7 +22,7 @@
 #include <algorithm>
 #include "tcb/span.hpp"
 #include "dbps_api_client.h"
-#include "http_client_interface.h"
+#include "http_client_base.h"
 #include "../common/enums.h"
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
@@ -56,8 +56,14 @@ bool CompareJsonStrings(const std::string& json1, const std::string& json2, cons
 }
 
 // Mock HTTP client for testing
-class MockHttpClient : public HttpClientInterface {
+class MockHttpClient : public HttpClientBase {
 public:
+    MockHttpClient()
+        : HttpClientBase(
+              "mock://",
+              ClientCredentials{{"client_id", "test_client_AAAA"}, {"api_key", "test_key_AAAA"}}) {
+    }
+
     // Mock responses for different endpoints
     void SetMockResponse(const std::string& endpoint, const HttpResponse& response) {
         mock_responses_[endpoint] = response;
@@ -67,8 +73,9 @@ public:
         mock_post_responses_[endpoint] = {expected_body, response};
     }
     
-    // Implement the interface methods
-    HttpResponse Get(const std::string& endpoint) override {
+protected:
+    HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override {
+        (void)headers;
         auto it = mock_responses_.find(endpoint);
         if (it != mock_responses_.end()) {
             return it->second;
@@ -76,7 +83,11 @@ public:
         return HttpResponse(404, "", "Mock endpoint not found: " + endpoint);
     }
     
-    HttpResponse Post(const std::string& endpoint, const std::string& json_body) override {
+    HttpResponse DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) override {
+        (void)headers;
+        if (endpoint == "/token") {
+            return HttpResponse(200, R"({"token":"mock_jwt","token_type":"Bearer","expires_at":1766138275})");
+        }
         auto it = mock_post_responses_.find(endpoint);
         if (it != mock_post_responses_.end()) {
             if (CompareJsonStrings(it->second.first, json_body, {"debug"})) {
@@ -299,7 +310,7 @@ TEST(DBPSApiClient, EncryptWithValidData) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -391,7 +402,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
     })";
     
     mock_client->SetMockPostResponse("/decrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -534,7 +545,7 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -600,7 +611,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
     })";
     
     mock_client->SetMockPostResponse("/decrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));
@@ -677,7 +688,7 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
     })";
     
     mock_client->SetMockPostResponse("/encrypt", expected_request, 
-        HttpClientInterface::HttpResponse(200, mock_response));
+        HttpClientBase::HttpResponse(200, mock_response));
     
     // Create DBPSApiClient with mock client
     DBPSApiClient client(std::move(mock_client));

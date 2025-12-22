@@ -335,12 +335,13 @@ class TokenRequest {
 public:
     TokenRequest() = default;
 
-    std::string client_id_;
-    std::string api_key_;
+    // Stores top-level key/value pairs from the token request JSON payload containing the authentication credentials.
+    // - This allows a generic credentials payload to be passed as-is from the application layer to the API server for authentication.
+    // - Note that this is NOT the JWT token. These are input credentials used by the server to authenticate the client and
+    //   issue a token in the TokenResponse.
+    std::map<std::string, std::string> credential_values_;
 
-    void Parse(const std::string& request_body);
-    bool IsValid() const;
-    std::string GetValidationError() const;
+    std::optional<std::string> ParseWithError(const std::string& request_body);
     std::string ToJson() const;
 };
 
@@ -352,6 +353,7 @@ public:
     TokenResponse() = default;
 
     std::optional<std::string> token_;
+    std::optional<std::string> token_type_;
     std::optional<std::int64_t> expires_at_;
     std::string error_message_;
     int error_status_code_ = 0;

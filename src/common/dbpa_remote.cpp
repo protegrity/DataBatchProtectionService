@@ -21,6 +21,7 @@
 #include "../client/httplib_pooled_client.h"
 #include "dbpa_utils.h"
 #include "enum_utils.h"
+#include <cstring>
 #include <iostream>
 
 using namespace dbps::external;
@@ -160,7 +161,7 @@ static std::unique_ptr<EncryptApiResponse> ValidateEncryptFieldMatch(
     return nullptr;
 }
 
-RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientInterface> http_client)
+RemoteDataBatchProtectionAgent::RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientBase> http_client)
     : api_client_(std::make_unique<DBPSApiClient>(http_client)) {
     // API client is created immediately with the injected HTTP client
     // init() will still be called to set up configuration, but won't create a new client
@@ -367,25 +368,22 @@ void RemoteDataBatchProtectionAgent::UpdateEncryptionMetadata(std::optional<std:
     column_encryption_metadata_ = std::move(encryption_metadata);
 }
 
-std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConfigFile(const std::string& config_file_key) const {
-    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::LoadConfigFile() - ";
+std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConfigFile(const std::string& config_file_key, std::string& error_string) const {
+    error_string = "";
     auto config_file_it = configuration_map_.find(config_file_key);
     if (config_file_it == configuration_map_.end()) {
-        std::cerr << error_trace 
-                  << "configuration_map does not provide " << config_file_key << std::endl;
+        error_string = "configuration_map does not provide " + config_file_key;
         return std::nullopt;
     }
     auto config_file_path = config_file_it->second;
     if (!std::filesystem::exists(config_file_path)) {
-        std::cerr << error_trace << config_file_key << " [" << config_file_path 
-                  << "] does not exist" << std::endl;
+        error_string = config_file_key + " [" + config_file_path + "] does not exist";
         return std::nullopt;
     }
 
     std::ifstream config_file(config_file_path);
     if (!config_file.is_open()) {
-        std::cerr << error_trace << config_file_key << " [" << config_file_path 
-                  << "] could not be opened" << std::endl;
+        error_string = config_file_key + " [" + config_file_path + "] could not be opened";
         return std::nullopt;
     }
 
@@ -394,28 +392,53 @@ std::optional<nlohmann::json> RemoteDataBatchProtectionAgent::LoadConfigFile(con
     config_file.close();
 
     if (config_file_contents.empty()) {
-        std::cerr << error_trace << config_file_key << " [" << config_file_path 
-                  << "] is empty" << std::endl;
+        error_string = config_file_key + " [" + config_file_path + "] is empty";
         return std::nullopt;
     }
 
     try {
         auto json = nlohmann::json::parse(config_file_contents);
+        
+        // Validate that the JSON is an object (map)
+        if (!json.is_object()) {
+            error_string = config_file_key + " [" + config_file_path + "] must contain a JSON object, not " + json.type_name();
+            return std::nullopt;
+        }
+        
+        // Validate that all values are strings (keys are always strings in JSON objects)
+        for (const auto& item : json.items()) {
+            if (!item.value().is_string()) {
+                error_string = config_file_key + " [" + config_file_path + "] contains non-string value for key '" + 
+                         item.key() + "' (type: " + item.value().type_name() + ")";
+                return std::nullopt;
+            }
+        }
+        
         return json;
     } catch (const nlohmann::json::exception& e) {
-        std::cerr << error_trace << config_file_key << " [" << config_file_path 
-                  << "] is not a valid JSON file: " << e.what() << std::endl;
+        error_string = config_file_key + " [" + config_file_path + "] is not a valid JSON file: " + std::string(e.what());
         return std::nullopt;
     }
 }
 
-std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::InstantiateHttpClient() {
-    auto config_json_opt = LoadConfigFile(k_connection_config_key_);
-    auto server_url_opt = config_json_opt ? ExtractServerUrl(*config_json_opt) : std::nullopt;
+std::shared_ptr<HttpClientBase> RemoteDataBatchProtectionAgent::InstantiateHttpClient() {
+    const std::string error_trace = "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - ";
+    const std::string init_error_prefix = "Agent not properly initialized - ";
+    std::string error_string;
+
+    auto config_json_opt = LoadConfigFile(k_connection_config_key_, error_string);
+    if (!config_json_opt) {
+        std::cerr << error_trace << error_string << std::endl;
+        initialized_ = init_error_prefix + error_string;
+        throw DBPSException("Failed to load connection config: " + error_string);
+    }
+
+    auto server_url_opt = ExtractServerUrl(*config_json_opt);
     if (!server_url_opt || server_url_opt->empty()) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - No server_url provided in " << k_connection_config_key_ << "." << std::endl;
-        initialized_ = "Agent not properly initialized - server_url missing";
-        throw DBPSException("No server_url provided in " + k_connection_config_key_);
+        error_string = "No server_url provided in " + k_connection_config_key_;
+        std::cerr << error_trace << error_string << std::endl;
+        initialized_ = init_error_prefix + error_string;
+        throw DBPSException(error_string);
     }
     server_url_ = *server_url_opt;
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - server_url extracted: [" << server_url_ << "]" << std::endl;
@@ -428,14 +451,46 @@ std::shared_ptr<HttpClientInterface> RemoteDataBatchProtectionAgent::Instantiate
 
     // get the client for the given server_url_ with configured number of worker threads
     std::size_t num_worker_threads = ExtractNumWorkerThreads(*config_json_opt);
-    std::shared_ptr<HttpClientInterface> http_client = HttplibPooledClient::Acquire(server_url_, num_worker_threads);
+    
+    // TODO: Split credentials config file key and credentials file from connection config.
+    HttpClientBase::ClientCredentials credentials = ExtractClientCredentials(*config_json_opt);
+    
+    std::shared_ptr<HttpClientBase> http_client =
+        HttplibPooledClient::Acquire(server_url_, num_worker_threads, std::move(credentials));
     if (!http_client) {
-        std::cerr << "ERROR: RemoteDataBatchProtectionAgent::InstantiateHttpClient() - Failed to acquire HTTP client for server: " << server_url_ << std::endl;
-        initialized_ = "Agent not properly initialized - failed to acquire HTTP client";
-        throw DBPSException("Failed to acquire HTTP client for server: " + server_url_);
+        error_string = "Failed to acquire HTTP client for server: " + server_url_;
+        std::cerr << error_trace << error_string << std::endl;
+        initialized_ = init_error_prefix + error_string;
+        throw DBPSException(error_string);
     }
     
     return http_client;
+}
+
+HttpClientBase::ClientCredentials RemoteDataBatchProtectionAgent::ExtractClientCredentials(
+    const nlohmann::json& config_json) const {
+
+    HttpClientBase::ClientCredentials credentials;
+    static constexpr const char* kCredentialsPrefix = "credentials.";
+
+    for (const auto& item : config_json.items()) {
+        const std::string& key = item.key();
+        if (key.rfind(kCredentialsPrefix, 0) != 0) {
+            continue;
+        }
+        const std::string stripped_key = key.substr(std::strlen(kCredentialsPrefix));
+        if (stripped_key.empty()) {
+            continue;
+        }
+        const auto& val = item.value();
+        if (val.is_string()) {
+            credentials[stripped_key] = val.get<std::string>();
+        } else {
+            credentials[stripped_key] = val.dump();
+        }
+    }
+
+    return credentials;
 }
 
 std::optional<std::string> RemoteDataBatchProtectionAgent::ExtractServerUrl(const nlohmann::json& config_json) const {

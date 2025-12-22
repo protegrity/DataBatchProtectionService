@@ -30,6 +30,11 @@ ClientCredentialStore::ClientCredentialStore(const std::string& jwt_secret_key)
 }
 
 // Initialize credential store from a given map.
+// Expected map format:
+// {
+//   {"one_client_id", "one_api_key"},
+//   {"another_client_id", "another_api_key"}
+// }
 void ClientCredentialStore::init(const std::map<std::string, std::string>& credentials) {
     credentials_.clear();
     credentials_ = credentials;
@@ -42,6 +47,11 @@ void ClientCredentialStore::init(bool enable_credential_check) {
 }
 
 // Initialize credential store from a JSON file
+// Expected JSON file format:
+// {
+//   "one_client_id": "one_api_key",
+//   "another_client_id": "another_api_key"
+// }
 bool ClientCredentialStore::init(const std::string& file_path) {
     try {
         // Open and read the JSON file
@@ -110,20 +120,21 @@ bool ClientCredentialStore::HasClientId(const std::string& client_id) const {
 std::optional<ClientCredentialStore::TokenWithExpiration> ClientCredentialStore::GenerateJWT(
     const std::string& client_id,
     const std::string& api_key) const {
-    // Validate that client_id is not empty
-    if (client_id.empty()) {
-        std::cout << "Error generating JWT: client_id cannot be empty" << std::endl;
-        return std::nullopt;
-    }
-    
-    // Skip credential validation if flag is not set
-    if (!enable_credential_check_) {
-        std::cout << "Warning: Credential checking is skipped. Generating JWT without validation for client_id: " << client_id << std::endl;
-    } 
-    // Validate credentials before generating JWT
-    else if (!ValidateCredential(client_id, api_key)) {
-        std::cout << "Error generating JWT: Invalid credentials for client_id: " << client_id << std::endl;
-        return std::nullopt;
+    if (enable_credential_check_) {
+        // Validate that client_id and api_key are not empty
+        if (client_id.empty() || api_key.empty()) {
+            std::cout << "Error generating JWT: client_id or api_key cannot be empty" << std::endl;
+            return std::nullopt;
+        }
+
+        // Validate credentials before generating JWT
+        if (!ValidateCredential(client_id, api_key)) {
+            std::cout << "Error generating JWT: Invalid credentials for client_id=[" << client_id << "]" << std::endl;
+            return std::nullopt;
+        }
+    } else {
+        // Skip credential validation (and any client_id emptiness checks) if flag is not set.
+        std::cout << "Warning: Credential checking is skipped. Generating JWT without validation for client_id=[" << client_id << "]" << std::endl;
     }
     
     try {
@@ -155,37 +166,48 @@ TokenResponse ClientCredentialStore::ProcessTokenRequest(const std::string& requ
     
     // Parse token request
     TokenRequest token_req;
-    token_req.Parse(request_body);
-    
-    // Check if parsing resulted in an error
-    if (!token_req.IsValid()) {
+    auto error_opt = token_req.ParseWithError(request_body);
+    if (error_opt.has_value()) {
         response.SetErrorStatusCodeAndClearToken(400);
-        response.error_message_ = token_req.GetValidationError();
+        response.error_message_ = error_opt.value();
         return response;
     }
     
-    // Log the request for debugging
-    std::cout << "=== ProcessTokenRequest ===" << std::endl;
-    std::cout << "client_id: " << token_req.client_id_ << std::endl;
-    std::cout << "====================" << std::endl;
-    
+    // Get client_id and api_key from the parsed token request.
+    const auto client_id_it = token_req.credential_values_.find("client_id");
+    const auto api_key_it = token_req.credential_values_.find("api_key");
+    const std::string client_id = (client_id_it != token_req.credential_values_.end()) ? client_id_it->second : "";
+    const std::string api_key = (api_key_it != token_req.credential_values_.end()) ? api_key_it->second : "";
+
+    // Get printables for client_id and api_key
+    const std::string client_id_prn =
+        std::string("client_id=[") + (client_id.empty() ? std::string("<empty>") : client_id) + "]";
+    const std::string api_key_prn =
+        std::string("api_key=[") + (api_key.empty() ? std::string("<empty>") : std::string("<redacted>")) + "]";
+
+    // Print a warning if client_id or api_key is missing, but proceed with the request.
+    if (client_id.empty() || api_key.empty()) {
+        std::cout << "ProcessTokenRequest -- Warning: Missing client_id or api_key. Proceeding with the request. "
+            << client_id_prn << ", " << api_key_prn << std::endl;
+    } else {
+        std::cout << "ProcessTokenRequest -- " << client_id_prn << ", " << api_key_prn << std::endl;
+    }
+
     // Generate JWT token (validates credentials internally)
-    auto token = GenerateJWT(token_req.client_id_, token_req.api_key_);
+    auto token = GenerateJWT(client_id, api_key);
     
     if (!token.has_value()) {
         response.SetErrorStatusCodeAndClearToken(401);
-        response.error_message_ = "Invalid credentials";
+        response.error_message_ = "Invalid credentials -- " + client_id_prn + ", " + api_key_prn;
         return response;
     }
     
     response.token_ = token->token;
+    response.token_type_ = JWT_TOKEN_TYPE;
     response.expires_at_ = token->expires_at;
     response.error_status_code_ = 200;
-    
-    std::cout << "=== ProcessTokenRequest (Success) ===" << std::endl;
-    std::cout << "Token generated for client_id: " << token_req.client_id_ << std::endl;
-    std::cout << "=================================" << std::endl;
-    
+    std::cout << "ProcessTokenRequest -- Token generated successfully for " << client_id_prn << std::endl;
+
     return response;
 }
 
@@ -225,12 +247,11 @@ std::optional<std::string> ClientCredentialStore::VerifyTokenForEndpoint(const s
         return std::nullopt;
     }
     
-    // Extract Bearer token from Authorization header
+    // Extract token from Authorization header
     std::optional<std::string> token = std::nullopt;
-    const std::string bearer_prefix = "Bearer ";
-    if (authorization_header.length() > bearer_prefix.length() && 
-        authorization_header.substr(0, bearer_prefix.length()) == bearer_prefix) {
-        token = authorization_header.substr(bearer_prefix.length());
+    const std::string expected_prefix = JWT_TOKEN_TYPE + " ";
+    if (authorization_header.rfind(expected_prefix, 0) == 0) {  // starts_with(expected_prefix)
+        token = authorization_header.substr(expected_prefix.size());
     }
     
     // Verify JWT token

@@ -17,19 +17,16 @@
 
 #include "httplib_client.h"
 
-HttplibClient::HttplibClient(const std::string& base_url)
-    : base_url_(base_url) {
+HttplibClient::HttplibClient(const std::string& base_url, ClientCredentials credentials)
+    : HttpClientBase(base_url, std::move(credentials)) {
 }
 
-HttpClientInterface::HttpResponse HttplibClient::Get(const std::string& endpoint) {
+HttpClientBase::HttpResponse HttplibClient::DoGet(const std::string& endpoint, const HeaderList& headers) {
     try {
         httplib::Client client(base_url_);
         
         client.set_connection_timeout(10);
         client.set_read_timeout(30);
-        
-        // Set headers to indicate JSON responses
-        auto headers = HttpClientInterface::DefaultJsonGetHeaders();
         
         // Make the GET request
         auto result = client.Get(endpoint, headers);
@@ -45,18 +42,15 @@ HttpClientInterface::HttpResponse HttplibClient::Get(const std::string& endpoint
     }
 }
 
-HttpClientInterface::HttpResponse HttplibClient::Post(const std::string& endpoint, const std::string& json_body) {
+HttpClientBase::HttpResponse HttplibClient::DoPost(const std::string& endpoint, const std::string& json_body, const HeaderList& headers) {
     try {
         httplib::Client client(base_url_);
         
         client.set_connection_timeout(10);
         client.set_read_timeout(30);
         
-        // Set headers for JSON content
-        auto headers = HttpClientInterface::DefaultJsonPostHeaders();
-        
         // Make the POST request
-        auto result = client.Post(endpoint, headers, json_body, HttpClientInterface::kJsonContentType);
+        auto result = client.Post(endpoint, headers, json_body, HttpClientBase::kJsonContentType);
         
         if (!result) {
             return HttpResponse(0, "", "HTTP POST request failed: no response received");

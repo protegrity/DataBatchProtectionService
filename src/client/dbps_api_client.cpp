@@ -159,12 +159,12 @@ void DecryptApiResponse::SetJsonRequest(const DecryptJsonRequest& request) { jso
 bool DecryptApiResponse::HasJsonRequest() const { return json_request_.has_value(); }
 const JsonRequest& DecryptApiResponse::GetJsonRequest() const { return json_request_.value(); }
 
-DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientInterface> http_client)
+DBPSApiClient::DBPSApiClient(std::shared_ptr<HttpClientBase> http_client)
     : http_client_(std::move(http_client)) {
 }
 
 std::string DBPSApiClient::HealthCheck() {
-    auto response = http_client_->Get("/healthz");
+    auto response = http_client_->Get("/healthz", false);
     
     if (!response.error_message.empty()) {
         return "Error: " + response.error_message;

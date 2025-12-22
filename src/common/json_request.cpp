@@ -143,57 +143,46 @@ std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
     }
 }
 
-void TokenRequest::Parse(const std::string& request_body) {
-    client_id_.clear();
-    api_key_.clear();
+// Allow strings or nested structures in the JSON payload for authentication credentials.
+// TODO(Issue #205): Unify usage of nlohmann or crow json for parsing and dumping.
+std::optional<std::string> TokenRequest::ParseWithError(const std::string& request_body) {
+    credential_values_.clear();
 
-    auto json_body_opt = SafeLoadJsonBody(request_body);
-    if (!json_body_opt) {
-        return;
+    try {
+        nlohmann::json nlohmann_body = nlohmann::json::parse(request_body);
+        if (!nlohmann_body.is_object()) {
+            return "Invalid JSON object";
+        }
+        for (const auto& item : nlohmann_body.items()) {
+            const auto& key = item.key();
+            const auto& val = item.value();
+            if (val.is_string()) {
+                credential_values_[key] = val.get<std::string>();
+            } else {
+                credential_values_[key] = val.dump();
+            }
+        }
+    } catch (const nlohmann::json::exception&) {
+        return "Invalid JSON body";
     }
-
-    auto json_body = *json_body_opt;
-    if (json_body.t() != crow::json::type::Object) {
-        return;
-    }
-
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"client_id"})) {
-        client_id_ = *parsed_value;
-    }
-
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"api_key"})) {
-        api_key_ = *parsed_value;
-    }
+    return std::nullopt;
 }
 
 std::string TokenRequest::ToJson() const {
+    // When there are no credential values, emit an empty JSON object rather than JSON null.
+    if (credential_values_.empty()) {
+        return "{}";
+    }
     crow::json::wvalue json;
-    if (!IsValid()) {
-        json["error"] = GetValidationError();
-        return PrettyPrintJson(json.dump());
+    for (const auto& pair : credential_values_) {
+        json[pair.first] = pair.second;
     }
-
-    json["client_id"] = client_id_;
-    json["api_key"] = api_key_;
     return PrettyPrintJson(json.dump());
-}
-
-bool TokenRequest::IsValid() const {
-    return !client_id_.empty() && !api_key_.empty();
-}
-
-std::string TokenRequest::GetValidationError() const {
-    if (IsValid()) {
-        return "";
-    }
-    std::vector<std::string> missing_fields;
-    if (client_id_.empty()) missing_fields.push_back("client_id");
-    if (api_key_.empty()) missing_fields.push_back("api_key");
-    return BuildValidationError(missing_fields);
 }
 
 void TokenResponse::Parse(const std::string& response_body) {
     token_ = std::nullopt;
+    token_type_ = std::nullopt;
     expires_at_ = std::nullopt;
     error_message_.clear();
     error_status_code_ = 0;
@@ -216,6 +205,10 @@ void TokenResponse::Parse(const std::string& response_body) {
         token_ = *parsed_value;
     }
 
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"token_type"})) {
+        token_type_ = *parsed_value;
+    }
+
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"expires_at"})) {
         expires_at_ = SafeParseToInt64(*parsed_value);
     }
@@ -225,6 +218,8 @@ bool TokenResponse::IsValid() const {
     return error_message_.empty() &&
            token_.has_value() &&
            !token_.value().empty() &&
+           token_type_.has_value() &&
+           !token_type_.value().empty() &&
            expires_at_.has_value();
 }
 
@@ -237,12 +232,14 @@ std::string TokenResponse::GetValidationError() const {
     }
     std::vector<std::string> missing_fields;
     if (!token_.has_value() || token_.value().empty()) missing_fields.push_back("token");
+    if (!token_type_.has_value() || token_type_.value().empty()) missing_fields.push_back("token_type");
     if (!expires_at_.has_value()) missing_fields.push_back("expires_at");
     return BuildValidationError(missing_fields);
 }
 
 void TokenResponse::SetErrorStatusCodeAndClearToken(int status_code) {
     token_ = std::nullopt;
+    token_type_ = std::nullopt;
     expires_at_ = std::nullopt;
     error_message_.clear();
     error_status_code_ = status_code;
@@ -257,7 +254,7 @@ std::string TokenResponse::ToJson() const {
     }
 
     json["token"] = token_.value();
-    json["token_type"] = "Bearer";
+    json["token_type"] = token_type_.value();
     json["expires_at"] = expires_at_.value();
 
     return PrettyPrintJson(json.dump());

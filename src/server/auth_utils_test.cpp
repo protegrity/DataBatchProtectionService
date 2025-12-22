@@ -92,18 +92,18 @@ TEST(AuthUtilsTest, ProcessTokenRequestParsing) {
     response = store.ProcessTokenRequest(missing_client_id);
     EXPECT_FALSE(response.token_.has_value());
     EXPECT_FALSE(response.expires_at_.has_value());
-    EXPECT_EQ(response.error_status_code_, 400);
+    EXPECT_EQ(response.error_status_code_, 401);
     EXPECT_FALSE(response.IsValid());
-    EXPECT_FALSE(response.GetValidationError().empty());
+    EXPECT_TRUE(response.GetValidationError().find("Invalid credentials") != std::string::npos);
     
     // Missing api_key
     std::string missing_api_key = R"({"client_id": "test_client"})";
     response = store.ProcessTokenRequest(missing_api_key);
     EXPECT_FALSE(response.token_.has_value());
     EXPECT_FALSE(response.expires_at_.has_value());
-    EXPECT_EQ(response.error_status_code_, 400);
+    EXPECT_EQ(response.error_status_code_, 401);
     EXPECT_FALSE(response.IsValid());
-    EXPECT_FALSE(response.GetValidationError().empty());
+    EXPECT_TRUE(response.GetValidationError().find("Invalid credentials") != std::string::npos);
     
     // Invalid JSON
     std::string invalid_json = "{invalid json}";
@@ -124,8 +124,9 @@ TEST(AuthUtilsTest, ProcessTokenRequestEmptyClientId) {
     auto response = store.ProcessTokenRequest(empty_client_id_json);
     EXPECT_FALSE(response.token_.has_value());
     EXPECT_FALSE(response.expires_at_.has_value());
-    EXPECT_EQ(response.error_status_code_, 400);
+    EXPECT_EQ(response.error_status_code_, 401);
     EXPECT_FALSE(response.IsValid());
+    EXPECT_TRUE(response.GetValidationError().find("Invalid credentials") != std::string::npos);
 }
 
 // Test init with enable_credential_check flag
@@ -189,7 +190,7 @@ TEST(AuthUtilsTest, VerifyTokenForEndpointSkipCheck) {
     auto result2 = store.VerifyTokenForEndpoint("Invalid header");
     EXPECT_FALSE(result2.has_value());
     
-    auto result3 = store.VerifyTokenForEndpoint("Bearer invalid_token");
+    auto result3 = store.VerifyTokenForEndpoint(JWT_TOKEN_TYPE + " invalid_token");
     EXPECT_FALSE(result3.has_value());
 }
 
@@ -204,13 +205,13 @@ TEST(AuthUtilsTest, VerifyTokenForEndpointWithCheck) {
     EXPECT_TRUE(result1.has_value());
     EXPECT_TRUE(result1.value().find("Unauthorized") != std::string::npos);
     
-    // Test with invalid Bearer format (no "Bearer " prefix)
+    // Test with invalid token type format (no "<token_type> " prefix)
     auto result2 = store.VerifyTokenForEndpoint("invalid_token");
     EXPECT_TRUE(result2.has_value());
     EXPECT_TRUE(result2.value().find("Unauthorized") != std::string::npos);
     
     // Test with invalid JWT token
-    auto result3 = store.VerifyTokenForEndpoint("Bearer invalid.jwt.token");
+    auto result3 = store.VerifyTokenForEndpoint(JWT_TOKEN_TYPE + " invalid.jwt.token");
     EXPECT_TRUE(result3.has_value());
     EXPECT_TRUE(result3.value().find("Unauthorized") != std::string::npos);
     
@@ -219,13 +220,13 @@ TEST(AuthUtilsTest, VerifyTokenForEndpointWithCheck) {
     auto token_response = store.ProcessTokenRequest(valid_token_json);
     ASSERT_TRUE(token_response.token_.has_value());
     
-    std::string bearer_token = "Bearer " + token_response.token_.value();
-    auto result4 = store.VerifyTokenForEndpoint(bearer_token);
+    std::string token_type_token = JWT_TOKEN_TYPE + " " + token_response.token_.value();
+    auto result4 = store.VerifyTokenForEndpoint(token_type_token);
     EXPECT_FALSE(result4.has_value());  // Should succeed (return nullopt)
     
-    // Test with valid JWT token but wrong format (missing space after Bearer)
-    std::string invalid_bearer = "Bearer" + token_response.token_.value();
-    auto result5 = store.VerifyTokenForEndpoint(invalid_bearer);
+    // Test with valid JWT token but wrong format (missing space after token type)
+    std::string invalid_token_type = JWT_TOKEN_TYPE + token_response.token_.value();
+    auto result5 = store.VerifyTokenForEndpoint(invalid_token_type);
     EXPECT_TRUE(result5.has_value());
     EXPECT_TRUE(result5.value().find("Unauthorized") != std::string::npos);
 }

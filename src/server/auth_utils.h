@@ -36,6 +36,7 @@
 
 // JWT expiration time: 4 hours in seconds
 inline constexpr int JWT_EXPIRATION_SECONDS = 4 * 60 * 60;  // 14400 seconds
+inline const std::string JWT_TOKEN_TYPE = "Bearer";
 
 /**
  * ClientCredentialStore manages client_id to api_key mappings for authentication.
@@ -94,12 +95,14 @@ public:
 
      /**
      * Verifies JWT token from Authorization header for protected endpoints.
-     * @param authorization_header The Authorization header value (e.g., "Bearer <token>")
+     * @param authorization_header The Authorization header value (e.g., "<token_type> <token>")
      * @return Error message if verification fails, or std::nullopt if verification succeeds
      */
     std::optional<std::string> VerifyTokenForEndpoint(const std::string& authorization_header) const;
     
 private:
+    // Private struct to hold the token and expiration time during JWT generation requests.
+    // It is intentionally separate from the client-side authentication logic to avoid server<>client coupling.
     struct TokenWithExpiration {
         std::string token;
         std::int64_t expires_at;

@@ -42,3 +42,6 @@ _deps/
 
 # Docker artifacts
 *.tar
+
+# Testing credentials file
+testing_credentials.json

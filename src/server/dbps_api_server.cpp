@@ -16,6 +16,7 @@
 // under the License.
 
 #include <crow/app.h>
+#include <iostream>
 #include <string>
 #include <optional>
 #include <cxxopts.hpp>
@@ -43,20 +44,34 @@ std::optional<std::string> VerifyJWTFromRequest(const crow::request& req, const 
 }
 
 int main(int argc, char* argv[]) {
+    // Command line parameter names
+    static constexpr const char* kCredentialsFileParam = "credentials_file";
+    static constexpr const char* kCredentialsFileParamShort = "c,credentials_file";
+    static constexpr const char* kJwtSecretParam = "jwt_secret";
+    static constexpr const char* kJwtSecretParamShort = "j,jwt_secret";
+    static constexpr const char* kAllowMissingCredentialsParam = "allow_missing_credentials";
+    static constexpr const char* kAllowMissingCredentialsParamShort = "m,allow_missing_credentials";
+    
     // Initialize credentials file path and JWT secret key with parsed command line options
     std::optional<std::string> credentials_file_path = std::nullopt;
     std::string jwt_secret_key = "default-secret-key-overwritten-by-command-line";
+    // TODO: Flip allow_missing_credentials=False when instructions are updated with the cmdline flags to run the server.
+    bool allow_missing_credentials = true;
     try {
         cxxopts::Options options("dbps_api_server", "Data Batch Protection Service API Server");
         options.add_options()
-            ("c,credentials", "Path to credentials JSON file", cxxopts::value<std::string>())
-            ("j,jwt-secret", "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>());
-            auto result = options.parse(argc, argv);        
-        if (result.count("credentials")) {
-            credentials_file_path = result["credentials"].as<std::string>();
+            (kCredentialsFileParamShort, "Path to credentials JSON file", cxxopts::value<std::string>())
+            (kJwtSecretParamShort, "JWT secret key for signing and verifying tokens", cxxopts::value<std::string>())
+            (kAllowMissingCredentialsParamShort, "Allow credentials checking to be skipped if the credentials file is not provided", cxxopts::value<bool>());
+        auto result = options.parse(argc, argv);
+        if (result.count(kCredentialsFileParam)) {
+            credentials_file_path = result[kCredentialsFileParam].as<std::string>();
         }
-        if (result.count("jwt-secret")) {
-            jwt_secret_key = result["jwt-secret"].as<std::string>();
+        if (result.count(kJwtSecretParam)) {
+            jwt_secret_key = result[kJwtSecretParam].as<std::string>();
+        }
+        if (result.count(kAllowMissingCredentialsParam)) {
+            allow_missing_credentials = result[kAllowMissingCredentialsParam].as<bool>();
         }
     } catch (const std::exception& e) {
         std::cerr << "Error parsing command line options: " << e.what() << std::endl;
@@ -65,6 +80,8 @@ int main(int argc, char* argv[]) {
     
     // Initialize credential store with JWT secret key
     ClientCredentialStore credential_store(jwt_secret_key);
+
+    // If credentials file is provided, load credentials from file.
     if (credentials_file_path.has_value()) {
         // Load credentials from file
         if (!credential_store.init(credentials_file_path.value())) {
@@ -72,10 +89,16 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         std::cout << "Credentials loaded successfully from: " << credentials_file_path.value() << std::endl;
-    } else {
-        // No credentials file provided, disable credential checking
+    }
+    // If no credentials file is provided, disable credential checking if allowed.
+    else if (allow_missing_credentials) {
         credential_store.init(false);
-        std::cout << "No credentials file provided. Credential checking will be skipped." << std::endl;
+        std::cout << "No credentials file provided, but skipping credential checking is allowed by --allow_missing_credentials option." << std::endl;
+    }
+    // If no credentials file is provided and skipping credential checking is not allowed, return error.
+    else {
+        std::cerr << "Error: No credentials file provided and --allow_missing_credentials is not set." << std::endl;
+        return 1;
     }
 
     // Initialize API server
@@ -101,7 +124,7 @@ int main(int argc, char* argv[]) {
     CROW_ROUTE(app, "/token").methods("POST"_method)([&credential_store](const crow::request& req) {
         // Process token request
         TokenResponse token_response = credential_store.ProcessTokenRequest(req.body);
-        
+
         // Check if processing resulted in an error
         auto validation_error = token_response.GetValidationError();
         if (!validation_error.empty()) {
