@@ -30,9 +30,9 @@ ClientCredentialStore::ClientCredentialStore(const std::string& jwt_secret_key)
 }
 
 // Initialize credential store from a given map.
-// Expected format:
+// Expected map format:
 // {
-//   {"client_id", "api_key"},
+//   {"one_client_id", "one_api_key"},
 //   {"another_client_id", "another_api_key"}
 // }
 void ClientCredentialStore::init(const std::map<std::string, std::string>& credentials) {
@@ -47,9 +47,9 @@ void ClientCredentialStore::init(bool enable_credential_check) {
 }
 
 // Initialize credential store from a JSON file
-// Expected format:
+// Expected JSON file format:
 // {
-//   "client_id": "api_key",
+//   "one_client_id": "one_api_key",
 //   "another_client_id": "another_api_key"
 // }
 bool ClientCredentialStore::init(const std::string& file_path) {
