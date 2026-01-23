@@ -95,7 +95,7 @@ const std::string VALID_ENCRYPT_JSON = R"({
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "UNDEFINED"
+            "encoding": "UNDEFINED"
         }
     },
     "data_batch_encrypted": {
@@ -126,7 +126,7 @@ const std::string VALID_DECRYPT_JSON = R"({
         },
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "UNDEFINED"
+            "encoding": "UNDEFINED"
         }
     },
     "data_batch_encrypted": {
@@ -159,7 +159,7 @@ TEST(JsonRequest, JsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -185,7 +185,7 @@ TEST(JsonRequest, JsonRequestMissingRequiredFields) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_FALSE(request.datatype_.has_value());
     ASSERT_FALSE(request.compression_.has_value());
-    ASSERT_FALSE(request.format_.has_value());
+    ASSERT_FALSE(request.encoding_.has_value());
     ASSERT_FALSE(request.encrypted_compression_.has_value());
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
@@ -208,7 +208,7 @@ TEST(JsonRequest, JsonRequestInvalidJson) {
     ASSERT_EQ("", request.column_name_);
     ASSERT_FALSE(request.datatype_.has_value());
     ASSERT_FALSE(request.compression_.has_value());
-    ASSERT_FALSE(request.format_.has_value());
+    ASSERT_FALSE(request.encoding_.has_value());
     ASSERT_FALSE(request.encrypted_compression_.has_value());
     ASSERT_EQ("", request.key_id_);
     ASSERT_EQ("", request.user_id_);
@@ -228,7 +228,7 @@ TEST(JsonRequest, JsonRequestRequiredReferenceIdMissing) {
             },
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "UNDEFINED"
+                "encoding": "UNDEFINED"
             }
         },
         "data_batch_encrypted": {
@@ -250,7 +250,7 @@ TEST(JsonRequest, JsonRequestRequiredReferenceIdMissing) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -273,7 +273,7 @@ TEST(JsonRequest, EncryptJsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -297,7 +297,7 @@ TEST(JsonRequest, EncryptJsonRequestMissingValue) {
             },
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "UNDEFINED"
+                "encoding": "UNDEFINED"
             }
         },
         "data_batch_encrypted": {
@@ -325,7 +325,7 @@ TEST(JsonRequest, EncryptJsonRequestMissingValue) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -348,7 +348,7 @@ TEST(JsonRequest, DecryptJsonRequestValidParse) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -376,7 +376,7 @@ TEST(JsonRequest, DecryptJsonRequestMissingEncryptedValue) {
             },
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "UNDEFINED"
+                "encoding": "UNDEFINED"
             }
         },
         "data_batch_encrypted": {
@@ -404,7 +404,7 @@ TEST(JsonRequest, DecryptJsonRequestMissingEncryptedValue) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, request.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -491,7 +491,7 @@ TEST(JsonRequest, EncryptJsonRequestWithEncodingAttributes) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN",
+                "encoding": "PLAIN",
                 "encoding_attributes": {
                     "page_type": "DATA_PAGE",
                     "page_encoding": "PLAIN",
@@ -523,7 +523,7 @@ TEST(JsonRequest, EncryptJsonRequestWithEncodingAttributes) {
     ASSERT_EQ("email", request.column_name_);
     ASSERT_EQ(Type::BYTE_ARRAY, request.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, request.compression_.value());
-    ASSERT_EQ(Format::PLAIN, request.format_.value());
+    ASSERT_EQ(Encoding::PLAIN, request.encoding_.value());
     ASSERT_EQ(CompressionCodec::GZIP, request.encrypted_compression_.value());
     ASSERT_EQ("key123", request.key_id_);
     ASSERT_EQ("user456", request.user_id_);
@@ -546,7 +546,7 @@ TEST(JsonRequest, EncryptJsonRequestToJsonWithEncodingAttributes) {
     request.column_name_ = "email";
     request.datatype_ = Type::BYTE_ARRAY;
     request.compression_ = CompressionCodec::UNCOMPRESSED;
-    request.format_ = Format::PLAIN;
+    request.encoding_ = Encoding::PLAIN;
     request.encrypted_compression_ = CompressionCodec::GZIP;
     request.key_id_ = "key123";
     request.user_id_ = "user456";
@@ -631,7 +631,7 @@ const std::string VALID_DECRYPT_RESPONSE_JSON = R"({
         "value": "dGVzdEBleGFtcGxlLmNvbQ==",
         "value_format": {
             "compression": "UNCOMPRESSED",
-            "format": "UNDEFINED"
+            "encoding": "UNDEFINED"
         }
     },
     "access": {
@@ -675,7 +675,7 @@ TEST(JsonRequest, DecryptJsonResponseValidParse) {
     ASSERT_EQ("ref789", response.reference_id_);
     ASSERT_EQ(Type::BYTE_ARRAY, response.datatype_.value());
     ASSERT_EQ(CompressionCodec::UNCOMPRESSED, response.compression_.value());
-    ASSERT_EQ(Format::UNDEFINED, response.format_.value());
+    ASSERT_EQ(Encoding::UNDEFINED, response.encoding_.value());
     ASSERT_EQ(StringToBinary("test@example.com"), response.decrypted_value_);
     
     ASSERT_TRUE(response.IsValid());
@@ -724,7 +724,7 @@ TEST(JsonRequest, DecryptJsonResponseMissingDecryptedValue) {
             "datatype_info": {
                 "datatype": "BYTE_ARRAY"
             },
-            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"}
+            "value_format": {"compression": "UNCOMPRESSED", "encoding": "UNDEFINED"}
         }
     })");
     
@@ -752,7 +752,7 @@ TEST(JsonRequest, DecryptJsonResponseMissingDatatype) {
         "debug": {"reference_id": "ref456"},
         "data_batch": {
             "value": "ZGVjcnlwdGVkX2RhdGE=",
-            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"}
+            "value_format": {"compression": "UNCOMPRESSED", "encoding": "UNDEFINED"}
         }
     })");
     
@@ -794,7 +794,7 @@ TEST(JsonRequest, DecryptJsonResponseToJson) {
     response.reference_id_ = "ref456";
     response.datatype_ = Type::BYTE_ARRAY;
     response.compression_ = CompressionCodec::UNCOMPRESSED;
-    response.format_ = Format::UNDEFINED;
+    response.encoding_ = Encoding::UNDEFINED;
     response.decrypted_value_ = StringToBinary("decrypted_data");
     
     ASSERT_TRUE(response.IsValid());
@@ -855,7 +855,7 @@ TEST(JsonRequest, DatatypeLengthParsing) {
             "value": "SGVsbG8sIFdvcmxkIQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -901,7 +901,7 @@ TEST(JsonRequest, DatatypeLengthSerialization) {
     request.datatype_ = Type::FIXED_LEN_BYTE_ARRAY;
     request.datatype_length_ = 16;
     request.compression_ = CompressionCodec::UNCOMPRESSED;
-    request.format_ = Format::PLAIN;
+    request.encoding_ = Encoding::PLAIN;
     request.encrypted_compression_ = CompressionCodec::UNCOMPRESSED;
     request.key_id_ = "test_key_123";
     request.value_ = StringToBinary("Hello, World!");
@@ -921,7 +921,7 @@ TEST(JsonRequest, JsonRequestInvalidDatatypeLength) {
                 "datatype": "FIXED_LEN_BYTE_ARRAY",
                 "length": "not_a_number"
             },
-            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"}
+            "value_format": {"compression": "UNCOMPRESSED", "encoding": "UNDEFINED"}
         },
         "data_batch_encrypted": {"value_format": {"compression": "GZIP"}},
         "encryption": {"key_id": "key123"},
@@ -947,7 +947,7 @@ TEST(JsonRequest, DecryptJsonResponseInvalidDatatypeLength) {
                 "datatype": "FIXED_LEN_BYTE_ARRAY",
                 "length": "invalid_int"
             },
-            "value_format": {"compression": "UNCOMPRESSED", "format": "UNDEFINED"},
+            "value_format": {"compression": "UNCOMPRESSED", "encoding": "UNDEFINED"},
             "value": "decrypted_data"
         }
     })";

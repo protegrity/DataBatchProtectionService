@@ -41,7 +41,7 @@ public:
     std::optional<Type::type> datatype_;
     std::optional<int> datatype_length_;
     std::optional<CompressionCodec::type> compression_;
-    std::optional<Format::type> format_;
+    std::optional<Encoding::type> encoding_;
     std::map<std::string, std::string> encoding_attributes_;
     std::optional<CompressionCodec::type> encrypted_compression_;
     std::string key_id_;
@@ -291,7 +291,7 @@ public:
     std::optional<Type::type> datatype_;
     std::optional<int> datatype_length_;
     std::optional<CompressionCodec::type> compression_;
-    std::optional<Format::type> format_;
+    std::optional<Encoding::type> encoding_;
     std::vector<uint8_t> decrypted_value_;
     
     /**

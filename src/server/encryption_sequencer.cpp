@@ -62,7 +62,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     CompressionCodec::type compression,
-    Format::type format,
+    Encoding::type encoding,
     const std::map<std::string, std::string>& encoding_attributes,
     CompressionCodec::type encrypted_compression,
     const std::string& key_id,
@@ -73,7 +73,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     datatype_(datatype),
     datatype_length_(datatype_length),
     compression_(compression),
-    format_(format),
+    encoding_(encoding),
     encoding_attributes_(encoding_attributes),
     encrypted_compression_(encrypted_compression),
     key_id_(key_id),
@@ -88,7 +88,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     CompressionCodec::type compression,
-    Format::type format,
+    Encoding::type encoding,
     const std::map<std::string, std::string>& encoding_attributes,
     CompressionCodec::type encrypted_compression,
     const std::string& key_id,
@@ -100,7 +100,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     datatype_(datatype),
     datatype_length_(datatype_length),
     compression_(compression),
-    format_(format),
+    encoding_(encoding),
     encoding_attributes_(encoding_attributes),
     encrypted_compression_(encrypted_compression),
     key_id_(key_id),
@@ -111,7 +111,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
 
 // Top level encryption/decryption methods.
 
-// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+// TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -143,7 +143,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
             plaintext, compression_, encoding_attributes_converted_);
         
         // Parse value bytes into typed list
-        auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, format_);
+        auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, encoding_);
         
         // Encrypt the typed list and level bytes, then join them into a single encrypted byte vector.
         auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
@@ -165,10 +165,10 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         const bool is_compression_supported = (compression_ == CompressionCodec::UNCOMPRESSED ||
                                                compression_ == CompressionCodec::SNAPPY);
         
-        // Format: Only PLAIN is currently supported
+        // Encoding: Only PLAIN is currently supported
         // RLE_DICTIONARY is not supported for per-value encryption since the values are not present in the 
         // `plaintext` data, only references to them.
-        const bool is_format_supported = (format_ == Format::PLAIN && format_ != Format::RLE_DICTIONARY);
+        const bool is_encoding_supported = (encoding_ == Encoding::PLAIN && encoding_ != Encoding::RLE_DICTIONARY);
         
         // Page type: All are supported (DATA_PAGE_V1, DATA_PAGE_V2, DICTIONARY_PAGE)
         const bool is_page_supported = true;
@@ -177,7 +177,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
         // BOOLEAN is not supported for per-value encryption and always defaults to per-block encryption.
         const bool is_datatype_supported = (datatype_ != Type::BOOLEAN);
 
-        if (is_compression_supported && is_format_supported && is_page_supported && is_datatype_supported) {
+        if (is_compression_supported && is_encoding_supported && is_page_supported && is_datatype_supported) {
             // All conditions are supported, therefore an DBPSUnsupportedException exception should not have happened. 
             // Re-throw the exception.
             throw;
@@ -199,7 +199,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     }
 }
 
-// TODO: Rename this method so it captures better the flow of decompress/format and encrypt/decrypt operations.
+// TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -241,7 +241,7 @@ bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>&
         auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
         
         // Convert the decrypted typed list back to value bytes
-        auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, format_);
+        auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, encoding_);
         
         // Join the decrypted level and value bytes, then compress to get plaintext
         decrypted_result_ = CompressAndJoin(

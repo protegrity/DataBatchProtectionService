@@ -143,17 +143,17 @@ std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format) {
+    Encoding::type encoding) {
 
     // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
     // only references to them.
-    if (format == Format::RLE_DICTIONARY) {
-        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations "
+    if (encoding == Encoding::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException("Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations "
             "since values are not present in the data, only references to them.");
     }
 
-    if (format != Format::PLAIN) {
-        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported format: " + std::string(to_string(format)));
+    if (encoding != Encoding::PLAIN) {
+        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported encoding: " + std::string(to_string(encoding)));
     }
 
     // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
@@ -207,16 +207,16 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
     const std::vector<RawValueBytes>& elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format) {
+    Encoding::type encoding) {
 
     // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
     // only references to them.
-    if (format == Format::RLE_DICTIONARY) {
-        throw DBPSUnsupportedException("Unsupported format: RLE_DICTIONARY is not supported for per-value operations");
+    if (encoding == Encoding::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException("Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations");
     }
 
-    if (format != Format::PLAIN) {
-        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported format: " + std::string(to_string(format)));
+    if (encoding != Encoding::PLAIN) {
+        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported encoding: " + std::string(to_string(encoding)));
     }
 
     // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
@@ -345,9 +345,9 @@ TypedListValues ParseValueBytesIntoTypedList(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format) {
+    Encoding::type encoding) {
     std::vector<RawValueBytes> raw_values =
-        SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, format);
+        SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, encoding);
     return BuildTypedListFromRawBytes(datatype, raw_values);
 }
 
@@ -355,7 +355,7 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     const TypedListValues& list,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format) {
+    Encoding::type encoding) {
     std::vector<RawValueBytes> raw_values = BuildRawBytesFromTypedListValues(list);
-    return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, format);
+    return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, encoding);
 }

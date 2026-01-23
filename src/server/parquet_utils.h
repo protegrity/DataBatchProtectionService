@@ -48,14 +48,14 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     const AttributesMap& encoding_attribs);
 
 /**
- * Slice a flat byte buffer into RawValueBytes elements according to datatype/format.
+ * Slice a flat byte buffer into RawValueBytes elements according to datatype/encoding.
  * This follows the Parquet specific encoding.
  */
 std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format);
+    Encoding::type encoding);
 
 /**
  * Combine RawValueBytes elements back into a flat value-bytes buffer.
@@ -64,7 +64,7 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
     const std::vector<RawValueBytes>& elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format);
+    Encoding::type encoding);
 
 /**
  * Decompresses and splits a Parquet page into level and value bytes.
@@ -87,36 +87,36 @@ std::vector<uint8_t> CompressAndJoin(
     const AttributesMap& encoding_attributes);
 
 /**
- * Parse the value bytes into a typed list based on the data type and format.
+ * Parse the value bytes into a typed list based on the data type and encoding.
  * 
  * @param bytes The value bytes to parse
  * @param datatype The data type of the values
  * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
- * @param format The format of the data (currently only PLAIN is supported)
+ * @param encoding The encoding of the data (currently only PLAIN is supported)
  * @return TypedListValues containing the parsed values
- * @throws DBPSUnsupportedException if format or datatype is unsupported
+ * @throws DBPSUnsupportedException if encoding or datatype is unsupported
  * @throws InvalidInputException if the data is invalid or malformed
  */
 TypedListValues ParseValueBytesIntoTypedList(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format);
+    Encoding::type encoding);
 
 /**
- * Convert a typed list back into value bytes based on the data type and format.
+ * Convert a typed list back into value bytes based on the data type and encoding.
  * This is the reverse operation of ParseValueBytesIntoTypedList.
  * 
  * @param list The typed list to convert
  * @param datatype The data type of the values
  * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
- * @param format The format of the data (currently only PLAIN is supported)
+ * @param encoding The encoding of the data (currently only PLAIN is supported)
  * @return std::vector<uint8_t> containing the serialized value bytes
- * @throws DBPSUnsupportedException if format or datatype is unsupported
+ * @throws DBPSUnsupportedException if encoding or datatype is unsupported
  * @throws InvalidInputException if the data is invalid or malformed
  */
 std::vector<uint8_t> GetTypedListAsValueBytes(
     const TypedListValues& list,
     Type::type datatype,
     const std::optional<int>& datatype_length,
-    Format::type format);
+    Encoding::type encoding);

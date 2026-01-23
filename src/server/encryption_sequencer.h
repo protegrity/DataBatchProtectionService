@@ -48,7 +48,7 @@ using namespace dbps::external;
  * - Validates supported parameter combinations (uncompressed, base64, plain)
  * - Provides comprehensive error reporting with stage and message tracking
  * 
- * Supports all data types, compression types, and formats.
+ * Supports all data types, compression types, and encodings.
  * 
  * The class takes constructor parameters that were previously public attributes in JsonRequest.
  */
@@ -71,7 +71,7 @@ public:
         Type::type datatype,
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
-        Format::type format,
+        Encoding::type encoding,
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
@@ -86,7 +86,7 @@ public:
         Type::type datatype,
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
-        Format::type format,
+        Encoding::type encoding,
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
@@ -112,7 +112,7 @@ protected:
     Type::type datatype_;
     std::optional<int> datatype_length_;
     CompressionCodec::type compression_;
-    Format::type format_;
+    Encoding::type encoding_;
     std::map<std::string, std::string> encoding_attributes_;
     CompressionCodec::type encrypted_compression_;
     std::string key_id_;
@@ -136,7 +136,7 @@ protected:
     /**
      * Performs comprehensive validation of all parameters and key_id.
      * Converts string parameters to enums, validates key_id, and checks supported combinations.
-     * Supports all data types, compression types, and formats.
+     * Supports all data types, compression types, and encodings.
      * Returns true if all validation passes, false otherwise.
      */
     bool ValidateParameters();

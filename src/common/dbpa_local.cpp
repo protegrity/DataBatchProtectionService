@@ -179,9 +179,9 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         return std::make_unique<LocalEncryptionResult>("initialization", *initialized_);
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Encrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         return std::make_unique<LocalEncryptionResult>("parameter_validation", "page_encoding not found or invalid in encoding_attributes");
     }
@@ -192,7 +192,7 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,
@@ -230,9 +230,9 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         return std::make_unique<LocalDecryptionResult>("initialization", *initialized_);
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Decrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         return std::make_unique<LocalDecryptionResult>("parameter_validation", "page_encoding not found or invalid in encoding_attributes");
     }
@@ -243,7 +243,7 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,

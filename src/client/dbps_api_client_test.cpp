@@ -236,7 +236,7 @@ TEST(DBPSApiClient, DecryptApiResponseGetResponsePlaintextWithValidData) {
     json_response.decrypted_value_ = StringToBytes("test@example.com");
     json_response.datatype_ = Type::BYTE_ARRAY;
     json_response.compression_ = CompressionCodec::UNCOMPRESSED;
-    json_response.format_ = Format::PLAIN;
+    json_response.encoding_ = Encoding::PLAIN;
     json_response.user_id_ = "test_user";
     json_response.role_ = "test_role";
     json_response.access_control_ = "test_access";
@@ -280,7 +280,7 @@ TEST(DBPSApiClient, EncryptWithValidData) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -325,7 +325,7 @@ TEST(DBPSApiClient, EncryptWithValidData) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -366,7 +366,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
             },
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -388,7 +388,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "access": {
@@ -417,7 +417,7 @@ TEST(DBPSApiClient, DecryptWithValidData) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -464,7 +464,7 @@ TEST(DBPSApiClient, EncryptWithInvalidData) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -494,7 +494,7 @@ TEST(DBPSApiClient, DecryptWithInvalidData) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -521,7 +521,7 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -560,7 +560,7 @@ TEST(DBPSApiClient, EncryptWithInvalidJsonResponse) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -585,7 +585,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
             },
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN"
+                "encoding": "PLAIN"
             }
         },
         "data_batch_encrypted": {
@@ -626,7 +626,7 @@ TEST(DBPSApiClient, DecryptWithInvalidJsonResponse) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         std::map<std::string, std::string>{}, // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
@@ -653,7 +653,7 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
             "value": "dGVzdEBleGFtcGxlLmNvbQ==",
             "value_format": {
                 "compression": "UNCOMPRESSED",
-                "format": "PLAIN",
+                "encoding": "PLAIN",
                 "encoding_attributes": {
                     "page_type": "DATA_PAGE",
                     "page_encoding": "PLAIN",
@@ -709,7 +709,7 @@ TEST(DBPSApiClient, EncryptWithEncodingAttributes) {
         Type::BYTE_ARRAY,           // datatype
         std::nullopt,               // datatype_length
         CompressionCodec::UNCOMPRESSED, // compression
-        Format::PLAIN,         // format
+        Encoding::PLAIN,         // encoding
         encoding_attributes,        // encoding_attributes
         CompressionCodec::UNCOMPRESSED, // encrypted_compression
         "test_key_123",             // key_id
