@@ -111,7 +111,6 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
 
 // Top level encryption/decryption methods.
 
-// TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
@@ -199,7 +198,6 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& 
     }
 }
 
-// TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
 bool DataBatchEncryptionSequencer::DecryptAndEncode(const std::vector<uint8_t>& ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
