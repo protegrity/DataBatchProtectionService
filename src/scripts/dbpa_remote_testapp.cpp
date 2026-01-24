@@ -29,7 +29,7 @@
 #include "../common/dbpa_remote.h"
 #include "../client/httplib_client.h"
 #include "../common/enums.h"
-#include "../server/compression_utils.h"
+#include "../processing/compression_utils.h"
 #include "../common/bytes_utils.h"
 #include "tcb/span.hpp"
 

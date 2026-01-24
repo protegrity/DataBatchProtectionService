@@ -20,7 +20,7 @@
 #include "../../common/enum_utils.h"
 #include <functional>
 #include <iostream>
-#include "../../common/value_encryption_utils.h"
+#include "../value_encryption_utils.h"
 
 using namespace dbps::value_encryption_utils;
 

@@ -125,8 +125,6 @@ include(GoogleTest)
 add_library(dbps_common_lib STATIC 
   src/common/json_request.cpp
   src/common/enum_utils.cpp
-  src/common/value_encryption_utils.cpp
-  src/common/typed_list_values.cpp
 )
 target_include_directories(dbps_common_lib PUBLIC
   src/common
@@ -137,15 +135,19 @@ target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 
 # Server components library
 add_library(dbps_server_lib STATIC 
-  src/server/encryption_sequencer.cpp
+  src/processing/encryption_sequencer.cpp
   src/server/auth_utils.cpp
-  src/server/parquet_utils.cpp
-  src/server/compression_utils.cpp
-  src/server/encryptors/basic_encryptor.cpp
+  src/processing/parquet_utils.cpp
+  src/processing/compression_utils.cpp
+  src/processing/value_encryption_utils.cpp
+  src/processing/typed_list_values.cpp
+  src/processing/encryptors/basic_encryptor.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
 target_include_directories(dbps_server_lib PUBLIC
   src/server
+  src/processing
+  src/processing/encryptors
   src/common
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/jwt-cpp-src/include
@@ -196,7 +198,7 @@ target_link_libraries(dbps_local_lib PUBLIC
   dbps_common_lib
 )
 target_include_directories(dbps_local_lib PUBLIC
-  src/server
+  src/processing
   ${CMAKE_BINARY_DIR}/_deps/crow-src/include
   ${CMAKE_BINARY_DIR}/_deps/cppcodec-src
   ${CMAKE_BINARY_DIR}/_deps/nlohmann_json-src/include
@@ -231,7 +233,7 @@ target_link_libraries(dbpa_remote_testapp
 )
 target_include_directories(dbpa_remote_testapp PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
-  src/server
+  src/processing
   ${CMAKE_BINARY_DIR}/_deps/snappy-src
 )
 
@@ -258,21 +260,23 @@ if(BUILD_TESTS)
   )
 
   # Value encryption utils tests
-  add_executable(value_encryption_utils_test src/common/value_encryption_utils_test.cpp)
+  add_executable(value_encryption_utils_test src/processing/value_encryption_utils_test.cpp)
   target_link_libraries(value_encryption_utils_test
+    dbps_server_lib
     dbps_common_lib
     gtest_main
   )
 
   # Typed list values tests
-  add_executable(typed_list_values_test src/common/typed_list_values_test.cpp)
+  add_executable(typed_list_values_test src/processing/typed_list_values_test.cpp)
   target_link_libraries(typed_list_values_test
+    dbps_server_lib
     dbps_common_lib
     gtest_main
   )
 
   # Encryption sequencer tests
-  add_executable(encryption_sequencer_test src/server/encryption_sequencer_test.cpp)
+  add_executable(encryption_sequencer_test src/processing/encryption_sequencer_test.cpp)
   target_link_libraries(encryption_sequencer_test 
     dbps_server_lib
     dbps_common_lib
@@ -280,13 +284,13 @@ if(BUILD_TESTS)
   )
 
   # Parquet utils tests
-  add_executable(parquet_utils_test src/server/parquet_utils_test.cpp)
+  add_executable(parquet_utils_test src/processing/parquet_utils_test.cpp)
   target_link_libraries(parquet_utils_test
     dbps_server_lib
     dbps_common_lib
     gtest_main
   )
-  target_include_directories(parquet_utils_test PRIVATE src/server)
+  target_include_directories(parquet_utils_test PRIVATE src/processing)
 
   # Bytes utils tests
   add_executable(bytes_utils_test src/common/bytes_utils_test.cpp)
@@ -298,22 +302,22 @@ if(BUILD_TESTS)
   target_include_directories(bytes_utils_test PRIVATE src/server src/common)
 
   # Compression utils tests
-  add_executable(compression_utils_test src/server/compression_utils_test.cpp)
+  add_executable(compression_utils_test src/processing/compression_utils_test.cpp)
   target_link_libraries(compression_utils_test
     dbps_server_lib
     dbps_common_lib
     gtest_main
   )
-  target_include_directories(compression_utils_test PRIVATE src/server)
+  target_include_directories(compression_utils_test PRIVATE src/processing)
 
   # Basic encryptor tests
-  add_executable(basic_encryptor_test src/server/encryptors/basic_encryptor_test.cpp)
+  add_executable(basic_encryptor_test src/processing/encryptors/basic_encryptor_test.cpp)
   target_link_libraries(basic_encryptor_test
     dbps_server_lib
     dbps_common_lib
     gtest_main
   )
-  target_include_directories(basic_encryptor_test PRIVATE src/server)
+  target_include_directories(basic_encryptor_test PRIVATE src/processing src/processing/encryptors)
 
   # Auth utils tests
   add_executable(auth_utils_test src/server/auth_utils_test.cpp)
