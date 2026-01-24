@@ -61,6 +61,9 @@ public:
     HttpResponse Get(const std::string& endpoint, bool auth_required = true);
     HttpResponse Post(const std::string& endpoint, const std::string& json_body, bool auth_required = true);
 
+    // Fetches a JWT if missing. Returns nullopt on success, error message otherwise.
+    std::optional<std::string> PrefetchToken();
+
 protected:
     explicit HttpClientBase(std::string base_url,
                                  ClientCredentials credentials = {})

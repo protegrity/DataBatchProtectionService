@@ -52,6 +52,7 @@ public:
     HeaderList last_get_headers;
     std::vector<HeaderList> get_headers_history;
     bool fail_first_get_with_401 = false;
+    bool fail_token_fetch = false;
 
 protected:
     HttpResponse DoGet(const std::string& endpoint, const HeaderList& headers) override {
@@ -72,6 +73,9 @@ protected:
         ++post_calls;
         if (endpoint == "/token") {
             ++token_calls;
+            if (fail_token_fetch) {
+                return HttpResponse(401, "", "Unauthorized");
+            }
             // Use far-future expiry so the cached token is always considered valid.
             const TokenResp* tr = nullptr;
             if (!token_responses_.empty()) {
@@ -170,6 +174,30 @@ TEST(HttpClientBaseTest, RetryOnceOn401FetchesNewTokenAndRetries) {
     ASSERT_NE(auth2, client.get_headers_history[1].end());
     ASSERT_EQ(auth1->second, "Bearer t1");
     ASSERT_EQ(auth2->second, "Bearer t2");
+}
+
+TEST(HttpClientBaseTest, PrefetchTokenFetchesAndCachesToken) {
+    FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
+    client.SetTokenResponse("prefetch", "Bearer", 4102444800);
+
+    auto error = client.PrefetchToken();
+    ASSERT_FALSE(error.has_value());
+    ASSERT_EQ(client.token_calls.load(), 1);
+
+    auto r = client.Get("/statusz");
+    ASSERT_TRUE(r.error_message.empty());
+    ASSERT_EQ(r.status_code, 200);
+    ASSERT_EQ(client.token_calls.load(), 1);
+}
+
+TEST(HttpClientBaseTest, PrefetchTokenReturnsErrorOnFailure) {
+    FakeHttpClient client({{"client_id", "clientA"}, {"api_key", "keyA"}});
+    client.fail_token_fetch = true;
+
+    auto error = client.PrefetchToken();
+    ASSERT_TRUE(error.has_value());
+    ASSERT_NE(error->find("status code: 401"), std::string::npos);
+    ASSERT_EQ(client.token_calls.load(), 1);
 }
 
 

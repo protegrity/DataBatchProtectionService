@@ -88,6 +88,18 @@ HttpClientBase::HttpResponse HttpClientBase::Post(const std::string& endpoint,
     return result;
 }
 
+std::optional<std::string> HttpClientBase::PrefetchToken() {
+    std::string error;
+    auto token_opt = EnsureValidToken(error);
+    if (!token_opt.has_value()) {
+        if (error.empty()) {
+            return std::string("Failed to fetch auth token");
+        }
+        return error;
+    }
+    return std::nullopt;
+}
+
 std::string HttpClientBase::AddAuthorizationHeader(HeaderList& headers) {
     // Get the valid token or an error message.
     std::string token_or_error;
