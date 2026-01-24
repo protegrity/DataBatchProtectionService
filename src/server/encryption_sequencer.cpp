@@ -112,7 +112,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
 // Top level encryption/decryption methods.
 
 // TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
-bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>& plaintext) {
+bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;
@@ -129,7 +129,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
     
     /*
      * Note on try-catch block:
-     * - When fully done, ConvertAndEncrypt will support per-value encryption for all cases, except for
+     * - When fully done, DecodeAndEncrypt will support per-value encryption for all cases, except for
      *   (1) BOOLEAN datatype and (2) RLE_DICTIONARY encoding.
      * - This try-catch block allows features to be developed incrementally until all features are
      *   complete: Compressions, Encodings, Page types, Datatypes.
@@ -200,7 +200,7 @@ bool DataBatchEncryptionSequencer::ConvertAndEncrypt(const std::vector<uint8_t>&
 }
 
 // TODO: Rename this method so it captures better the flow of decompress/encoding and encrypt/decrypt operations.
-bool DataBatchEncryptionSequencer::ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext) {
+bool DataBatchEncryptionSequencer::DecryptAndEncode(const std::vector<uint8_t>& ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;

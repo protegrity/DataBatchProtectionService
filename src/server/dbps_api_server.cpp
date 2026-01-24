@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
         );
         
         try {
-            bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
+            bool encrypt_result = sequencer.DecodeAndEncrypt(request.value_);
             if (!encrypt_result) {
                 return CreateErrorResponse("Encryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
             }
@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
         );
         
         try {
-            bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);
+            bool decrypt_result = sequencer.DecryptAndEncode(request.encrypted_value_);
             if (!decrypt_result) {
                 return CreateErrorResponse("Decryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
             }

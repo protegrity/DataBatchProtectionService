@@ -117,7 +117,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
         );
         
         // Test encryption
-        bool encrypt_result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool encrypt_result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(encrypt_result) << "Encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     }
     
@@ -132,8 +132,8 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
         );
         
         
-        bool result1 = sequencer1.ConvertAndEncrypt(HELLO_WORLD_DATA);
-        bool result2 = sequencer2.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result1 = sequencer1.DecodeAndEncrypt(HELLO_WORLD_DATA);
+        bool result2 = sequencer2.DecodeAndEncrypt(HELLO_WORLD_DATA);
         
         ASSERT_TRUE(result1);
         ASSERT_TRUE(result2);
@@ -150,8 +150,8 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
         );
         
         
-        bool result1 = sequencer1.ConvertAndEncrypt(HELLO_WORLD_DATA);
-        bool result2 = sequencer2.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result1 = sequencer1.DecodeAndEncrypt(HELLO_WORLD_DATA);
+        bool result2 = sequencer2.DecodeAndEncrypt(HELLO_WORLD_DATA);
         
         ASSERT_TRUE(result1);
         ASSERT_TRUE(result2);
@@ -164,7 +164,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
         );
         
         // This should fail because empty input is rejected
-        bool result = sequencer.ConvertAndEncrypt(EMPTY_DATA);
+        bool result = sequencer.DecodeAndEncrypt(EMPTY_DATA);
         EXPECT_FALSE(result) << "Empty data encryption should have failed";
     }
     
@@ -176,7 +176,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
         
         // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
         
-        bool result = sequencer.ConvertAndEncrypt(BINARY_DATA);
+        bool result = sequencer.DecodeAndEncrypt(BINARY_DATA);
         ASSERT_TRUE(result) << "Binary data encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     }
     
@@ -189,7 +189,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Valid parameters test failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     }
     
@@ -198,7 +198,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::GZIP, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result);
         EXPECT_TRUE(sequencer.error_stage_.empty());
     }
@@ -208,7 +208,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::UNDEFINED, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Encoding UNDEFINED should be supported: " << sequencer.error_message_;
         EXPECT_TRUE(sequencer.error_stage_.empty()) << "Unexpected error stage for supported encoding: " << sequencer.error_stage_;
     }
@@ -218,7 +218,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::RLE, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Encoding RLE should now be supported: " << sequencer.error_message_;
         EXPECT_TRUE(sequencer.error_stage_.empty()) << "Unexpected error stage for supported encoding (RLE): " << sequencer.error_stage_;
     }
@@ -232,7 +232,7 @@ TEST(EncryptionSequencer, InputValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(EMPTY_DATA);
+        bool result = sequencer.DecodeAndEncrypt(EMPTY_DATA);
         EXPECT_FALSE(result) << "Empty plaintext test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "validation") << "Wrong error stage for empty plaintext";
     }
@@ -242,7 +242,7 @@ TEST(EncryptionSequencer, InputValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndDecrypt(EMPTY_DATA);
+        bool result = sequencer.DecryptAndEncode(EMPTY_DATA);
         EXPECT_FALSE(result) << "Empty ciphertext test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "validation") << "Wrong error stage for empty ciphertext";
     }
@@ -252,7 +252,7 @@ TEST(EncryptionSequencer, InputValidation) {
         DataBatchEncryptionSequencer sequencer(
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "", "test_user", "{}", {}
         );
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         EXPECT_FALSE(result) << "Empty key_id test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "validation") << "Wrong error stage for empty key_id";
     }
@@ -263,7 +263,7 @@ TEST(EncryptionSequencer, InputValidation) {
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
             {}  // encryption_metadata, setting it to empty map.
         );
-        bool result = sequencer.ConvertAndDecrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecryptAndEncode(HELLO_WORLD_DATA);
         EXPECT_FALSE(result) << "Missing encryption_metadata test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "decrypt_version_check") << "Wrong error stage for missing encryption_metadata";
         EXPECT_TRUE(sequencer.error_message_.find("encryption_metadata must contain key") != std::string::npos) << "Wrong error message for missing encryption_metadata";
@@ -275,7 +275,7 @@ TEST(EncryptionSequencer, InputValidation) {
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
             {{"dbps_agent_version", "v0.09"}}  // encryption_metadata, setting it to incorrect version.
         );
-        bool result = sequencer.ConvertAndDecrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecryptAndEncode(HELLO_WORLD_DATA);
         EXPECT_FALSE(result) << "Incorrect encryption_metadata version test should have failed";
         EXPECT_EQ(sequencer.error_stage_, "decrypt_version_check") << "Wrong error stage for incorrect encryption_metadata version";
         EXPECT_TRUE(sequencer.error_message_.find("must match") != std::string::npos) << "Wrong error message for incorrect encryption_metadata version";
@@ -292,12 +292,12 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         );
         
         // Encrypt
-        bool encrypt_result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool encrypt_result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(encrypt_result) << "Round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
         ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
-        bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+        bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Verify the decrypted result matches the original
@@ -311,12 +311,12 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         );
         
         // Encrypt
-        bool encrypt_result = sequencer.ConvertAndEncrypt(BINARY_DATA);  // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
+        bool encrypt_result = sequencer.DecodeAndEncrypt(BINARY_DATA);  // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
         ASSERT_TRUE(encrypt_result) << "Binary round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
         ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
-        bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+        bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Binary round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Verify the decrypted result matches the original
@@ -332,12 +332,12 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         // "A"
         
         // Encrypt
-        bool encrypt_result = sequencer.ConvertAndEncrypt(SINGLE_CHAR_DATA);
+        bool encrypt_result = sequencer.DecodeAndEncrypt(SINGLE_CHAR_DATA);
         ASSERT_TRUE(encrypt_result) << "Single char round trip encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Decrypt the encrypted result - need encryption_metadata with dbps_agent_version
         ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
-        bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+        bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Single char round trip decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Verify the decrypted result matches the original
@@ -354,8 +354,8 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "key2", "test_user", "{}", {}
         );
         
-        bool result1 = sequencer1.ConvertAndEncrypt(HELLO_WORLD_DATA);
-        bool result2 = sequencer2.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result1 = sequencer1.DecodeAndEncrypt(HELLO_WORLD_DATA);
+        bool result2 = sequencer2.DecodeAndEncrypt(HELLO_WORLD_DATA);
         
         ASSERT_TRUE(result1);
         ASSERT_TRUE(result2);
@@ -366,8 +366,8 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
         // But both should decrypt back to the same original - need encryption_metadata with dbps_agent_version
         ASSERT_TRUE(sequencer1.encryption_metadata_.size() > 0 && sequencer1.encryption_metadata_.at("dbps_agent_version").length() > 0);
         ASSERT_TRUE(sequencer2.encryption_metadata_.size() > 0 && sequencer2.encryption_metadata_.at("dbps_agent_version").length() > 0);
-        bool decrypt1 = sequencer1.ConvertAndDecrypt(sequencer1.encrypted_result_);
-        bool decrypt2 = sequencer2.ConvertAndDecrypt(sequencer2.encrypted_result_);
+        bool decrypt1 = sequencer1.DecryptAndEncode(sequencer1.encrypted_result_);
+        bool decrypt2 = sequencer2.DecryptAndEncode(sequencer2.encrypted_result_);
         
         ASSERT_TRUE(decrypt1);
         ASSERT_TRUE(decrypt2);
@@ -385,7 +385,7 @@ TEST(EncryptionSequencer, ResultStorage) {
             "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Result storage encryption test failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Verify encrypted_result_ is not empty and is different from input
@@ -401,12 +401,12 @@ TEST(EncryptionSequencer, ResultStorage) {
         );
         
         // First encrypt something
-        bool encrypt_result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool encrypt_result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(encrypt_result) << "Result storage decryption test failed during encryption";
         
         // Then decrypt it - need encryption_metadata with dbps_agent_version
         ASSERT_TRUE(sequencer.encryption_metadata_.size() > 0 && sequencer.encryption_metadata_.at("dbps_agent_version").length() > 0);
-        bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+        bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
         ASSERT_TRUE(decrypt_result) << "Result storage decryption test failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
         
         // Verify decrypted_result_ is not empty and matches original
@@ -436,7 +436,7 @@ TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
         {}
     );
     
-    bool result = sequencer.ConvertAndEncrypt(boolean_data);
+    bool result = sequencer.DecodeAndEncrypt(boolean_data);
     ASSERT_TRUE(result) << "BOOLEAN encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     
     // Verify per-block encryption mode as used.
@@ -444,7 +444,7 @@ TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
     EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
     
     // Verify round-trip works
-    bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+    bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
     ASSERT_TRUE(decrypt_result) << "BOOLEAN decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     EXPECT_EQ(sequencer.decrypted_result_, boolean_data);
 }
@@ -468,7 +468,7 @@ TEST(EncryptionSequencer, RleDictionaryEncodingUsesPerBlockEncryption) {
         {}
     );
     
-    bool result = sequencer.ConvertAndEncrypt(rle_dict_data);
+    bool result = sequencer.DecodeAndEncrypt(rle_dict_data);
     ASSERT_TRUE(result) << "RLE_DICTIONARY encryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     
     // Verify it used per-block encryption mode
@@ -476,7 +476,7 @@ TEST(EncryptionSequencer, RleDictionaryEncodingUsesPerBlockEncryption) {
     EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_dict_page"), "per_block");
     
     // Verify round-trip works
-    bool decrypt_result = sequencer.ConvertAndDecrypt(sequencer.encrypted_result_);
+    bool decrypt_result = sequencer.DecryptAndEncode(sequencer.encrypted_result_);
     ASSERT_TRUE(decrypt_result) << "RLE_DICTIONARY decryption failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
     EXPECT_EQ(sequencer.decrypted_result_, rle_dict_data);
 }
@@ -490,7 +490,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
             "test_column", Type::FIXED_LEN_BYTE_ARRAY, datatype_length, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {}
         );
         
-        bool result = sequencer.ConvertAndEncrypt(HELLO_WORLD_DATA);
+        bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         if (result) {
             std::cout << "ERROR: Should have failed validation" << std::endl;
             return false;
@@ -512,7 +512,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
 
     // Test valid case (should pass parameter validation)
     DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {});
-    bool result = sequencer.ConvertAndEncrypt(FIXED_LEN_BYTE_ARRAY_DATA);
+    bool result = sequencer.DecodeAndEncrypt(FIXED_LEN_BYTE_ARRAY_DATA);
     
     if (!result && sequencer.error_stage_ == "parameter_validation") {
         ADD_FAILURE() << "Valid datatype_length should pass parameter validation";

@@ -103,8 +103,8 @@ public:
     ~DataBatchEncryptionSequencer() = default;
     
     // Main processing methods
-    bool ConvertAndEncrypt(const std::vector<uint8_t>& plaintext);
-    bool ConvertAndDecrypt(const std::vector<uint8_t>& ciphertext);
+    bool DecodeAndEncrypt(const std::vector<uint8_t>& plaintext);
+    bool DecryptAndEncode(const std::vector<uint8_t>& ciphertext);
 
 protected:
     // Parameters for encryption/decryption operations
