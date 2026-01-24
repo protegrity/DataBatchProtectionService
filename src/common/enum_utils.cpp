@@ -96,29 +96,29 @@ std::optional<C> to_compression_enum(std::string_view s) {
     return lookup::from_string_impl<C>(s, kCodecPairs);
 }
 
-// For dbps::external::Format
+// For dbps::external::Encoding
 namespace {
-using F = ::dbps::external::Format::type;
-inline constexpr std::array<std::pair<F, std::string_view>, 11> kFormatPairs{{
-    {F::PLAIN, "PLAIN"},
-    {F::PLAIN_DICTIONARY, "PLAIN_DICTIONARY"},
-    {F::RLE, "RLE"},
-    {F::BIT_PACKED, "BIT_PACKED"},
-    {F::DELTA_BINARY_PACKED, "DELTA_BINARY_PACKED"},
-    {F::DELTA_LENGTH_BYTE_ARRAY, "DELTA_LENGTH_BYTE_ARRAY"},
-    {F::DELTA_BYTE_ARRAY, "DELTA_BYTE_ARRAY"},
-    {F::RLE_DICTIONARY, "RLE_DICTIONARY"},
-    {F::BYTE_STREAM_SPLIT, "BYTE_STREAM_SPLIT"},
-    {F::UNDEFINED, "UNDEFINED"},
-    {F::UNKNOWN, "UNKNOWN"},
+using E = ::dbps::external::Encoding::type;
+inline constexpr std::array<std::pair<E, std::string_view>, 11> kEncodingPairs{{
+    {E::PLAIN, "PLAIN"},
+    {E::PLAIN_DICTIONARY, "PLAIN_DICTIONARY"},
+    {E::RLE, "RLE"},
+    {E::BIT_PACKED, "BIT_PACKED"},
+    {E::DELTA_BINARY_PACKED, "DELTA_BINARY_PACKED"},
+    {E::DELTA_LENGTH_BYTE_ARRAY, "DELTA_LENGTH_BYTE_ARRAY"},
+    {E::DELTA_BYTE_ARRAY, "DELTA_BYTE_ARRAY"},
+    {E::RLE_DICTIONARY, "RLE_DICTIONARY"},
+    {E::BYTE_STREAM_SPLIT, "BYTE_STREAM_SPLIT"},
+    {E::UNDEFINED, "UNDEFINED"},
+    {E::UNKNOWN, "UNKNOWN"},
 }};
 } // anon
 
-std::string_view to_string(F v) {
-    return lookup::to_string_impl(v, kFormatPairs);
+std::string_view to_string(E v) {
+    return lookup::to_string_impl(v, kEncodingPairs);
 }
-std::optional<F> to_format_enum(std::string_view s) {
-    return lookup::from_string_impl<F>(s, kFormatPairs);
+std::optional<E> to_encoding_enum(std::string_view s) {
+    return lookup::from_string_impl<E>(s, kEncodingPairs);
 }
 
 }

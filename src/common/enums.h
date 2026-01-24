@@ -53,11 +53,10 @@ struct CompressionCodec {
     };
 };
 
-// Format for data values
+// Encoding for data values
 // Intentionally similar to parquet::Encoding to ease mapping and for compatibility with a known enum.
 // Originally defined in Arrow codebase: arrow/blob/main/cpp/src/parquet/types.h
-// TODO: Rename to Encoding to match parquet::Encoding (as a further cleanup)
-struct Format {
+struct Encoding {
     enum type {
         PLAIN = 0,
         PLAIN_DICTIONARY = 2,

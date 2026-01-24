@@ -165,79 +165,78 @@ TEST(EnumUtils, CompressionCodecInvalidFromString) {
     ASSERT_FALSE(result.has_value());
 }
 
-// Test Format enum conversions
-TEST(EnumUtils, FormatToStringConversion) {
-    ASSERT_EQ("PLAIN", std::string(to_string(Format::PLAIN)));
-    ASSERT_EQ("PLAIN_DICTIONARY", std::string(to_string(Format::PLAIN_DICTIONARY)));
-    ASSERT_EQ("RLE", std::string(to_string(Format::RLE)));
-    ASSERT_EQ("BIT_PACKED", std::string(to_string(Format::BIT_PACKED)));
-    ASSERT_EQ("DELTA_BINARY_PACKED", std::string(to_string(Format::DELTA_BINARY_PACKED)));
-    ASSERT_EQ("DELTA_LENGTH_BYTE_ARRAY", std::string(to_string(Format::DELTA_LENGTH_BYTE_ARRAY)));
-    ASSERT_EQ("DELTA_BYTE_ARRAY", std::string(to_string(Format::DELTA_BYTE_ARRAY)));
-    ASSERT_EQ("RLE_DICTIONARY", std::string(to_string(Format::RLE_DICTIONARY)));
-    ASSERT_EQ("BYTE_STREAM_SPLIT", std::string(to_string(Format::BYTE_STREAM_SPLIT)));
-    ASSERT_EQ("UNDEFINED", std::string(to_string(Format::UNDEFINED)));
-    ASSERT_EQ("UNKNOWN", std::string(to_string(Format::UNKNOWN)));
+// Test Encoding enum conversions
+TEST(EnumUtils, EncodingToStringConversion) {
+    ASSERT_EQ("PLAIN", std::string(to_string(Encoding::PLAIN)));
+    ASSERT_EQ("PLAIN_DICTIONARY", std::string(to_string(Encoding::PLAIN_DICTIONARY)));
+    ASSERT_EQ("RLE", std::string(to_string(Encoding::RLE)));
+    ASSERT_EQ("BIT_PACKED", std::string(to_string(Encoding::BIT_PACKED)));
+    ASSERT_EQ("DELTA_BINARY_PACKED", std::string(to_string(Encoding::DELTA_BINARY_PACKED)));
+    ASSERT_EQ("DELTA_LENGTH_BYTE_ARRAY", std::string(to_string(Encoding::DELTA_LENGTH_BYTE_ARRAY)));
+    ASSERT_EQ("DELTA_BYTE_ARRAY", std::string(to_string(Encoding::DELTA_BYTE_ARRAY)));
+    ASSERT_EQ("RLE_DICTIONARY", std::string(to_string(Encoding::RLE_DICTIONARY)));
+    ASSERT_EQ("BYTE_STREAM_SPLIT", std::string(to_string(Encoding::BYTE_STREAM_SPLIT)));
+    ASSERT_EQ("UNDEFINED", std::string(to_string(Encoding::UNDEFINED)));
+    ASSERT_EQ("UNKNOWN", std::string(to_string(Encoding::UNKNOWN)));
 }
 
-TEST(EnumUtils, FormatFromStringConversion) {
-    auto result = to_format_enum("PLAIN");
+TEST(EnumUtils, EncodingFromStringConversion) {
+    auto result = to_encoding_enum("PLAIN");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::PLAIN, result.value());
+    ASSERT_EQ(Encoding::PLAIN, result.value());
     
-    result = to_format_enum("PLAIN_DICTIONARY");
+    result = to_encoding_enum("PLAIN_DICTIONARY");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::PLAIN_DICTIONARY, result.value());
+    ASSERT_EQ(Encoding::PLAIN_DICTIONARY, result.value());
     
-    result = to_format_enum("RLE");
+    result = to_encoding_enum("RLE");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::RLE, result.value());
+    ASSERT_EQ(Encoding::RLE, result.value());
     
-    result = to_format_enum("BIT_PACKED");
+    result = to_encoding_enum("BIT_PACKED");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::BIT_PACKED, result.value());
+    ASSERT_EQ(Encoding::BIT_PACKED, result.value());
     
-    result = to_format_enum("DELTA_BINARY_PACKED");
+    result = to_encoding_enum("DELTA_BINARY_PACKED");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::DELTA_BINARY_PACKED, result.value());
+    ASSERT_EQ(Encoding::DELTA_BINARY_PACKED, result.value());
     
-    result = to_format_enum("DELTA_LENGTH_BYTE_ARRAY");
+    result = to_encoding_enum("DELTA_LENGTH_BYTE_ARRAY");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::DELTA_LENGTH_BYTE_ARRAY, result.value());
+    ASSERT_EQ(Encoding::DELTA_LENGTH_BYTE_ARRAY, result.value());
     
-    result = to_format_enum("DELTA_BYTE_ARRAY");
+    result = to_encoding_enum("DELTA_BYTE_ARRAY");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::DELTA_BYTE_ARRAY, result.value());
+    ASSERT_EQ(Encoding::DELTA_BYTE_ARRAY, result.value());
     
-    result = to_format_enum("RLE_DICTIONARY");
+    result = to_encoding_enum("RLE_DICTIONARY");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::RLE_DICTIONARY, result.value());
+    ASSERT_EQ(Encoding::RLE_DICTIONARY, result.value());
     
-    result = to_format_enum("BYTE_STREAM_SPLIT");
+    result = to_encoding_enum("BYTE_STREAM_SPLIT");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::BYTE_STREAM_SPLIT, result.value());
+    ASSERT_EQ(Encoding::BYTE_STREAM_SPLIT, result.value());
     
-    result = to_format_enum("UNDEFINED");
+    result = to_encoding_enum("UNDEFINED");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::UNDEFINED, result.value());
+    ASSERT_EQ(Encoding::UNDEFINED, result.value());
     
-    result = to_format_enum("UNKNOWN");
+    result = to_encoding_enum("UNKNOWN");
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Format::UNKNOWN, result.value());
+    ASSERT_EQ(Encoding::UNKNOWN, result.value());
 }
 
-TEST(EnumUtils, FormatInvalidFromString) {
-    auto result = to_format_enum("INVALID");
+TEST(EnumUtils, EncodingInvalidFromString) {
+    auto result = to_encoding_enum("INVALID");
     ASSERT_FALSE(result.has_value());
     
-    
-    result = to_format_enum("RAWC_DATA");  // missing underscore
+    result = to_encoding_enum("RAWC_DATA");  // missing underscore
     ASSERT_FALSE(result.has_value());
     
-    result = to_format_enum("");
+    result = to_encoding_enum("");
     ASSERT_FALSE(result.has_value());
     
-    result = to_format_enum("XML");  // common format
+    result = to_encoding_enum("XML");  // common encoding
     ASSERT_FALSE(result.has_value());
 }
 
@@ -275,17 +274,17 @@ TEST(EnumUtils, RoundTripCompressionCodecConversion) {
     }
 }
 
-TEST(EnumUtils, RoundTripFormatConversion) {
-    // Test all Format enum values
-    Format::type formats[] = {
-        Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
+TEST(EnumUtils, RoundTripEncodingConversion) {
+    // Test all Encoding enum values
+    Encoding::type encodings[] = {
+        Encoding::PLAIN, Encoding::PLAIN_DICTIONARY, Encoding::RLE, Encoding::BIT_PACKED, Encoding::DELTA_BINARY_PACKED, Encoding::DELTA_LENGTH_BYTE_ARRAY, Encoding::DELTA_BYTE_ARRAY, Encoding::RLE_DICTIONARY, Encoding::BYTE_STREAM_SPLIT, Encoding::UNDEFINED, Encoding::UNKNOWN
     };
     
-    for (auto format : formats) {
-        auto str = to_string(format);
-        auto converted = to_format_enum(str);
+    for (auto encoding : encodings) {
+        auto str = to_string(encoding);
+        auto converted = to_encoding_enum(str);
         ASSERT_TRUE(converted.has_value());
-        ASSERT_EQ(format, converted.value());
+        ASSERT_EQ(encoding, converted.value());
     }
 }
 
@@ -294,7 +293,7 @@ TEST(EnumUtils, RoundTripFormatConversion) {
 TEST(EnumUtils, EmptyStringHandling) {
     ASSERT_FALSE(to_datatype_enum("").has_value());
     ASSERT_FALSE(to_compression_enum("").has_value());
-    ASSERT_FALSE(to_format_enum("").has_value());
+    ASSERT_FALSE(to_encoding_enum("").has_value());
 }
 
 TEST(EnumUtils, WhitespaceHandling) {
@@ -336,11 +335,11 @@ TEST(EnumUtils, RuntimeEvaluation) {
     // Test runtime evaluation of the functions
     auto type_str = to_string(Type::BYTE_ARRAY);
     auto codec_str = to_string(CompressionCodec::BZ2);
-    auto format_str = to_string(Format::RLE);
+    auto encoding_str = to_string(Encoding::RLE);
     // Verify the results
     ASSERT_EQ("BYTE_ARRAY", std::string(type_str));
     ASSERT_EQ("BZ2", std::string(codec_str));
-    ASSERT_EQ("RLE", std::string(format_str));
+    ASSERT_EQ("RLE", std::string(encoding_str));
 }
 
 // Protection tests: ensure enum_utils stays in sync with enum definitions
@@ -382,20 +381,20 @@ TEST(EnumUtils, CompressionCodecEnumCompleteness) {
     }
 }
 
-TEST(EnumUtils, FormatEnumCompleteness) {
-    // Define all known Format enum values
-    Format::type all_formats[] = {
-        Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
+TEST(EnumUtils, EncodingEnumCompleteness) {
+    // Define all known Encoding enum values
+    Encoding::type all_encodings[] = {
+        Encoding::PLAIN, Encoding::PLAIN_DICTIONARY, Encoding::RLE, Encoding::BIT_PACKED, Encoding::DELTA_BINARY_PACKED, Encoding::DELTA_LENGTH_BYTE_ARRAY, Encoding::DELTA_BYTE_ARRAY, Encoding::RLE_DICTIONARY, Encoding::BYTE_STREAM_SPLIT, Encoding::UNDEFINED, Encoding::UNKNOWN
     };
     
     // Test that every enum value can be converted to string and back
-    for (auto format : all_formats) {
-        auto str = to_string(format);
+    for (auto encoding : all_encodings) {
+        auto str = to_string(encoding);
         ASSERT_TRUE(str != "UNKNOWN_ENUM");  // Should not return UNKNOWN_ENUM for valid enum
         
-        auto converted = to_format_enum(str);
+        auto converted = to_encoding_enum(str);
         ASSERT_TRUE(converted.has_value());
-        ASSERT_EQ(format, converted.value());
+        ASSERT_EQ(encoding, converted.value());
     }
 }
 
@@ -403,7 +402,7 @@ TEST(EnumUtils, StringUniqueness) {
     // Test that all string representations are unique
     std::set<std::string> type_strings;
     std::set<std::string> codec_strings;
-    std::set<std::string> format_strings;
+    std::set<std::string> encoding_strings;
     // Collect all Type strings
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
@@ -426,14 +425,14 @@ TEST(EnumUtils, StringUniqueness) {
     }
     ASSERT_EQ(10, codec_strings.size());  // All strings should be unique
     
-    // Collect all Format strings
-    Format::type all_formats[] = {
-        Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
+    // Collect all Encoding strings
+    Encoding::type all_encodings[] = {
+        Encoding::PLAIN, Encoding::PLAIN_DICTIONARY, Encoding::RLE, Encoding::BIT_PACKED, Encoding::DELTA_BINARY_PACKED, Encoding::DELTA_LENGTH_BYTE_ARRAY, Encoding::DELTA_BYTE_ARRAY, Encoding::RLE_DICTIONARY, Encoding::BYTE_STREAM_SPLIT, Encoding::UNDEFINED, Encoding::UNKNOWN
     };
-    for (auto format : all_formats) {
-        format_strings.insert(std::string(to_string(format)));
+    for (auto encoding : all_encodings) {
+        encoding_strings.insert(std::string(to_string(encoding)));
     }
-    ASSERT_EQ(11, format_strings.size());  // All strings should be unique
+    ASSERT_EQ(11, encoding_strings.size());  // All strings should be unique
     
 }
 
@@ -461,19 +460,19 @@ TEST(EnumUtils, CrossEnumStringCollision) {
         all_strings.insert(std::string(to_string(codec)));
     }
     
-    Format::type all_formats[] = {
-        Format::PLAIN, Format::PLAIN_DICTIONARY, Format::RLE, Format::BIT_PACKED, Format::DELTA_BINARY_PACKED, Format::DELTA_LENGTH_BYTE_ARRAY, Format::DELTA_BYTE_ARRAY, Format::RLE_DICTIONARY, Format::BYTE_STREAM_SPLIT, Format::UNDEFINED, Format::UNKNOWN
+    Encoding::type all_encodings[] = {
+        Encoding::PLAIN, Encoding::PLAIN_DICTIONARY, Encoding::RLE, Encoding::BIT_PACKED, Encoding::DELTA_BINARY_PACKED, Encoding::DELTA_LENGTH_BYTE_ARRAY, Encoding::DELTA_BYTE_ARRAY, Encoding::RLE_DICTIONARY, Encoding::BYTE_STREAM_SPLIT, Encoding::UNDEFINED, Encoding::UNKNOWN
     };
-    for (auto format : all_formats) {
-        all_strings.insert(std::string(to_string(format)));
+    for (auto encoding : all_encodings) {
+        all_strings.insert(std::string(to_string(encoding)));
     }
     
     // Verify two equally named enums are handled correctly.
     ASSERT_EQ("UNDEFINED", std::string(to_string(Type::UNDEFINED)));
-    ASSERT_EQ("UNDEFINED", std::string(to_string(Format::UNDEFINED)));
+    ASSERT_EQ("UNDEFINED", std::string(to_string(Encoding::UNDEFINED)));
     
     // Total should be 9 + 10 + 11 = 30 unique strings, but we have 1 collision
-    // (Type::UNDEFINED and Format::UNDEFINED both map to "UNDEFINED")
+    // (Type::UNDEFINED and Encoding::UNDEFINED both map to "UNDEFINED")
     // So we expect 29 unique strings
     ASSERT_EQ(29, all_strings.size());
 }

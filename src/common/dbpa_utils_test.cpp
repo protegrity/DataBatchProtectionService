@@ -87,7 +87,7 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_ValidPlainEncoding) {
     auto result = ExtractPageEncoding(encoding_attributes);
     
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), Format::PLAIN);
+    EXPECT_EQ(result.value(), Encoding::PLAIN);
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_ValidRLEEncoding) {
@@ -95,7 +95,7 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_ValidRLEEncoding) {
     auto result = ExtractPageEncoding(encoding_attributes);
     
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), Format::RLE);
+    EXPECT_EQ(result.value(), Encoding::RLE);
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_ValidDeltaBinaryPackedEncoding) {
@@ -103,7 +103,7 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_ValidDeltaBinaryPackedEncoding) {
     auto result = ExtractPageEncoding(encoding_attributes);
     
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), Format::DELTA_BINARY_PACKED);
+    EXPECT_EQ(result.value(), Encoding::DELTA_BINARY_PACKED);
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_WithOtherAttributes) {
@@ -115,7 +115,7 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_WithOtherAttributes) {
     auto result = ExtractPageEncoding(encoding_attributes);
     
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), Format::PLAIN);
+    EXPECT_EQ(result.value(), Encoding::PLAIN);
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_MissingPageEncodingKey) {
@@ -136,7 +136,7 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_EmptyMap) {
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_InvalidEncodingValue) {
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "INVALID_FORMAT"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "INVALID_ENCODING"}};
     auto result = ExtractPageEncoding(encoding_attributes);
     
     EXPECT_FALSE(result.has_value());
@@ -150,11 +150,11 @@ TEST(DBPAUtilsTest, ExtractPageEncoding_EmptyEncodingValue) {
 }
 
 TEST(DBPAUtilsTest, ExtractPageEncoding_CaseSensitivity) {
-    // Assuming the to_format_enum is case-sensitive
+    // Assuming the to_encoding_enum is case-sensitive
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "plain"}};
     auto result = ExtractPageEncoding(encoding_attributes);
     
-    // This test depends on whether to_format_enum is case-sensitive
+    // This test depends on whether to_encoding_enum is case-sensitive
     // If it's case-sensitive, this should fail
     // Adjust expectation based on actual implementation
     EXPECT_FALSE(result.has_value());

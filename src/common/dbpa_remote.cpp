@@ -258,9 +258,9 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         return std::make_unique<RemoteEncryptionResult>(std::move(empty_response));
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Encrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         auto empty_response = std::make_unique<EncryptApiResponse>();
         empty_response->SetApiClientError("page_encoding not found or invalid in encoding_attributes");
@@ -274,7 +274,7 @@ std::unique_ptr<EncryptionResult> RemoteDataBatchProtectionAgent::Encrypt(span<c
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,
@@ -314,9 +314,9 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         return std::make_unique<RemoteDecryptionResult>(std::move(empty_response));
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: RemoteDataBatchProtectionAgent::Decrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         auto empty_response = std::make_unique<DecryptApiResponse>();
         empty_response->SetApiClientError("page_encoding not found or invalid in encoding_attributes");
@@ -330,7 +330,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,
@@ -341,7 +341,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     );
 
     // Validate that response fields match request fields
-    // TODO: Add validation for format when these are expanded beyond PLAIN.
+    // TODO: Add validation for encoding when these are expanded beyond PLAIN.
     if (response.Success()) {
         const auto& response_attrs = response.GetResponseAttributes();
         

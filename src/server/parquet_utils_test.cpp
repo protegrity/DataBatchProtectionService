@@ -163,7 +163,7 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_INT32) {
     std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
     
-    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN);
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
     
     auto* int32_values = std::get_if<std::vector<int32_t>>(&result);
     ASSERT_NE(nullptr, int32_values);
@@ -175,7 +175,7 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_INT64) {
     std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int64_t));
     
-    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT64, std::nullopt, Format::PLAIN);
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::INT64, std::nullopt, Encoding::PLAIN);
     
     auto* int64_values = std::get_if<std::vector<int64_t>>(&result);
     ASSERT_NE(nullptr, int64_values);
@@ -195,7 +195,7 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
                  reinterpret_cast<const uint8_t*>(&len2) + sizeof(len2));
     bytes.insert(bytes.end(), {'w', 'o', 'r', 'l', 'd'});
     
-    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     
     auto* string_values = std::get_if<std::vector<std::string>>(&result);
     ASSERT_NE(nullptr, string_values);
@@ -207,7 +207,7 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_BYTE_ARRAY) {
 TEST(ParquetUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
     std::vector<uint8_t> bytes = {'a', 'b', 'c', 'x', 'y', 'z'}; // Two 3-byte strings
     
-    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN);
+    TypedListValues result = ParseValueBytesIntoTypedList(bytes, Type::FIXED_LEN_BYTE_ARRAY, 3, Encoding::PLAIN);
     
     auto* string_values = std::get_if<std::vector<std::string>>(&result);
     ASSERT_NE(nullptr, string_values);
@@ -216,28 +216,28 @@ TEST(ParquetUtils, ParseValueBytesIntoTypedList_FIXED_LEN_BYTE_ARRAY) {
     EXPECT_EQ("xyz", (*string_values)[1]);
 }
 
-TEST(ParquetUtils, ParseValueBytesIntoTypedList_UnsupportedFormat) {
+TEST(ParquetUtils, ParseValueBytesIntoTypedList_UnsupportedEncoding) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
-    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::RLE), 
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Encoding::RLE), 
                  DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, ParseValueBytesIntoTypedList_BOOLEAN_Throws) {
     // BOOLEAN type is not supported for per-value parsing
     std::vector<uint8_t> bytes = {0xB4};  // 8 boolean values bit-packed
-    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
                  DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, ParseValueBytesIntoTypedList_InvalidDataSize) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03}; // 3 bytes, not divisible by sizeof(int32_t)
-    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Format::PLAIN), 
+    EXPECT_THROW(ParseValueBytesIntoTypedList(bytes, Type::INT32, std::nullopt, Encoding::PLAIN), 
                  InvalidInputException);
 }
 
 TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT32) {
     std::vector<uint8_t> bytes = {0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A};
-    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Format::PLAIN);
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
     ASSERT_EQ(out.size(), 2u);
     EXPECT_EQ(out[0], (std::vector<uint8_t>{0x04,0x03,0x02,0x01}));
     EXPECT_EQ(out[1], (std::vector<uint8_t>{0x0D,0x0C,0x0B,0x0A}));
@@ -247,7 +247,7 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BOOLEAN_Throws) {
     // BOOLEAN is bit-packed and not supported for per-value slicing
     std::vector<uint8_t> bytes = {0xB4};  // 8 boolean values bit-packed
     EXPECT_THROW(
-        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
         DBPSUnsupportedException);
 }
 
@@ -255,7 +255,7 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BOOLEAN_MultipleBytes_Throws) {
     // Multiple bytes of boolean data
     std::vector<uint8_t> bytes = {0xFF, 0x00, 0xAA, 0x55};  // 32 boolean values
     EXPECT_THROW(
-        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        SliceValueBytesIntoRawBytes(bytes, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
         DBPSUnsupportedException);
 }
 
@@ -265,7 +265,7 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_INT96) {
         0x05,0x06,0x07,0x08,
         0x09,0x0A,0x0B,0x0C
     };
-    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT96, std::nullopt, Format::PLAIN);
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::INT96, std::nullopt, Encoding::PLAIN);
     ASSERT_EQ(out.size(), 1u);
     EXPECT_EQ(out[0], bytes);
 }
@@ -277,7 +277,7 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
     append_u32_le(bytes, 3);
     bytes.insert(bytes.end(), {'x','y','z'});
 
-    auto out = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    auto out = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     ASSERT_EQ(out.size(), 2u);
     EXPECT_EQ(out[0], (std::vector<uint8_t>{'h','i'}));
     EXPECT_EQ(out[1], (std::vector<uint8_t>{'x','y','z'}));
@@ -286,21 +286,21 @@ TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY) {
 TEST(ParquetUtils, SliceValueBytesIntoRawBytes_BYTE_ARRAY_Truncated) {
     std::vector<uint8_t> bytes = {0x04,0x00,0x00,0x00, 'a','b','c'};
     EXPECT_THROW(
-        SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN),
+        SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN),
         InvalidInputException);
 }
 
 TEST(ParquetUtils, SliceValueBytesIntoRawBytes_FixedSizeMisaligned) {
     std::vector<uint8_t> bytes = {0x00,0x01,0x02}; // not divisible by 8 for INT64
     EXPECT_THROW(
-        SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Format::PLAIN),
+        SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Encoding::PLAIN),
         InvalidInputException);
 }
 
-TEST(ParquetUtils, SliceValueBytesIntoRawBytes_UnsupportedFormat) {
+TEST(ParquetUtils, SliceValueBytesIntoRawBytes_UnsupportedEncoding) {
     std::vector<uint8_t> bytes = {0x01,0x00,0x00,0x00};
     EXPECT_THROW(
-        SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Format::RLE),
+        SliceValueBytesIntoRawBytes(bytes, Type::INT32, std::nullopt, Encoding::RLE),
         DBPSUnsupportedException);
 }
 
@@ -309,7 +309,7 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_INT32) {
         {0x04,0x03,0x02,0x01},
         {0x0D,0x0C,0x0B,0x0A}
     };
-    auto out = CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Format::PLAIN);
+    auto out = CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Encoding::PLAIN);
     EXPECT_EQ(out, (std::vector<uint8_t>{0x04,0x03,0x02,0x01, 0x0D,0x0C,0x0B,0x0A}));
 }
 
@@ -320,7 +320,7 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BOOLEAN_Throws) {
         {0x00}
     };
     EXPECT_THROW(
-        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
         DBPSUnsupportedException);
 }
 
@@ -328,7 +328,7 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BOOLEAN_EmptyInput_Throws) {
     // Even empty input should throw for BOOLEAN type
     std::vector<RawValueBytes> elems;
     EXPECT_THROW(
-        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Format::PLAIN),
+        CombineRawBytesIntoValueBytes(elems, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
         DBPSUnsupportedException);
 }
 
@@ -337,7 +337,7 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
         {'h','i'},
         {'x','y','z'}
     };
-    auto out = CombineRawBytesIntoValueBytes(elems, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    auto out = CombineRawBytesIntoValueBytes(elems, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     // Expect [len=2][hi][len=3][xyz]
     std::vector<uint8_t> expected;
     append_u32_le(expected, 2);
@@ -354,16 +354,16 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismat
         {'x','y','z'}
     };
     EXPECT_THROW(
-        CombineRawBytesIntoValueBytes(elems, Type::FIXED_LEN_BYTE_ARRAY, 3, Format::PLAIN),
+        CombineRawBytesIntoValueBytes(elems, Type::FIXED_LEN_BYTE_ARRAY, 3, Encoding::PLAIN),
         InvalidInputException);
 }
 
-TEST(ParquetUtils, CombineRawBytesIntoValueBytes_UnsupportedFormat) {
+TEST(ParquetUtils, CombineRawBytesIntoValueBytes_UnsupportedEncoding) {
     std::vector<RawValueBytes> elems = {
         {0x04,0x03,0x02,0x01}
     };
     EXPECT_THROW(
-        CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Format::RLE),
+        CombineRawBytesIntoValueBytes(elems, Type::INT32, std::nullopt, Encoding::RLE),
         DBPSUnsupportedException);
 }
 
@@ -373,8 +373,8 @@ TEST(ParquetUtils, SliceAndCombine_RoundTrip_INT64) {
         0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
         0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     };
-    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Format::PLAIN);
-    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::INT64, std::nullopt, Format::PLAIN);
+    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::INT64, std::nullopt, Encoding::PLAIN);
+    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::INT64, std::nullopt, Encoding::PLAIN);
     EXPECT_EQ(bytes, combined);
 }
 
@@ -386,8 +386,8 @@ TEST(ParquetUtils, SliceAndCombine_RoundTrip_BYTE_ARRAY) {
     append_u32_le(bytes, 4);
     bytes.insert(bytes.end(), {'b','a','r','!'});
 
-    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
-    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::BYTE_ARRAY, std::nullopt, Format::PLAIN);
+    auto sliced = SliceValueBytesIntoRawBytes(bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+    auto combined = CombineRawBytesIntoValueBytes(sliced, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     EXPECT_EQ(bytes, combined);
 }
 

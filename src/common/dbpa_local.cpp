@@ -179,9 +179,9 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         return std::make_unique<LocalEncryptionResult>("initialization", *initialized_);
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Encrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         return std::make_unique<LocalEncryptionResult>("parameter_validation", "page_encoding not found or invalid in encoding_attributes");
     }
@@ -192,7 +192,7 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,
@@ -205,7 +205,7 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
     std::vector<uint8_t> plaintext_vec(plaintext.begin(), plaintext.end());
     
     // Call the sequencer to encrypt
-    bool encrypt_result = sequencer.ConvertAndEncrypt(plaintext_vec);
+    bool encrypt_result = sequencer.DecodeAndEncrypt(plaintext_vec);
     if (!encrypt_result) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Encrypt() - Encryption failed: " 
                   << sequencer.error_stage_ << " - " << sequencer.error_message_ << std::endl;
@@ -230,9 +230,9 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         return std::make_unique<LocalDecryptionResult>("initialization", *initialized_);
     }
     
-    // Extract page_encoding from encoding_attributes and convert to Format::type
-    auto format_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
-    if (!format_opt.has_value()) {
+    // Extract page_encoding from encoding_attributes and convert to Encoding::type
+    auto encoding_opt = dbps::external::ExtractPageEncoding(encoding_attributes);
+    if (!encoding_opt.has_value()) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Decrypt() - page_encoding not found or invalid in encoding_attributes." << std::endl;
         return std::make_unique<LocalDecryptionResult>("parameter_validation", "page_encoding not found or invalid in encoding_attributes");
     }
@@ -243,7 +243,7 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         datatype_,
         datatype_length_,
         compression_type_,
-        format_opt.value(),
+        encoding_opt.value(),
         encoding_attributes,
         compression_type_,
         column_key_id_,
@@ -256,7 +256,7 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
     std::vector<uint8_t> ciphertext_vec(ciphertext.begin(), ciphertext.end());
     
     // Call the sequencer to decrypt
-    bool decrypt_result = sequencer.ConvertAndDecrypt(ciphertext_vec);
+    bool decrypt_result = sequencer.DecryptAndEncode(ciphertext_vec);
     if (!decrypt_result) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Decrypt() - Decryption failed: " 
                   << sequencer.error_stage_ << " - " << sequencer.error_message_ << std::endl;

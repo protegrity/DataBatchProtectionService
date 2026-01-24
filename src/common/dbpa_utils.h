@@ -56,21 +56,21 @@ inline std::optional<std::string> ExtractUserId(const std::string& app_context) 
 }
 
 /**
- * Extract page_encoding from encoding_attributes map and convert to Format::type
+ * Extract page_encoding from encoding_attributes map and convert to Encoding::type
  * 
  * @param encoding_attributes Map of encoding attribute key-value pairs
- * @return Format::type value if page_encoding found and valid, std::nullopt otherwise
+ * @return Encoding::type value if page_encoding found and valid, std::nullopt otherwise
  * 
- * Expected key: "page_encoding" with value as string representation of Format enum
+ * Expected key: "page_encoding" with value as string representation of Encoding enum
  */
-inline std::optional<Format::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) {
+inline std::optional<Encoding::type> ExtractPageEncoding(const std::map<std::string, std::string>& encoding_attributes) {
     using namespace dbps::enum_utils;
     auto it = encoding_attributes.find("page_encoding");
     if (it != encoding_attributes.end()) {
         const std::string& encoding_str = it->second;
-        auto format_opt = to_format_enum(encoding_str);
-        if (format_opt.has_value()) {
-            return format_opt.value();
+        auto encoding_opt = to_encoding_enum(encoding_str);
+        if (encoding_opt.has_value()) {
+            return encoding_opt.value();
         } else {
             std::cerr << "ERROR: ExtractPageEncoding() - Unknown page_encoding: " << encoding_str << std::endl;
             return std::nullopt;

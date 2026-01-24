@@ -290,9 +290,9 @@ void JsonRequest::ParseCommon(const std::string& request_body) {
             compression_ = *enum_value;
         }
     }
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "format"})) {
-        if (auto enum_value = to_format_enum(*parsed_value)) {
-            format_ = *enum_value;
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "encoding"})) {
+        if (auto enum_value = to_encoding_enum(*parsed_value)) {
+            encoding_ = *enum_value;
         }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch_encrypted", "value_format", "compression"})) {
@@ -337,7 +337,7 @@ bool JsonRequest::IsValid() const {
     return !column_name_.empty() && 
            datatype_.has_value() && 
            compression_.has_value() && 
-           format_.has_value() && 
+           encoding_.has_value() && 
            encrypted_compression_.has_value() && 
            !key_id_.empty() && 
            !user_id_.empty() && 
@@ -352,7 +352,7 @@ std::string JsonRequest::GetValidationError() const {
     if (column_name_.empty()) missing_fields.push_back("column_reference.name");
     if (!datatype_.has_value()) missing_fields.push_back("data_batch.datatype_info.datatype");
     if (!compression_.has_value()) missing_fields.push_back("data_batch.value_format.compression");
-    if (!format_.has_value()) missing_fields.push_back("data_batch.value_format.format");
+    if (!encoding_.has_value()) missing_fields.push_back("data_batch.value_format.encoding");
     if (!encrypted_compression_.has_value()) missing_fields.push_back("data_batch_encrypted.value_format.compression");
     if (key_id_.empty()) missing_fields.push_back("encryption.key_id");
     if (user_id_.empty()) missing_fields.push_back("access.user_id");
@@ -436,7 +436,7 @@ std::string EncryptJsonRequest::ToJsonString() const {
     
     crow::json::wvalue value_format;
     value_format["compression"] = std::string(to_string(compression_.value()));
-    value_format["format"] = std::string(to_string(format_.value()));
+    value_format["encoding"] = std::string(to_string(encoding_.value()));
     
     // Add encoding_attributes if not empty
     if (!encoding_attributes_.empty()) {
@@ -542,7 +542,7 @@ std::string DecryptJsonRequest::ToJsonString() const {
     
     crow::json::wvalue value_format;
     value_format["compression"] = std::string(to_string(compression_.value()));
-    value_format["format"] = std::string(to_string(format_.value()));
+    value_format["encoding"] = std::string(to_string(encoding_.value()));
     
     // Add encoding_attributes if not empty
     if (!encoding_attributes_.empty()) {
@@ -552,7 +552,7 @@ std::string DecryptJsonRequest::ToJsonString() const {
         }
         value_format["encoding_attributes"] = std::move(encoding_attrs);
     }
-    
+
     data_batch["value_format"] = std::move(value_format);
     
     json["data_batch"] = std::move(data_batch);
@@ -679,9 +679,9 @@ void DecryptJsonResponse::Parse(const std::string& response_body) {
             compression_ = *enum_value;
         }
     }
-    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "format"})) {
-        if (auto enum_value = to_format_enum(*parsed_value)) {
-            format_ = *enum_value;
+    if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value_format", "encoding"})) {
+        if (auto enum_value = to_encoding_enum(*parsed_value)) {
+            encoding_ = *enum_value;
         }
     }
     if (auto parsed_value = SafeGetFromJsonPath(json_body, {"data_batch", "value"})) {
@@ -790,7 +790,7 @@ bool DecryptJsonResponse::IsValid() const {
     return JsonResponse::IsValid() && 
            datatype_.has_value() && 
            compression_.has_value() && 
-           format_.has_value() && 
+           encoding_.has_value() && 
            !decrypted_value_.empty() &&
            datatype_length_valid;
 }
@@ -807,7 +807,7 @@ std::string DecryptJsonResponse::GetValidationError() const {
     // Check decrypt-specific fields
     if (!datatype_.has_value()) missing_fields.push_back("data_batch.datatype_info.datatype");
     if (!compression_.has_value()) missing_fields.push_back("data_batch.value_format.compression");
-    if (!format_.has_value()) missing_fields.push_back("data_batch.value_format.format");
+    if (!encoding_.has_value()) missing_fields.push_back("data_batch.value_format.encoding");
     if (decrypted_value_.empty()) missing_fields.push_back("data_batch.value");
     
     // Check for invalid datatype_length
@@ -836,7 +836,7 @@ std::string DecryptJsonResponse::ToJsonString() const {
     
     crow::json::wvalue value_format;
     value_format["compression"] = std::string(to_string(compression_.value()));
-    value_format["format"] = std::string(to_string(format_.value()));
+    value_format["encoding"] = std::string(to_string(encoding_.value()));
     data_batch["value_format"] = std::move(value_format);
     
     json["data_batch"] = std::move(data_batch);
