@@ -164,7 +164,7 @@ public:
      * @param column_name Name of the database column for which this data is being encrypted
      * @param datatype The data type of the plaintext (e.g., BYTE_ARRAY, STRING, etc.)
      * @param compression Compression algorithm used to compress the plaintext before this call (format of the input)
-     * @param format Data format specification (Parquet formats supported)
+     * @param encoding Data encoding specification (Parquet encodings supported)
      * @param encoding_attributes Map of string key-value pairs containing encoding-specific attributes
      * @param encrypted_compression Compression algorithm to be used to compress the encrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used (not the key itself)
@@ -173,7 +173,7 @@ public:
      * 
      * @return The encryption API response object containing comprehensive information about the call
      * 
-     * @note Data types, compression types, and formats as defined in the enums.h file are supported
+     * @note Data types, compression types, and encodings as defined in the enums.h file are supported
      */
     EncryptApiResponse Encrypt(
         span<const uint8_t> plaintext,
@@ -181,7 +181,7 @@ public:
         Type::type datatype,
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
-        Format::type format,
+        Encoding::type encoding,
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,
@@ -196,7 +196,7 @@ public:
      * @param column_name Name of the database column for which this data is being decrypted
      * @param datatype The data type of the original plaintext (e.g., BYTE_ARRAY, STRING, etc.)
      * @param compression Compression algorithm used to compress the encrypted data before this call (format of the input)
-     * @param format Data format specification (Parquet formats supported)
+     * @param encoding Data encoding specification (Parquet encodings supported)
      * @param encoding_attributes Map of string key-value pairs containing encoding-specific attributes
      * @param encrypted_compression Compression algorithm to be used to compress the decrypted data (format of the output)
      * @param key_id Identifier for the encryption key to be used for decryption (not the key itself)
@@ -205,7 +205,7 @@ public:
      * 
      * @return The decryption API response object containing comprehensive information about the call
      * 
-     * @note Data types, compression types, and formats as defined in the enums.h file are supported
+     * @note Data types, compression types, and encodings as defined in the enums.h file are supported
      */
     DecryptApiResponse Decrypt(
         span<const uint8_t> ciphertext,
@@ -213,7 +213,7 @@ public:
         Type::type datatype,
         const std::optional<int>& datatype_length,
         CompressionCodec::type compression,
-        Format::type format,
+        Encoding::type encoding,
         const std::map<std::string, std::string>& encoding_attributes,
         CompressionCodec::type encrypted_compression,
         const std::string& key_id,

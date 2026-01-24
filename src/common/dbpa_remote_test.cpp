@@ -502,7 +502,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, SuccessfulDecryption) {
         "\"debug\":{\"reference_id\":\"123\"},"
         "\"data_batch\":{"
         "\"datatype_info\":{\"datatype\":\"BYTE_ARRAY\"},"
-        "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"PLAIN\"},"
+        "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"encoding\":\"PLAIN\"},"
         "\"value\":\"dGVzdF9kYXRh\""
         "}}", 
         ""
@@ -551,7 +551,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
             "\"debug\":{\"reference_id\":\"123\"},"
             "\"data_batch\":{"
             "\"datatype_info\":{\"datatype\":\"INT32\"},"
-            "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"format\":\"PLAIN\"},"
+            "\"value_format\":{\"compression\":\"UNCOMPRESSED\",\"encoding\":\"PLAIN\"},"
             "\"value\":\"dGVzdF9kYXRh\""
             "}}",
             "datatype mismatch",
@@ -564,7 +564,7 @@ TEST_F(RemoteDataBatchProtectionAgentTest, DecryptionFieldMismatch) {
             "\"debug\":{\"reference_id\":\"123\"},"
             "\"data_batch\":{"
             "\"datatype_info\":{\"datatype\":\"BYTE_ARRAY\"},"
-            "\"value_format\":{\"compression\":\"GZIP\",\"format\":\"PLAIN\"},"
+            "\"value_format\":{\"compression\":\"GZIP\",\"encoding\":\"PLAIN\"},"
             "\"value\":\"dGVzdF9kYXRh\""
             "}}",
             "compression mismatch",

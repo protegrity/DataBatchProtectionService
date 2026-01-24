@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
             request.datatype_.value(),
             request.datatype_length_,
             request.compression_.value(),
-            request.format_.value(),
+            request.encoding_.value(),
             request.encoding_attributes_,
             request.encrypted_compression_.value(),
             request.key_id_,
@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
         );
         
         try {
-            bool encrypt_result = sequencer.ConvertAndEncrypt(request.value_);
+            bool encrypt_result = sequencer.DecodeAndEncrypt(request.value_);
             if (!encrypt_result) {
                 return CreateErrorResponse("Encryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
             }
@@ -244,7 +244,7 @@ int main(int argc, char* argv[]) {
         response.datatype_ = request.datatype_;
         response.datatype_length_ = request.datatype_length_;
         response.compression_ = request.compression_;
-        response.format_ = request.format_;
+        response.encoding_ = request.encoding_;
         
         // Use DataBatchEncryptionSequencer for actual decryption
         // It is safe to use value() because the request is validated above.
@@ -253,7 +253,7 @@ int main(int argc, char* argv[]) {
             request.datatype_.value(),
             request.datatype_length_,
             request.compression_.value(),
-            request.format_.value(),
+            request.encoding_.value(),
             request.encoding_attributes_,
             request.encrypted_compression_.value(),
             request.key_id_,
@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
         );
         
         try {
-            bool decrypt_result = sequencer.ConvertAndDecrypt(request.encrypted_value_);
+            bool decrypt_result = sequencer.DecryptAndEncode(request.encrypted_value_);
             if (!decrypt_result) {
                 return CreateErrorResponse("Decryption failed: " + sequencer.error_stage_ + " - " + sequencer.error_message_);
             }

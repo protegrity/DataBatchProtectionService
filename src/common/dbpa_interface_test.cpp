@@ -108,7 +108,7 @@ TEST(DBPAInterface, AgentEncryptDecrypt) {
     MockAgent agent;
     std::vector<uint8_t> original = {10, 20, 30};
     
-    std::map<std::string, std::string> encoding_attributes = {{"format", "PLAIN"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}};
     auto encrypted = agent.Encrypt(span<const uint8_t>(original.data(), original.size()), encoding_attributes);
     ASSERT_TRUE(encrypted->success());
     

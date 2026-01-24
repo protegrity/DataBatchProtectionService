@@ -123,7 +123,7 @@ public:
     * Encrypts the provided plaintext data using the configured encryption parameters.
     * 
     * @param plaintext Binary data to be encrypted, provided as a span of bytes
-    * @param encoding_attributes A map of string key-values. The plaintext is encoded with a type defined in enums.h Format::type.
+    * @param encoding_attributes A map of string key-values. The plaintext is encoded with a type defined in enums.h Encoding::type.
     *   Each encoding type requires additional attributes to be properly decoded. These attributes are specified in the map so an 
     *   implementation can properly interpret and process the input text.
     * 
