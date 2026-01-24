@@ -173,7 +173,12 @@ std::string DBPSApiClient::HealthCheck() {
     if (!IsHttpSuccess(response.status_code)) {
         return "Health check failed with status: " + std::to_string(response.status_code);
     }
-    
+
+    auto auth_error = http_client_->PrefetchToken();
+    if (auth_error.has_value()) {
+        return "Health check succeeded but JWT fetch failed: " + auth_error.value();
+    }
+
     return response.result;
 }
 
