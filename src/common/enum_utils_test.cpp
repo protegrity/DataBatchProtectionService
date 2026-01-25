@@ -34,7 +34,6 @@ TEST(EnumUtils, TypeToStringConversion) {
     ASSERT_EQ("DOUBLE", std::string(to_string(Type::DOUBLE)));
     ASSERT_EQ("BYTE_ARRAY", std::string(to_string(Type::BYTE_ARRAY)));
     ASSERT_EQ("FIXED_LEN_BYTE_ARRAY", std::string(to_string(Type::FIXED_LEN_BYTE_ARRAY)));
-    ASSERT_EQ("UNDEFINED", std::string(to_string(Type::UNDEFINED)));
 }
 
 TEST(EnumUtils, TypeFromStringConversion) {
@@ -69,10 +68,6 @@ TEST(EnumUtils, TypeFromStringConversion) {
     result = to_datatype_enum("FIXED_LEN_BYTE_ARRAY");
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(Type::FIXED_LEN_BYTE_ARRAY, result.value());
-    
-    result = to_datatype_enum("UNDEFINED");
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(Type::UNDEFINED, result.value());
 }
 
 TEST(EnumUtils, TypeInvalidFromString) {
@@ -246,7 +241,7 @@ TEST(EnumUtils, RoundTripTypeConversion) {
     // Test all Type enum values
     Type::type types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
-        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY, Type::UNDEFINED
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
     };
     
     for (auto type : types) {
@@ -347,7 +342,7 @@ TEST(EnumUtils, TypeEnumCompleteness) {
     // Define all known Type enum values
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
-        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY, Type::UNDEFINED
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
     };
     
     // Test that every enum value can be converted to string and back
@@ -406,12 +401,12 @@ TEST(EnumUtils, StringUniqueness) {
     // Collect all Type strings
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
-        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY, Type::UNDEFINED
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
     };
     for (auto type : all_types) {
         type_strings.insert(std::string(to_string(type)));
     }
-    ASSERT_EQ(9, type_strings.size());  // All strings should be unique
+    ASSERT_EQ(8, type_strings.size());  // All strings should be unique
     
     // Collect all CompressionCodec strings
     CompressionCodec::type all_codecs[] = {
@@ -444,7 +439,7 @@ TEST(EnumUtils, CrossEnumStringCollision) {
     // Collect all strings from all enums
     Type::type all_types[] = {
         Type::BOOLEAN, Type::INT32, Type::INT64, Type::INT96,
-        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY, Type::UNDEFINED
+        Type::FLOAT, Type::DOUBLE, Type::BYTE_ARRAY, Type::FIXED_LEN_BYTE_ARRAY
     };
     for (auto type : all_types) {
         all_strings.insert(std::string(to_string(type)));
@@ -467,12 +462,8 @@ TEST(EnumUtils, CrossEnumStringCollision) {
         all_strings.insert(std::string(to_string(encoding)));
     }
     
-    // Verify two equally named enums are handled correctly.
-    ASSERT_EQ("UNDEFINED", std::string(to_string(Type::UNDEFINED)));
     ASSERT_EQ("UNDEFINED", std::string(to_string(Encoding::UNDEFINED)));
     
-    // Total should be 9 + 10 + 11 = 30 unique strings, but we have 1 collision
-    // (Type::UNDEFINED and Encoding::UNDEFINED both map to "UNDEFINED")
-    // So we expect 29 unique strings
+    // Total should be 8 + 10 + 11 = 29 unique strings
     ASSERT_EQ(29, all_strings.size());
 }

@@ -31,8 +31,7 @@ struct Type {
         FLOAT = 4,
         DOUBLE = 5,
         BYTE_ARRAY = 6,
-        FIXED_LEN_BYTE_ARRAY = 7,
-        UNDEFINED = 8
+        FIXED_LEN_BYTE_ARRAY = 7
     };
 };
 

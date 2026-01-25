@@ -127,8 +127,6 @@ inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::opt
             }
             return static_cast<size_t>(datatype_length.value());
         }
-        case Type::UNDEFINED:
-            return 1;
         case Type::BOOLEAN:
             throw InvalidInputException("BOOLEAN is bit-sized; not fixed byte-sized");
         case Type::BYTE_ARRAY:
@@ -252,6 +250,23 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
         out.insert(out.end(), v.begin(), v.end());
     }
     return out;
+}
+
+std::vector<uint8_t> BuildByteArrayValueBytes(const std::string& payload) {
+    std::vector<RawValueBytes> elements;
+    elements.emplace_back(payload.begin(), payload.end());
+    return CombineRawBytesIntoValueBytes(
+        elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+}
+
+std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>& bytes) {
+    TypedListValues list = ParseValueBytesIntoTypedList(
+        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+    const auto* values = std::get_if<std::vector<std::string>>(&list);
+    if (!values) {
+        throw InvalidInputException("Expected BYTE_ARRAY values");
+    }
+    return *values;
 }
 
 LevelAndValueBytes DecompressAndSplit(

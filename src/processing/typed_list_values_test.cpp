@@ -124,19 +124,6 @@ TEST(TypedListValuesTest, BuildRawBytesFromTypedListValues_BuildTypedListFromRaw
     }
 }
 
-TEST(TypedListValuesTest, BuildRawBytesFromTypedListValues_BuildTypedListFromRawBytes_RoundTrip_UNDEFINED) {
-    TypedListValues input = std::vector<uint8_t>{0u, 255u, 42u};
-    std::vector<RawValueBytes> raw = BuildRawBytesFromTypedListValues(input);
-    ASSERT_EQ(raw.size(), 3u);
-    for (const auto& r : raw) {
-        EXPECT_EQ(r.size(), 1u);
-    }
-    auto out = BuildTypedListFromRawBytes(Type::UNDEFINED, raw);
-    const auto& out_vec = std::get<std::vector<uint8_t>>(out);
-    const auto& in_vec = std::get<std::vector<uint8_t>>(input);
-    ASSERT_EQ(out_vec, in_vec);
-}
-
 TEST(TypedListValuesTest, BuildTypedListFromRawBytes_InvalidElementSizes_Throws) {
     // INT32 wrong size
     {
@@ -167,12 +154,6 @@ TEST(TypedListValuesTest, BuildTypedListFromRawBytes_InvalidElementSizes_Throws)
         RawValueBytes r = RawValueBytes(11, 0);
         std::vector<RawValueBytes> v{r};
         EXPECT_THROW((void)BuildTypedListFromRawBytes(Type::INT96, v), std::runtime_error);
-    }
-    // UNDEFINED wrong size (expects exactly 1)
-    {
-        RawValueBytes r = {0xAA, 0xBB};
-        std::vector<RawValueBytes> v{r};
-        EXPECT_THROW((void)BuildTypedListFromRawBytes(Type::UNDEFINED, v), std::runtime_error);
     }
 }
 

@@ -30,6 +30,7 @@
 #include "../client/httplib_client.h"
 #include "../common/enums.h"
 #include "../processing/compression_utils.h"
+#include "../processing/parquet_utils.h"
 #include "../common/bytes_utils.h"
 #include "tcb/span.hpp"
 
@@ -43,56 +44,16 @@ using span = tcb::span<T>;
 namespace {
     const std::string SEQUENCER_ENCRYPTION_METADATA_VERSION = "v0.01";
 
-    std::vector<uint8_t> MakeByteArrayPayload(const std::string& s) {
-        std::vector<uint8_t> out;
-        append_u32_le(out, static_cast<uint32_t>(s.size()));
-        out.insert(out.end(), s.begin(), s.end());
-        return out;
-    }
-
-    std::string ParseByteArrayPayload(const std::vector<uint8_t>& bytes) {
-        if (bytes.size() < 4) {
-            throw std::runtime_error("Invalid BYTE_ARRAY payload: too short for length prefix");
-        }
-        uint32_t len = read_u32_le(bytes, 0);
-        if (bytes.size() != 4 + len) {
-            throw std::runtime_error("Invalid BYTE_ARRAY payload: length mismatch");
-        }
-        return std::string(bytes.begin() + 4, bytes.end());
-    }
-
     std::vector<uint8_t> MakeByteArrayListPayload(const std::vector<std::string>& items) {
-        std::vector<uint8_t> out;
-        size_t total = 0;
+        std::vector<RawValueBytes> elements;
+        elements.reserve(items.size());
         for (const auto& s : items) {
-            total += 4 + s.size();
+            elements.emplace_back(s.begin(), s.end());
         }
-        out.reserve(total);
-        for (const auto& s : items) {
-            append_u32_le(out, static_cast<uint32_t>(s.size()));
-            out.insert(out.end(), s.begin(), s.end());
-        }
-        return out;
+        return CombineRawBytesIntoValueBytes(
+            elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     }
 
-    std::vector<std::string> ParseByteArrayListPayload(const std::vector<uint8_t>& bytes) {
-        std::vector<std::string> out;
-        size_t offset = 0;
-        while (offset < bytes.size()) {
-            if (offset + 4 > bytes.size()) {
-                throw std::runtime_error("Invalid BYTE_ARRAY list: incomplete length prefix");
-            }
-            uint32_t len = read_u32_le(bytes, static_cast<int>(offset));
-            offset += 4;
-            if (offset + len > bytes.size()) {
-                throw std::runtime_error("Invalid BYTE_ARRAY list: length exceeds remaining data");
-            }
-            out.emplace_back(bytes.begin() + static_cast<std::ptrdiff_t>(offset),
-                             bytes.begin() + static_cast<std::ptrdiff_t>(offset + len));
-            offset += len;
-        }
-        return out;
-    }
 }
 
 // Demo application class
@@ -352,7 +313,7 @@ public:
             auto decrypted_plain = Decompress(
                 std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
                 CompressionCodec::SNAPPY);
-            auto decrypted_list = ParseByteArrayListPayload(decrypted_plain);
+            auto decrypted_list = ParseByteArrayListValueBytes(decrypted_plain);
                             
             // Verify data integrity
             if (decrypted_list == sample_data) {
@@ -395,7 +356,7 @@ public:
             }
             
             try {
-                auto plaintext = MakeByteArrayPayload(test_data);
+                auto plaintext = BuildByteArrayValueBytes(test_data);
                 auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
                 
                 // Encrypt
@@ -432,7 +393,11 @@ public:
                 auto decrypted_plain = Decompress(
                     std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
                     CompressionCodec::SNAPPY);
-                std::string decrypted_string = ParseByteArrayPayload(decrypted_plain);
+                std::vector<std::string> decrypted_values = ParseByteArrayListValueBytes(decrypted_plain);
+                if (decrypted_values.size() != 1u) {
+                    throw std::runtime_error("Expected exactly one BYTE_ARRAY value");
+                }
+                std::string decrypted_string = decrypted_values.front();
                 
                 if (decrypted_string == test_data) {
                     std::cout << "  OK: Round-trip successful" << std::endl;
@@ -793,7 +758,7 @@ public:
         // Test with empty data
         std::cout << "\nTesting empty data handling:" << std::endl;
         try {
-            auto empty_data = MakeByteArrayPayload("");
+            auto empty_data = BuildByteArrayValueBytes("");
             auto compressed_empty = Compress(empty_data, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_empty), encoding_attributes);
@@ -813,7 +778,7 @@ public:
         std::cout << "\nTesting large data handling:" << std::endl;
         try {
             std::string large_data(1000, 'X');  // 1KB of data
-            auto plaintext = MakeByteArrayPayload(large_data);
+            auto plaintext = BuildByteArrayValueBytes(large_data);
             auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);

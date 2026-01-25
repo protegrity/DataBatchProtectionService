@@ -67,6 +67,16 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytes(
     Encoding::type encoding);
 
 /**
+ * Build BYTE_ARRAY value bytes for a single string payload.
+ */
+std::vector<uint8_t> BuildByteArrayValueBytes(const std::string& payload);
+
+/**
+ * Parse BYTE_ARRAY value bytes into a list of string payloads.
+ */
+std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>& bytes);
+
+/**
  * Decompresses and splits a Parquet page into level and value bytes.
  * Handles DATA_PAGE_V1, DATA_PAGE_V2 (including optional compression on value bytes),
  * and DICTIONARY_PAGE.
