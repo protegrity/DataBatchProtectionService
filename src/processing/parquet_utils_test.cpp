@@ -347,6 +347,35 @@ TEST(ParquetUtils, CombineRawBytesIntoValueBytes_BYTE_ARRAY) {
     EXPECT_EQ(out, expected);
 }
 
+TEST(ParquetUtils, BuildByteArrayValueBytes_SinglePayload) {
+    std::vector<uint8_t> out = BuildByteArrayValueBytes("abc");
+    ASSERT_EQ(out.size(), 7u);
+    EXPECT_EQ(read_u32_le(out, 0), 3u);
+    EXPECT_EQ(out[4], static_cast<uint8_t>('a'));
+    EXPECT_EQ(out[5], static_cast<uint8_t>('b'));
+    EXPECT_EQ(out[6], static_cast<uint8_t>('c'));
+}
+
+TEST(ParquetUtils, ParseByteArrayListValueBytes_SinglePayload) {
+    std::vector<uint8_t> bytes = BuildByteArrayValueBytes("hello");
+    std::vector<std::string> out = ParseByteArrayListValueBytes(bytes);
+    ASSERT_EQ(out.size(), 1u);
+    EXPECT_EQ(out[0], "hello");
+}
+
+TEST(ParquetUtils, ParseByteArrayListValueBytes_MultiplePayloads) {
+    std::vector<RawValueBytes> elems = {
+        {'a','b'},
+        {'x','y','z'}
+    };
+    std::vector<uint8_t> bytes = CombineRawBytesIntoValueBytes(
+        elems, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+    std::vector<std::string> out = ParseByteArrayListValueBytes(bytes);
+    ASSERT_EQ(out.size(), 2u);
+    EXPECT_EQ(out[0], "ab");
+    EXPECT_EQ(out[1], "xyz");
+}
+
 TEST(ParquetUtils, CombineRawBytesIntoValueBytes_FIXED_LEN_BYTE_ARRAY_SizeMismatch) {
     // Expect length 3, but provide a 2-byte element -> should throw
     std::vector<RawValueBytes> elems = {

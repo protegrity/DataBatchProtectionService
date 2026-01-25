@@ -52,7 +52,7 @@ constexpr std::optional<E> from_string_impl(
 // For dbps::external::Type
 namespace {
 using T = ::dbps::external::Type::type;
-inline constexpr std::array<std::pair<T, std::string_view>, 9> kTypePairs{{
+inline constexpr std::array<std::pair<T, std::string_view>, 8> kTypePairs{{
     {T::BOOLEAN, "BOOLEAN"},
     {T::INT32, "INT32"},
     {T::INT64, "INT64"},
@@ -61,7 +61,6 @@ inline constexpr std::array<std::pair<T, std::string_view>, 9> kTypePairs{{
     {T::DOUBLE, "DOUBLE"},
     {T::BYTE_ARRAY, "BYTE_ARRAY"},
     {T::FIXED_LEN_BYTE_ARRAY, "FIXED_LEN_BYTE_ARRAY"},
-    {T::UNDEFINED, "UNDEFINED"},
 }};
 } // anon
 

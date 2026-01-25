@@ -210,20 +210,6 @@ TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_Rou
     ASSERT_EQ(out_vec, vals);
 }
 
-TEST(ValueEncryptionUtilsTest, EncryptTypedListValues_DecryptTypedListValues_RoundTrip_UNDEFINED) {
-    auto enc = [](const std::vector<uint8_t>& b) { return b; };
-    auto dec = [](const std::vector<uint8_t>& b) { return b; };
-    TypedListValues input = std::vector<uint8_t>{1u, 2u, 255u};
-    auto encrypted = EncryptTypedListValues(input, enc);
-    ASSERT_EQ(encrypted.size(), 3u);
-    for (const auto& ev : encrypted) {
-        EXPECT_EQ(ev.size(), 1u);
-    }
-    auto decrypted = DecryptTypedListValues(encrypted, Type::UNDEFINED, dec);
-    const auto& out_vec = std::get<std::vector<uint8_t>>(decrypted);
-    ASSERT_EQ(out_vec, std::get<std::vector<uint8_t>>(input));
-}
-
 TEST(ValueEncryptionUtilsTest, DecryptTypedListValues_InvalidDecryptedSize_Throws) {
     // Provide an encrypted value whose decrypted bytes are of incorrect size for FLOAT (expect 4, give 3)
     EncryptedValue ev = std::vector<uint8_t>{0x00, 0x00, 0x80}; // 3 bytes

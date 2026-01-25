@@ -135,17 +135,6 @@ TypedListValues BuildTypedListFromRawBytes(
             }
             return out;
         }
-        case Type::UNDEFINED: {
-            std::vector<uint8_t> out;
-            for (size_t i = 0; i < elements_bytes.size(); ++i) {
-                const std::vector<uint8_t>& bytes = elements_bytes[i];
-                if (bytes.size() != 1) {
-                    throw std::runtime_error("DecryptTypedListValues: invalid UNDEFINED element size");
-                }
-                out.push_back(bytes[0]);
-            }
-            return out;
-        }
         default:
             throw std::runtime_error("DecryptTypedListValues: unsupported datatype");
     }
@@ -203,7 +192,6 @@ const char* GetTypeName() {
     else if constexpr (std::is_same_v<T, std::vector<std::array<uint32_t, 3>>>) return "INT96";
     else if constexpr (std::is_same_v<T, std::vector<std::string>>) 
       return "string (BYTE_ARRAY/FIXED_LEN_BYTE_ARRAY)";
-    else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) return "UNDEFINED (raw bytes)";
     else if constexpr (std::is_same_v<T, std::monostate>) return "empty/error";
     else return "unknown";
 }
@@ -226,28 +214,6 @@ std::string TypedListToString(const TypedListValues& list) {
                 out << "  [" << i << "] [" << values[i][0] << ", " 
                     << values[i][1] << ", " << values[i][2] << "]\n";
             }
-        }
-        else if constexpr (std::is_same_v<T, std::vector<uint8_t>>) {
-            // Special case for UNDEFINED - raw bytes as hex
-            out << "Decoded UNDEFINED type (raw bytes):\n";
-            out << "  Hex: ";
-            for (size_t i = 0; i < values.size(); ++i) {
-                out << std::hex << std::setw(2) << std::setfill('0') 
-                    << static_cast<int>(values[i]);
-                if (i < values.size() - 1) out << " ";
-            }
-            out << std::dec << "\n";  // Reset to decimal
-            
-            // Also show as string if printable
-            out << "  String: \"";
-            for (uint8_t byte : values) {
-                if (byte >= 32 && byte < 127) {
-                    out << static_cast<char>(byte);
-                } else {
-                    out << ".";
-                }
-            }
-            out << "\"\n";
         }
         else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
             // String values with quotes and the length of the string.
