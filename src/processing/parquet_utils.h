@@ -26,7 +26,7 @@
 #include "enums.h"
 #include "../common/exceptions.h"
 #include "enum_utils.h"
-#include "../common/typed_list_values.h"
+#include "typed_list_values.h"
 #include "../common/bytes_utils.h"
 
 struct LevelAndValueBytes {

@@ -16,7 +16,7 @@
 // under the License.
 
 #include "dbpa_local.h"
-#include "../server/encryption_sequencer.h"
+#include "../processing/encryption_sequencer.h"
 #include "enum_utils.h"
 #include "dbpa_utils.h"
 #include <iostream>

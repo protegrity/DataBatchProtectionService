@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 #include "../../common/exceptions.h"
-#include "../../common/typed_list_values.h"
+#include "../typed_list_values.h"
 #include "../../common/enums.h"
 
 #ifndef DBPS_EXPORT
