@@ -56,10 +56,6 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
         int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
         total_level_bytes = def_level_length + rep_level_length;
-        // TODO(Issue 183): Remove unnecessary printouts in this function.
-        std::cout << "CalculateLevelBytesLength DATA_PAGE_V2: total_level_bytes="
-                  << total_level_bytes << std::endl;
-        
     } else if (page_type == "DATA_PAGE_V1") {
         // Check that encoding types are RLE (instead of BIT_PACKED which is deprecated)
         const std::string& rep_encoding = std::get<std::string>(encoding_attribs.at("page_v1_repetition_level_encoding"));
@@ -77,14 +73,10 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
         if (max_rep_level > 0) {
             int bytes_skipped = SkipV1RLELevel(offset);
             total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: repetition level bytes skipped="
-                      << bytes_skipped << std::endl;
         }
         if (max_def_level > 0) {
             int bytes_skipped = SkipV1RLELevel(offset);
             total_level_bytes += bytes_skipped;
-            std::cout << "CalculateLevelBytesLength DATA_PAGE_V1: definition level bytes skipped="
-                      << bytes_skipped << std::endl;
         }
 
     } else if (page_type == "DICTIONARY_PAGE") {
