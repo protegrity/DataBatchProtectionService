@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -357,7 +358,9 @@ public:
         int scenario_number,
         Type::type datatype,
         const std::string& values_file_path,
-        std::optional<size_t> max_rows) {
+        std::optional<size_t> max_rows,
+        size_t iterations,
+        size_t warmup_rounds) {
         std::cout << "Starting DBPA Local Performance Test..." << std::endl;
         std::cout << std::endl;
         std::cout << "\n--- Local DBPA Scenario ---" << std::endl;
@@ -390,12 +393,25 @@ public:
             return;
         }
 
-        bool local_dbpa_ok = TestLocalDbpaAgentScenarios(
-            scenario_number,
-            datatype,
-            value_bytes,
-            num_values,
-            std::nullopt);
+        bool local_dbpa_ok = true;
+        std::vector<double> timings_ms;
+        size_t total_loops = warmup_rounds + iterations;
+        timings_ms.reserve(total_loops);
+        for (size_t i = 0; i < total_loops; ++i) {
+            auto start = std::chrono::steady_clock::now();
+            bool ok = TestLocalDbpaAgentScenarios(
+                scenario_number,
+                datatype,
+                value_bytes,
+                num_values,
+                std::nullopt);
+            auto end = std::chrono::steady_clock::now();
+            auto elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
+            timings_ms.push_back(elapsed_ms);
+            if (i >= warmup_rounds && !ok) {
+                local_dbpa_ok = false;
+            }
+        }
 
         std::cout << "\n=== Demo Summary ===" << std::endl;
         const auto& scenario = kScenarios[static_cast<size_t>(scenario_number - 1)];
@@ -403,6 +419,53 @@ public:
         std::cout << "Datatype: " << to_string(datatype) << std::endl;
         std::cout << "Values file: " << values_file_path << std::endl;
         std::cout << "Rows read: " << num_values << std::endl;
+        std::cout << "Iterations: " << iterations << std::endl;
+        std::cout << "Warmup: " << warmup_rounds << std::endl;
+        std::cout << "Total loops: " << total_loops << std::endl;
+        if (!timings_ms.empty()) {
+            size_t warmup_clamped = std::min(warmup_rounds, timings_ms.size());
+            size_t measured_count = timings_ms.size() - warmup_clamped;
+            if (measured_count == 0) {
+                std::cout << "Timing: no measured iterations after warmup" << std::endl;
+            } else {
+                double sum_ms = 0.0;
+                double min_ms = timings_ms[warmup_clamped];
+                double max_ms = timings_ms[warmup_clamped];
+                for (size_t i = warmup_clamped; i < timings_ms.size(); ++i) {
+                    double v = timings_ms[i];
+                    sum_ms += v;
+                    min_ms = std::min(min_ms, v);
+                    max_ms = std::max(max_ms, v);
+                }
+                double avg_ms = sum_ms / static_cast<double>(measured_count);
+                std::cout << "Timing (milliseconds): avg=" << avg_ms
+                          << " min=" << min_ms
+                          << " max=" << max_ms
+                          << " measured=" << measured_count << std::endl;
+
+                std::vector<double> measured_timings(timings_ms.begin() + static_cast<std::ptrdiff_t>(warmup_clamped),
+                                                     timings_ms.end());
+                std::sort(measured_timings.begin(), measured_timings.end());
+                size_t sample_count = std::min<size_t>(5, measured_timings.size());
+                std::cout << "Lowest " << sample_count << " (ms): ";
+                for (size_t i = 0; i < sample_count; ++i) {
+                    if (i > 0) {
+                        std::cout << ", ";
+                    }
+                    std::cout << measured_timings[i];
+                }
+                std::cout << std::endl;
+
+                std::cout << "Highest " << sample_count << " (ms): ";
+                for (size_t i = 0; i < sample_count; ++i) {
+                    if (i > 0) {
+                        std::cout << ", ";
+                    }
+                    std::cout << measured_timings[measured_timings.size() - sample_count + i];
+                }
+                std::cout << std::endl;
+            }
+        }
         std::cout << "Local DBPA Scenarios: " << (local_dbpa_ok ? "PASS" : "FAIL") << std::endl;
     }
 };
@@ -419,6 +482,10 @@ int main(int argc, char* argv[]) {
             cxxopts::value<std::string>())
         ("max_rows", "Maximum number of rows to read from values_file (0 = no limit).",
             cxxopts::value<size_t>()->default_value("0"))
+        ("iterations", "Number of iterations to run.",
+            cxxopts::value<size_t>()->default_value("20"))
+        ("warmup", "Warmup iterations to discard from timing.",
+            cxxopts::value<size_t>()->default_value("3"))
         ("h,help", "Display this help message");
 
     try {
@@ -432,6 +499,8 @@ int main(int argc, char* argv[]) {
         std::string datatype_arg = result["datatype"].as<std::string>();
         std::string values_file_path = result["values_file"].as<std::string>();
         size_t max_rows_raw = result["max_rows"].as<size_t>();
+        size_t iterations = result["iterations"].as<size_t>();
+        size_t warmup = result["warmup"].as<size_t>();
 
         if (values_file_path.empty()) {
             std::cout << "Error: --values_file is required." << std::endl;
@@ -445,6 +514,11 @@ int main(int argc, char* argv[]) {
             std::cout << options.help() << std::endl;
             return 1;
         }
+        if (iterations <= 0) {
+            std::cout << "Error: --iterations must be > 0." << std::endl;
+            std::cout << options.help() << std::endl;
+            return 1;
+        }
 
         std::optional<size_t> max_rows;
         if (max_rows_raw > 0) {
@@ -452,7 +526,7 @@ int main(int argc, char* argv[]) {
         }
 
         DBPALocalTestApp demo;
-        demo.RunDemo(scenario_number, datatype_opt.value(), values_file_path, max_rows);
+        demo.RunDemo(scenario_number, datatype_opt.value(), values_file_path, max_rows, iterations, warmup);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
