@@ -20,11 +20,20 @@
 #include "compression_utils.h"
 #include <cstring>
 #include <iostream>
+#include <chrono>
+#include <cstdlib>
+#include <functional>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
 using namespace dbps::compression;
 
+namespace {
+    bool ShouldLogParseValueTiming() {
+        const char* env = std::getenv("DBPS_LOG_PARSE_VALUE_TIMING");
+        return env == nullptr || std::string(env) == "1";
+    }
+}
 int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     const AttributesMap& encoding_attribs) {
     
@@ -353,9 +362,39 @@ TypedListValues ParseValueBytesIntoTypedList(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding) {
-    std::vector<RawValueBytes> raw_values =
-        SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, encoding);
-    return BuildTypedListFromRawBytes(datatype, raw_values);
+    const bool log_timings = ShouldLogParseValueTiming();
+    using Clock = std::chrono::steady_clock;
+    std::vector<std::pair<std::string, long long>> timings;
+
+    auto time_step = [&](const char* label, const std::function<void()>& fn) {
+        if (!log_timings) {
+            fn();
+            return;
+        }
+        auto start = Clock::now();
+        fn();
+        auto end = Clock::now();
+        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        timings.emplace_back(label, micros);
+    };
+
+    std::vector<RawValueBytes> raw_values;
+    time_step("SliceValueBytesIntoRawBytes", [&]() {
+        raw_values = SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, encoding);
+    });
+
+    TypedListValues typed_list;
+    time_step("BuildTypedListFromRawBytes", [&]() {
+        typed_list = BuildTypedListFromRawBytes(datatype, raw_values);
+    });
+
+    if (log_timings) {
+        std::cout << "ParseValueBytesIntoTypedList timings (microseconds):\n";
+        for (const auto& entry : timings) {
+            std::cout << "  " << entry.first << ": " << entry.second << "\n";
+        }
+    }
+    return typed_list;
 }
 
 std::vector<uint8_t> GetTypedListAsValueBytes(

@@ -20,6 +20,8 @@
 #include "../../common/enum_utils.h"
 #include <functional>
 #include <iostream>
+#include <cstdlib>
+#include <chrono>
 #include "../value_encryption_utils.h"
 
 using namespace dbps::value_encryption_utils;
@@ -52,6 +54,17 @@ namespace {
     std::vector<uint8_t> DecryptByteArray(const std::vector<uint8_t>& data, const std::string& key_id) {
         return EncryptByteArray(data, key_id); // for XOR encryption, decryption is the same as encryption
     }
+
+    bool ShouldLogValueEncryption() {
+        return false;
+        // const char* env = std::getenv("DBPS_LOG_VALUE_ENCRYPTION");
+        // return env != nullptr && std::string(env) == "1";
+    }
+
+    bool ShouldLogValueEncryptionTiming() {
+        const char* env = std::getenv("DBPS_LOG_VALUE_ENCRYPT_TIMING");
+        return env == nullptr || std::string(env) == "1";
+    }
 }
 
 std::vector<uint8_t> BasicEncryptor::EncryptBlock(const std::vector<uint8_t>& data) {
@@ -66,23 +79,40 @@ std::vector<uint8_t> BasicEncryptor::DecryptBlock(const std::vector<uint8_t>& da
 std::vector<uint8_t> BasicEncryptor::EncryptValueList(
     const TypedListValues& typed_list) {
 
-    // Printout the typed list.
-    auto print_result = TypedListToString(typed_list);
-    if (print_result.length() > 1000) {
-        std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n"
-                  << print_result.substr(0, 1000) << "...";
-    } else {
-        std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result;
-    }
+    const bool log_timings = ShouldLogValueEncryptionTiming();
+    using Clock = std::chrono::steady_clock;
+    std::vector<std::pair<std::string, long long>> timings;
 
-    // Printout the additional context parameters.
-    std::cout << "Context parameters:\n"
-              << "  column_name: " << column_name_ << "\n"
-              << "  user_id: " << user_id_ << "\n"
-              << "  key_id: " << key_id_ << "\n"
-              << "  application_context: " << application_context_ << "\n"
-              << "  datatype: " << dbps::enum_utils::to_string(datatype_) << "\n"
-              << std::endl;
+    auto time_step = [&](const char* label, const std::function<void()>& fn) {
+        if (!log_timings) {
+            fn();
+            return;
+        }
+        auto start = Clock::now();
+        fn();
+        auto end = Clock::now();
+        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        timings.emplace_back(label, micros);
+    };
+
+    if (ShouldLogValueEncryption()) {
+        // Printout the typed list.
+        auto print_result = TypedListToString(typed_list);
+        if (print_result.length() > 1000) {
+            std::cout << "Encrypt value - Decoded plaintext data (first 1000 chars):\n"
+                      << print_result.substr(0, 1000) << "...\n";
+        } else {
+            std::cout << "Encrypt value - Decoded plaintext data:\n" << print_result << "\n";
+        }
+
+        // Printout the additional context parameters.
+        std::cout << "Context parameters:\n"
+                  << "  column_name: " << column_name_ << "\n"
+                  << "  user_id: " << user_id_ << "\n"
+                  << "  key_id: " << key_id_ << "\n"
+                  << "  application_context: " << application_context_ << "\n"
+                  << "  datatype: " << dbps::enum_utils::to_string(datatype_) << "\n";
+    }
 
     // create a closure for the encrypt function (to be used below)
     // the closure captures the key_bytes and calls the EncryptByteArray function.
@@ -96,13 +126,26 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
     // (1) encrypt the list of values. Each element in the list is encrypted separately 
     // using the key and the EncryptByteArray function.
     
-    std::vector<EncryptedValue> encrypted_values = EncryptTypedListValues(
-        typed_list, 
-        encrypt_function);
+    std::vector<EncryptedValue> encrypted_values;
+    time_step("EncryptTypedListValues", [&]() {
+        encrypted_values = EncryptTypedListValues(
+            typed_list,
+            encrypt_function);
+    });
 
     // (2) concatenate the encrypted values into a single byte blob.
     // (the blob encodes #of elements and the size of each element)
-    std::vector<uint8_t> concatenated_encrypted_bytes = ConcatenateEncryptedValues(encrypted_values);
+    std::vector<uint8_t> concatenated_encrypted_bytes;
+    time_step("ConcatenateEncryptedValues", [&]() {
+        concatenated_encrypted_bytes = ConcatenateEncryptedValues(encrypted_values);
+    });
+
+    if (log_timings) {
+        std::cout << "EncryptValueList timings (microseconds):\n";
+        for (const auto& entry : timings) {
+            std::cout << "  " << entry.first << ": " << entry.second << "\n";
+        }
+    }
     
     return concatenated_encrypted_bytes;
 } // EncryptValueList
