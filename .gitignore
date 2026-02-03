@@ -45,3 +45,6 @@ _deps/
 
 # Testing credentials file
 testing_credentials.json
+
+# Performance test values files
+random_*.txt
