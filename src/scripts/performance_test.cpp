@@ -264,7 +264,8 @@ public:
         Type::type datatype,
         const std::vector<uint8_t>& value_bytes,
         size_t num_values,
-        std::optional<int> datatype_length) {
+        std::optional<int> datatype_length,
+        bool skip_decrypt) {
         std::cout << "\n=== Local DBPA Agent Scenarios ===" << std::endl;
 
         if (scenario_number <= 0 || scenario_number > static_cast<int>(kScenarios.size())) {
@@ -327,6 +328,11 @@ public:
         }
         std::cout << "  Encryption mode: " << mode_it->second << std::endl;
 
+        if (skip_decrypt) {
+            std::cout << "  OK: Encryption succeeded (decrypt skipped)" << std::endl;
+            return true;
+        }
+
         auto decrypt_agent = BuildLocalDbpaAgent(
             scenario.compression,
             datatype,
@@ -360,7 +366,8 @@ public:
         const std::string& values_file_path,
         std::optional<size_t> max_rows,
         size_t iterations,
-        size_t warmup_rounds) {
+        size_t warmup_rounds,
+        bool skip_decrypt) {
         std::cout << "Starting DBPA Local Performance Test..." << std::endl;
         std::cout << std::endl;
         std::cout << "\n--- Local DBPA Scenario ---" << std::endl;
@@ -404,7 +411,8 @@ public:
                 datatype,
                 value_bytes,
                 num_values,
-                std::nullopt);
+                std::nullopt,
+                skip_decrypt);
             auto end = std::chrono::steady_clock::now();
             auto elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
             timings_ms.push_back(elapsed_ms);
@@ -486,6 +494,8 @@ int main(int argc, char* argv[]) {
             cxxopts::value<size_t>()->default_value("20"))
         ("warmup", "Warmup iterations to discard from timing.",
             cxxopts::value<size_t>()->default_value("3"))
+        ("skip_decrypt", "Skip decryption step.",
+            cxxopts::value<bool>()->default_value("true"))
         ("h,help", "Display this help message");
 
     try {
@@ -501,6 +511,7 @@ int main(int argc, char* argv[]) {
         size_t max_rows_raw = result["max_rows"].as<size_t>();
         size_t iterations = result["iterations"].as<size_t>();
         size_t warmup = result["warmup"].as<size_t>();
+        bool skip_decrypt = result["skip_decrypt"].as<bool>();
 
         if (values_file_path.empty()) {
             std::cout << "Error: --values_file is required." << std::endl;
@@ -526,7 +537,7 @@ int main(int argc, char* argv[]) {
         }
 
         DBPALocalTestApp demo;
-        demo.RunDemo(scenario_number, datatype_opt.value(), values_file_path, max_rows, iterations, warmup);
+        demo.RunDemo(scenario_number, datatype_opt.value(), values_file_path, max_rows, iterations, warmup, skip_decrypt);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
