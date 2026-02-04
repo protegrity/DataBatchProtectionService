@@ -135,16 +135,16 @@ namespace {
         CompressionCodec::type compression_type,
         const std::string& page_encoding,
         int32_t max_definition_level = 1,
-        int32_t max_repetition_level = 0,
-        int32_t definition_levels_byte_length = 2,
-        int32_t repetition_levels_byte_length = 1,
+        int32_t max_repetition_level = 2,
+        int32_t definition_levels_byte_length = 3,
+        int32_t repetition_levels_byte_length = 5,
         int32_t num_nulls = 0,
         bool is_compressed = true) {
         DataPageBuildResult result;
         result.def_levels_byte_length = definition_levels_byte_length;
         result.rep_levels_byte_length = repetition_levels_byte_length;
         result.level_bytes = std::vector<uint8_t>(
-            static_cast<size_t>(definition_levels_byte_length + repetition_levels_byte_length), 0x00);
+            static_cast<size_t>(definition_levels_byte_length + repetition_levels_byte_length), 0xCC);
 
         std::vector<uint8_t> value_payload = value_bytes;
         if (is_compressed) {
@@ -173,16 +173,19 @@ namespace {
         CompressionCodec::type compression_type,
         const std::string& page_encoding,
         int32_t max_definition_level = 1,
-        int32_t max_repetition_level = 1,
-        uint32_t repetition_level_block_length = 1,
-        uint32_t definition_level_block_length = 2) {
+        int32_t max_repetition_level = 2,
+        uint32_t definition_level_block_length = 3,
+        uint32_t repetition_level_block_length = 5) {
         DataPageBuildResult result;
         result.level_bytes.clear();
         append_u32_le(result.level_bytes, repetition_level_block_length); // repetition level block length
-        result.level_bytes.push_back(0xAA);
+        result.level_bytes.insert(result.level_bytes.end(),
+                                  repetition_level_block_length,
+                                  0xAA);
         append_u32_le(result.level_bytes, definition_level_block_length); // definition level block length
-        result.level_bytes.push_back(0xBB);
-        result.level_bytes.push_back(0xCC);
+        result.level_bytes.insert(result.level_bytes.end(),
+                                  definition_level_block_length,
+                                  0xBB);
         auto combined_uncompressed = Join(result.level_bytes, value_bytes);
         result.payload = Compress(combined_uncompressed, compression_type);
         result.attrs = {
@@ -499,19 +502,19 @@ int main(int argc, char* argv[]) {
         ("h,help", "Display this help message");
 
     try {
-        auto result = options.parse(argc, argv);
-        if (result.count("help")) {
+        auto parsed_options = options.parse(argc, argv);
+        if (parsed_options.count("help")) {
             std::cout << options.help() << std::endl;
             return 0;
         }
 
-        int scenario_number = result["scenario_number"].as<int>();
-        std::string datatype_arg = result["datatype"].as<std::string>();
-        std::string values_file_path = result["values_file"].as<std::string>();
-        size_t max_rows_raw = result["max_rows"].as<size_t>();
-        size_t iterations = result["iterations"].as<size_t>();
-        size_t warmup = result["warmup"].as<size_t>();
-        bool skip_decrypt = result["skip_decrypt"].as<bool>();
+        int scenario_number = parsed_options["scenario_number"].as<int>();
+        std::string datatype_arg = parsed_options["datatype"].as<std::string>();
+        std::string values_file_path = parsed_options["values_file"].as<std::string>();
+        size_t max_rows_raw = parsed_options["max_rows"].as<size_t>();
+        size_t iterations = parsed_options["iterations"].as<size_t>();
+        size_t warmup = parsed_options["warmup"].as<size_t>();
+        bool skip_decrypt = parsed_options["skip_decrypt"].as<bool>();
 
         if (values_file_path.empty()) {
             std::cout << "Error: --values_file is required." << std::endl;
