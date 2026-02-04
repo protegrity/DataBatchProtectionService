@@ -237,6 +237,21 @@ target_include_directories(dbpa_remote_testapp PRIVATE
   ${CMAKE_BINARY_DIR}/_deps/snappy-src
 )
 
+# Performance Test Script executable
+add_executable(performance_test src/scripts/performance_test.cpp)
+target_link_libraries(performance_test 
+  dbps_remote_lib
+  dbps_client_lib
+  dbps_common_lib
+  dbps_server_lib
+  dbps_local_lib
+)
+target_include_directories(performance_test PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/cxxopts-src/include
+  src/processing
+  ${CMAKE_BINARY_DIR}/_deps/snappy-src
+)
+
 # =============================================================================
 # Test Executables
 # =============================================================================
@@ -486,6 +501,7 @@ add_custom_target(executables
   DEPENDS 
     dbps_api_server
     dbpa_remote_testapp
+    performance_test
   COMMENT "Building main executables"
 )
 

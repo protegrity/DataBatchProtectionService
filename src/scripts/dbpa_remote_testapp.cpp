@@ -451,9 +451,9 @@ public:
             std::cout << "Binary size: " << float_binary_data.size() << " bytes" << std::endl;
             
             // Build DATA_PAGE_V2 payload: level bytes (uncompressed) + compressed value bytes
-            const int32_t def_len = 2;
-            const int32_t rep_len = 1;
-            std::vector<uint8_t> level_bytes(static_cast<size_t>(def_len + rep_len), 0x00);
+            const int32_t def_len = 3;
+            const int32_t rep_len = 5;
+            std::vector<uint8_t> level_bytes(static_cast<size_t>(def_len + rep_len), 0xCC);
             auto compressed_values = Compress(float_binary_data, CompressionCodec::SNAPPY);
             auto joined_plaintext = Join(level_bytes, compressed_values);
 
@@ -461,7 +461,7 @@ public:
                 {"page_type", "DATA_PAGE_V2"},
                 {"data_page_num_values", std::to_string(float_test_data.size())},
                 {"data_page_max_definition_level", "1"},
-                {"data_page_max_repetition_level", "0"},
+                {"data_page_max_repetition_level", "2"},
                 {"page_v2_definition_levels_byte_length", std::to_string(def_len)},
                 {"page_v2_repetition_levels_byte_length", std::to_string(rep_len)},
                 {"page_v2_num_nulls", "0"},
@@ -620,19 +620,18 @@ public:
             
             // Build DATA_PAGE_V1 payload: level bytes use RLE blocks with length prefixes
             std::vector<uint8_t> level_bytes;
-            append_u32_le(level_bytes, 1); // repetition level block length
-            level_bytes.push_back(0xAA);
-            append_u32_le(level_bytes, 2); // definition level block length
-            level_bytes.push_back(0xBB);
-            level_bytes.push_back(0xCC);
+            append_u32_le(level_bytes, 3); // repetition level block length
+            level_bytes.insert(level_bytes.end(), 3, 0xAA);
+            append_u32_le(level_bytes, 5); // definition level block length
+            level_bytes.insert(level_bytes.end(), 5, 0xBB);
             auto combined_uncompressed = Join(level_bytes, fixed_length_data);
             auto joined_plaintext = Compress(combined_uncompressed, CompressionCodec::SNAPPY);
             std::cout << "Compressed size: " << joined_plaintext.size() << " bytes" << std::endl;
             std::map<std::string, std::string> fixed_len_encoding_attributes = {
                 {"page_type", "DATA_PAGE_V1"},
-                {"data_page_num_values", "3"},
-                {"data_page_max_repetition_level", "1"},
+                {"data_page_num_values", std::to_string(std::size(test_strings))},
                 {"data_page_max_definition_level", "1"},
+                {"data_page_max_repetition_level", "2"},
                 {"page_v1_repetition_level_encoding", "RLE"},
                 {"page_v1_definition_level_encoding", "RLE"},
                 {"page_encoding", "PLAIN"}
@@ -718,7 +717,7 @@ public:
                                                   decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset + def_len));
             offset += def_len;
 
-            if (rep_bytes != std::vector<uint8_t>{0xAA} || def_bytes != std::vector<uint8_t>{0xBB, 0xCC}) {
+            if (rep_bytes != std::vector<uint8_t>{0xAA, 0xAA, 0xAA} || def_bytes != std::vector<uint8_t>{0xBB, 0xBB, 0xBB, 0xBB, 0xBB}) {
                 std::cout << "ERROR: Level bytes content mismatch" << std::endl;
                 return false;
             }
