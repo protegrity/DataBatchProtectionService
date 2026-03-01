@@ -48,6 +48,7 @@ public:
     bool GetHasFixedSizedElements() const { return has_fixed_sized_elements_; }
     size_t GetElementSize() const { return element_size_; }
     const std::vector<size_t>& GetOffsets() const { return offsets_; }
+    const std::vector<uint8_t>& GetWriteBuffer() const { return write_buffer_; }
 };
 
 namespace {
@@ -60,6 +61,14 @@ void ExpectCommonState(
     EXPECT_EQ(buffer.GetNumElements(), expected_num_elements);
     EXPECT_EQ(buffer.GetHasFixedSizedElements(), expected_fixed_size_flag);
     EXPECT_EQ(buffer.GetElementSize(), expected_element_size);
+}
+
+std::vector<uint8_t> MakePayload(size_t size, uint8_t seed) {
+    std::vector<uint8_t> payload(size);
+    for (size_t i = 0; i < size; ++i) {
+        payload[i] = static_cast<uint8_t>(seed + static_cast<uint8_t>(i));
+    }
+    return payload;
 }
 
 } // namespace
@@ -182,6 +191,172 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
     EXPECT_EQ(read_first[4], 0x14);
     EXPECT_EQ(read_second[0], 0x20);
     EXPECT_EQ(read_second[6], 0x26);
+}
+
+TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
+    ByteBufferTestProxy buffer(3u, 32u, true);
+
+    std::vector<uint8_t> v2_first = {0xA0, 0xA1};
+    std::vector<uint8_t> v0_first = {0xB0, 0xB1, 0xB2};
+    std::vector<uint8_t> v1_first = {0xC0};
+    std::vector<uint8_t> v0_second = {0xD0, 0xD1, 0xD2, 0xD3};
+    std::vector<uint8_t> v2_second = {0xE0, 0xE1, 0xE2};
+
+    // Write in non-sequential order.
+    buffer.setElement(2, tcb::span<const uint8_t>(v2_first));
+    buffer.setElement(0, tcb::span<const uint8_t>(v0_first));
+    buffer.setElement(1, tcb::span<const uint8_t>(v1_first));
+
+    const auto e0_before = buffer.getElement(0);
+    const auto e1_before = buffer.getElement(1);
+    const auto e2_before = buffer.getElement(2);
+    ASSERT_EQ(e0_before.size(), v0_first.size());
+    ASSERT_EQ(e1_before.size(), v1_first.size());
+    ASSERT_EQ(e2_before.size(), v2_first.size());
+    for (size_t i = 0; i < v0_first.size(); ++i) {
+        EXPECT_EQ(e0_before[i], v0_first[i]);
+    }
+    for (size_t i = 0; i < v1_first.size(); ++i) {
+        EXPECT_EQ(e1_before[i], v1_first[i]);
+    }
+    for (size_t i = 0; i < v2_first.size(); ++i) {
+        EXPECT_EQ(e2_before[i], v2_first[i]);
+    }
+
+    const size_t offset0_before_overwrite = buffer.GetOffsets()[0];
+    const size_t offset2_before_overwrite = buffer.GetOffsets()[2];
+
+    // Overwrite previously written positions; latest append should win.
+    buffer.setElement(0, tcb::span<const uint8_t>(v0_second));
+    buffer.setElement(2, tcb::span<const uint8_t>(v2_second));
+
+    EXPECT_GT(buffer.GetOffsets()[0], offset0_before_overwrite);
+    EXPECT_GT(buffer.GetOffsets()[2], offset2_before_overwrite);
+
+    const auto e0 = buffer.getElement(0);
+    const auto e1 = buffer.getElement(1);
+    const auto e2 = buffer.getElement(2);
+
+    ASSERT_EQ(e0.size(), v0_second.size());
+    ASSERT_EQ(e1.size(), v1_first.size());
+    ASSERT_EQ(e2.size(), v2_second.size());
+
+    for (size_t i = 0; i < v0_second.size(); ++i) {
+        EXPECT_EQ(e0[i], v0_second[i]);
+    }
+    for (size_t i = 0; i < v1_first.size(); ++i) {
+        EXPECT_EQ(e1[i], v1_first[i]);
+    }
+    for (size_t i = 0; i < v2_second.size(); ++i) {
+        EXPECT_EQ(e2[i], v2_second[i]);
+    }
+}
+
+TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize) {
+    const std::vector<size_t> payload_sizes = {1u, 3u, 2u, 7u, 4u, 6u, 5u};
+    const size_t num_elements = payload_sizes.size();
+
+    size_t total_payload_bytes = 0;
+    for (size_t size : payload_sizes) {
+        total_payload_bytes += size;
+    }
+    const size_t exact_hint_bytes = (num_elements * 4u) + total_payload_bytes;
+
+    ByteBufferTestProxy buffer(num_elements, exact_hint_bytes, true);
+    const size_t initial_capacity = buffer.GetWriteBuffer().capacity();
+    const uint8_t* const initial_data_ptr = buffer.GetWriteBuffer().data();
+
+    std::vector<std::vector<uint8_t>> payloads;
+    payloads.reserve(num_elements);
+    for (size_t i = 0; i < num_elements; ++i) {
+        payloads.push_back(MakePayload(payload_sizes[i], static_cast<uint8_t>(0x10 + i)));
+        buffer.setElement(i, tcb::span<const uint8_t>(payloads.back()));
+    }
+
+    EXPECT_EQ(buffer.GetWriteBuffer().size(), exact_hint_bytes);
+    EXPECT_EQ(buffer.GetWriteBuffer().capacity(), initial_capacity);
+    EXPECT_EQ(buffer.GetWriteBuffer().data(), initial_data_ptr);
+
+    for (size_t i = 0; i < num_elements; ++i) {
+        const auto value = buffer.getElement(i);
+        ASSERT_EQ(value.size(), payloads[i].size());
+        for (size_t j = 0; j < payloads[i].size(); ++j) {
+            EXPECT_EQ(value[j], payloads[i][j]);
+        }
+    }
+}
+
+TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
+    const size_t num_elements = 7u;
+    ByteBufferTestProxy buffer(num_elements, 32u, true);
+
+    const size_t initial_capacity = buffer.GetWriteBuffer().capacity();
+    const uint8_t* const initial_data_ptr = buffer.GetWriteBuffer().data();
+
+    std::vector<std::vector<uint8_t>> payloads;
+    payloads.reserve(num_elements);
+    for (size_t i = 0; i < num_elements; ++i) {
+        payloads.push_back(MakePayload(64u + (i * 9u), static_cast<uint8_t>(0x40 + i)));
+        buffer.setElement(i, tcb::span<const uint8_t>(payloads.back()));
+    }
+
+    EXPECT_GT(buffer.GetWriteBuffer().size(), initial_capacity);
+    EXPECT_GT(buffer.GetWriteBuffer().capacity(), initial_capacity);
+    EXPECT_NE(buffer.GetWriteBuffer().data(), initial_data_ptr);
+
+    for (size_t i = 0; i < num_elements; ++i) {
+        const auto value = buffer.getElement(i);
+        ASSERT_EQ(value.size(), payloads[i].size());
+        for (size_t j = 0; j < payloads[i].size(); ++j) {
+            EXPECT_EQ(value[j], payloads[i][j]);
+        }
+    }
+}
+
+TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
+    ByteBufferTestProxy buffer(3u, 2u);
+
+    std::vector<uint8_t> v2_first = {0xA0, 0xA1};
+    std::vector<uint8_t> v0_first = {0xB0, 0xB1};
+    std::vector<uint8_t> v1_first = {0xC0, 0xC1};
+    std::vector<uint8_t> v0_second = {0xD0, 0xD1};
+    std::vector<uint8_t> v2_second = {0xE0, 0xE1};
+
+    // Write in non-sequential order.
+    buffer.setElement(2, tcb::span<const uint8_t>(v2_first));
+    buffer.setElement(0, tcb::span<const uint8_t>(v0_first));
+    buffer.setElement(1, tcb::span<const uint8_t>(v1_first));
+
+    const auto e0_before = buffer.getElement(0);
+    const auto e1_before = buffer.getElement(1);
+    const auto e2_before = buffer.getElement(2);
+    ASSERT_EQ(e0_before.size(), 2u);
+    ASSERT_EQ(e1_before.size(), 2u);
+    ASSERT_EQ(e2_before.size(), 2u);
+    EXPECT_EQ(e0_before[0], v0_first[0]);
+    EXPECT_EQ(e0_before[1], v0_first[1]);
+    EXPECT_EQ(e1_before[0], v1_first[0]);
+    EXPECT_EQ(e1_before[1], v1_first[1]);
+    EXPECT_EQ(e2_before[0], v2_first[0]);
+    EXPECT_EQ(e2_before[1], v2_first[1]);
+
+    // Overwrite previously written positions; latest fixed-size bytes should win.
+    buffer.setElement(0, tcb::span<const uint8_t>(v0_second));
+    buffer.setElement(2, tcb::span<const uint8_t>(v2_second));
+
+    const auto e0 = buffer.getElement(0);
+    const auto e1 = buffer.getElement(1);
+    const auto e2 = buffer.getElement(2);
+
+    ASSERT_EQ(e0.size(), 2u);
+    ASSERT_EQ(e1.size(), 2u);
+    ASSERT_EQ(e2.size(), 2u);
+    EXPECT_EQ(e0[0], v0_second[0]);
+    EXPECT_EQ(e0[1], v0_second[1]);
+    EXPECT_EQ(e1[0], v1_first[0]);
+    EXPECT_EQ(e1[1], v1_first[1]);
+    EXPECT_EQ(e2[0], v2_second[0]);
+    EXPECT_EQ(e2[1], v2_second[1]);
 }
 
 TEST(ByteBufferTest, SetElement_FixedSize_WrongPayloadSize_Throws) {
