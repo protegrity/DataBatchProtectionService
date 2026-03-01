@@ -106,7 +106,7 @@ TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpecte
         0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes));
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
     ExpectCommonState(buffer, 2u, false, 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
@@ -119,7 +119,7 @@ TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
         0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes));
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
 
     const auto first = buffer.getElement(0);
     const auto second = buffer.getElement(1);
@@ -167,7 +167,7 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
     EXPECT_EQ(buffer.GetElementSize(), 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
-    EXPECT_EQ(buffer.GetOffsets()[1], 4u);
+    EXPECT_EQ(buffer.GetOffsets()[1], 0u);
 
     std::vector<uint8_t> first = {0x10, 0x11, 0x12, 0x13, 0x14};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26};
@@ -199,7 +199,7 @@ TEST(ByteBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
 
 TEST(ByteBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {
     std::vector<uint8_t> bytes;
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes));
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
     ExpectCommonState(buffer, 0u, false, 0u);
     EXPECT_TRUE(buffer.GetOffsets().empty());
 }

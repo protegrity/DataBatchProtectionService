@@ -216,7 +216,7 @@ void ByteBuffer::setElement(size_t position, tcb::span<const uint8_t> element) {
         throw InvalidInputException("Element position out of range during setElement");
     }
 
-    if (write_buffer_.empty()) {
+    if (write_buffer_.empty() && write_buffer_.capacity() == 0) {
         throw InvalidInputException("Cannot set element: write buffer is not initialized");
     }
 
