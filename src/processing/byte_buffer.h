@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 #include <tcb/span.hpp>
@@ -53,6 +54,9 @@ public:
     tcb::span<const uint8_t> getElement(size_t position) const;
     void setElement(size_t position, tcb::span<const uint8_t> element);
 
+    // Finalizes the write path and transfers the resulting buffer ownership.
+    std::vector<uint8_t> FinalizeAndTakeBuffer();
+
 protected:
     size_t GetOffsetOfElement(size_t position) const;
 
@@ -67,6 +71,7 @@ protected:
 
     // Variables for write buffer.
     std::vector<uint8_t> write_buffer_;
+    bool write_buffer_finalized_ = false;
 
 private:
     // Initialization methods for read-only buffer
@@ -76,5 +81,7 @@ private:
     void InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint);
     void RebindSpanToWriteBuffer();
 };
+
+inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t>::max();
 
 } // namespace dbps::processing

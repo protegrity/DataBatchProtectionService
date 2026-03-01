@@ -24,6 +24,7 @@
 #include "exceptions.h"
 
 using dbps::processing::ByteBuffer;
+using dbps::processing::kUnsetVariableElementOffset;
 
 class ByteBufferTestProxy : public ByteBuffer {
 public:
@@ -175,8 +176,8 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
     EXPECT_FALSE(buffer.GetHasFixedSizedElements());
     EXPECT_EQ(buffer.GetElementSize(), 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
-    EXPECT_EQ(buffer.GetOffsets()[0], 0u);
-    EXPECT_EQ(buffer.GetOffsets()[1], 0u);
+    EXPECT_EQ(buffer.GetOffsets()[0], kUnsetVariableElementOffset);
+    EXPECT_EQ(buffer.GetOffsets()[1], kUnsetVariableElementOffset);
 
     std::vector<uint8_t> first = {0x10, 0x11, 0x12, 0x13, 0x14};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26};
@@ -191,6 +192,14 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
     EXPECT_EQ(read_first[4], 0x14);
     EXPECT_EQ(read_second[0], 0x20);
     EXPECT_EQ(read_second[6], 0x26);
+}
+
+TEST(ByteBufferTest, GetElement_VariableSize_UnsetPosition_Throws) {
+    ByteBufferTestProxy buffer(2u, 8u, true);
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    buffer.setElement(1, tcb::span<const uint8_t>(second));
+
+    EXPECT_THROW((void)buffer.getElement(0), InvalidInputException);
 }
 
 TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
@@ -253,7 +262,7 @@ TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLates
 }
 
 TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize) {
-    const std::vector<size_t> payload_sizes = {1u, 3u, 2u, 7u, 4u, 6u, 5u};
+    const std::vector<size_t> payload_sizes = {37u, 11u, 47u, 23u, 43u, 17u, 31u};
     const size_t num_elements = payload_sizes.size();
 
     size_t total_payload_bytes = 0;
@@ -310,6 +319,115 @@ TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
         for (size_t j = 0; j < payloads[i].size(); ++j) {
             EXPECT_EQ(value[j], payloads[i][j]);
         }
+    }
+}
+
+TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAllowsRetry) {
+    ByteBufferTestProxy buffer(2u, 8u, true);
+    std::vector<uint8_t> first = {0x10, 0x11};
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    buffer.setElement(1, tcb::span<const uint8_t>(second));
+
+    EXPECT_THROW((void)buffer.FinalizeAndTakeBuffer(), InvalidInputException);
+
+    buffer.setElement(0, tcb::span<const uint8_t>(first));
+    const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+    EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented after retry).
+
+    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    const auto r0 = read_back.getElement(0);
+    const auto r1 = read_back.getElement(1);
+    ASSERT_EQ(r0.size(), first.size());
+    ASSERT_EQ(r1.size(), second.size());
+    EXPECT_EQ(r0[0], 0x10);
+    EXPECT_EQ(r0[1], 0x11);
+    EXPECT_EQ(r1[0], 0x20);
+    EXPECT_EQ(r1[2], 0x22);
+}
+
+TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) {
+    ByteBufferTestProxy buffer(3u, 64u, true);
+    std::vector<uint8_t> first = {0x10, 0x11};
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    std::vector<uint8_t> third = {0x30};
+
+    buffer.setElement(0, tcb::span<const uint8_t>(first));
+    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.setElement(2, tcb::span<const uint8_t>(third));
+
+    const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
+    const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+
+    EXPECT_EQ(final_buffer, raw_before_finalize);     // Same byte content.
+    EXPECT_EQ(final_buffer.data(), data_ptr_before);  // Same allocation (moved, not copied).
+}
+
+TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) {
+    ByteBufferTestProxy buffer(3u, 64u, true);
+    std::vector<uint8_t> first = {0x10, 0x11};
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    std::vector<uint8_t> third = {0x30};
+
+    buffer.setElement(2, tcb::span<const uint8_t>(third));
+    buffer.setElement(0, tcb::span<const uint8_t>(first));
+    buffer.setElement(1, tcb::span<const uint8_t>(second));
+
+    const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
+    const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+
+    EXPECT_NE(final_buffer, raw_before_finalize);     // Different byte content.
+    EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
+
+    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    const auto r0 = read_back.getElement(0);
+    const auto r1 = read_back.getElement(1);
+    const auto r2 = read_back.getElement(2);
+    ASSERT_EQ(r0.size(), first.size());
+    ASSERT_EQ(r1.size(), second.size());
+    ASSERT_EQ(r2.size(), third.size());
+    for (size_t i = 0; i < first.size(); ++i) {
+        EXPECT_EQ(r0[i], first[i]);
+    }
+    for (size_t i = 0; i < second.size(); ++i) {
+        EXPECT_EQ(r1[i], second[i]);
+    }
+    for (size_t i = 0; i < third.size(); ++i) {
+        EXPECT_EQ(r2[i], third[i]);
+    }
+}
+
+TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) {
+    ByteBufferTestProxy buffer(2u, 64u, true);
+    std::vector<uint8_t> first_initial = {0x10, 0x11};
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    std::vector<uint8_t> first_overwrite = {0x30, 0x31, 0x32, 0x33};
+
+    buffer.setElement(0, tcb::span<const uint8_t>(first_initial));
+    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.setElement(0, tcb::span<const uint8_t>(first_overwrite));
+
+    const size_t raw_size_before_finalize = buffer.GetWriteBuffer().size();
+    const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
+    const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+
+    EXPECT_LT(final_buffer.size(), raw_size_before_finalize);
+    EXPECT_NE(final_buffer, raw_before_finalize);
+    EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
+
+    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    const auto r0 = read_back.getElement(0);
+    const auto r1 = read_back.getElement(1);
+    ASSERT_EQ(r0.size(), first_overwrite.size());
+    ASSERT_EQ(r1.size(), second.size());
+    for (size_t i = 0; i < first_overwrite.size(); ++i) {
+        EXPECT_EQ(r0[i], first_overwrite[i]);
+    }
+    for (size_t i = 0; i < second.size(); ++i) {
+        EXPECT_EQ(r1[i], second[i]);
     }
 }
 
