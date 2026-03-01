@@ -51,14 +51,14 @@ public:
         bool use_reserve_hint);
 
     // Get and set elements by position
-    tcb::span<const uint8_t> getElement(size_t position) const;
-    void setElement(size_t position, tcb::span<const uint8_t> element);
+    tcb::span<const uint8_t> GetElement(size_t position) const;
+    void SetElement(size_t position, tcb::span<const uint8_t> element);
 
     // Finalizes the write path and transfers the resulting buffer ownership.
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
 protected:
-    size_t GetOffsetOfElement(size_t position) const;
+    size_t CalculateOffsetOfElement(size_t position) const;
 
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;

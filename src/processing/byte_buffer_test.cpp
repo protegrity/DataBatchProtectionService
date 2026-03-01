@@ -85,9 +85,9 @@ TEST(ByteBufferTest, GetElement_FixedSize_ReturnsExpectedSlices) {
     std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21, 0x30, 0x31};
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
 
-    const auto first = buffer.getElement(0);
-    const auto second = buffer.getElement(1);
-    const auto third = buffer.getElement(2);
+    const auto first = buffer.GetElement(0);
+    const auto second = buffer.GetElement(1);
+    const auto third = buffer.GetElement(2);
 
     ASSERT_EQ(first.size(), 2u);
     ASSERT_EQ(second.size(), 2u);
@@ -120,7 +120,7 @@ TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpecte
     ExpectCommonState(buffer, 2u, false, 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
-    EXPECT_EQ(buffer.GetOffsets()[1], 9u);
+    EXPECT_EQ(buffer.GetOffsets()[1], 9u);  // 4 bytes length prefix + 5 bytes first payload.
 }
 
 TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
@@ -131,8 +131,8 @@ TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
     };
     ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
 
-    const auto first = buffer.getElement(0);
-    const auto second = buffer.getElement(1);
+    const auto first = buffer.GetElement(0);
+    const auto second = buffer.GetElement(1);
 
     ASSERT_EQ(first.size(), 5u);
     ASSERT_EQ(second.size(), 7u);
@@ -145,7 +145,7 @@ TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
 TEST(ByteBufferTest, GetElement_OutOfRange_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
-    EXPECT_THROW((void)buffer.getElement(2), InvalidInputException);
+    EXPECT_THROW((void)buffer.GetElement(2), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_AllocatesAndSets) {
@@ -157,11 +157,11 @@ TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_AllocatesAndSets) {
 
     std::vector<uint8_t> first = {0xAA, 0xBB};
     std::vector<uint8_t> third = {0xCC, 0xDD};
-    buffer.setElement(0, tcb::span<const uint8_t>(first));
-    buffer.setElement(2, tcb::span<const uint8_t>(third));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(2, tcb::span<const uint8_t>(third));
 
-    const auto read_first = buffer.getElement(0);
-    const auto read_third = buffer.getElement(2);
+    const auto read_first = buffer.GetElement(0);
+    const auto read_third = buffer.GetElement(2);
     ASSERT_EQ(read_first.size(), 2u);
     ASSERT_EQ(read_third.size(), 2u);
     EXPECT_EQ(read_first[0], 0xAA);
@@ -181,11 +181,11 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
 
     std::vector<uint8_t> first = {0x10, 0x11, 0x12, 0x13, 0x14};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26};
-    buffer.setElement(0, tcb::span<const uint8_t>(first));
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
 
-    const auto read_first = buffer.getElement(0);
-    const auto read_second = buffer.getElement(1);
+    const auto read_first = buffer.GetElement(0);
+    const auto read_second = buffer.GetElement(1);
     ASSERT_EQ(read_first.size(), first.size());
     ASSERT_EQ(read_second.size(), second.size());
     EXPECT_EQ(read_first[0], 0x10);
@@ -197,9 +197,9 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
 TEST(ByteBufferTest, GetElement_VariableSize_UnsetPosition_Throws) {
     ByteBufferTestProxy buffer(2u, 8u, true);
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
 
-    EXPECT_THROW((void)buffer.getElement(0), InvalidInputException);
+    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
 TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
@@ -212,13 +212,13 @@ TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLates
     std::vector<uint8_t> v2_second = {0xE0, 0xE1, 0xE2};
 
     // Write in non-sequential order.
-    buffer.setElement(2, tcb::span<const uint8_t>(v2_first));
-    buffer.setElement(0, tcb::span<const uint8_t>(v0_first));
-    buffer.setElement(1, tcb::span<const uint8_t>(v1_first));
+    buffer.SetElement(2, tcb::span<const uint8_t>(v2_first));
+    buffer.SetElement(0, tcb::span<const uint8_t>(v0_first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(v1_first));
 
-    const auto e0_before = buffer.getElement(0);
-    const auto e1_before = buffer.getElement(1);
-    const auto e2_before = buffer.getElement(2);
+    const auto e0_before = buffer.GetElement(0);
+    const auto e1_before = buffer.GetElement(1);
+    const auto e2_before = buffer.GetElement(2);
     ASSERT_EQ(e0_before.size(), v0_first.size());
     ASSERT_EQ(e1_before.size(), v1_first.size());
     ASSERT_EQ(e2_before.size(), v2_first.size());
@@ -236,15 +236,24 @@ TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLates
     const size_t offset2_before_overwrite = buffer.GetOffsets()[2];
 
     // Overwrite previously written positions; latest append should win.
-    buffer.setElement(0, tcb::span<const uint8_t>(v0_second));
-    buffer.setElement(2, tcb::span<const uint8_t>(v2_second));
+    buffer.SetElement(0, tcb::span<const uint8_t>(v0_second));
+    buffer.SetElement(2, tcb::span<const uint8_t>(v2_second));
+
+    const size_t expected_write_buffer_size =
+        (4u + v2_first.size()) +
+        (4u + v0_first.size()) +
+        (4u + v1_first.size()) +
+        (4u + v0_second.size()) +
+        (4u + v2_second.size());
+    // Check that append-only writes include overwritten records too.
+    EXPECT_EQ(buffer.GetWriteBuffer().size(), expected_write_buffer_size);
 
     EXPECT_GT(buffer.GetOffsets()[0], offset0_before_overwrite);
     EXPECT_GT(buffer.GetOffsets()[2], offset2_before_overwrite);
 
-    const auto e0 = buffer.getElement(0);
-    const auto e1 = buffer.getElement(1);
-    const auto e2 = buffer.getElement(2);
+    const auto e0 = buffer.GetElement(0);
+    const auto e1 = buffer.GetElement(1);
+    const auto e2 = buffer.GetElement(2);
 
     ASSERT_EQ(e0.size(), v0_second.size());
     ASSERT_EQ(e1.size(), v1_first.size());
@@ -279,7 +288,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
     payloads.reserve(num_elements);
     for (size_t i = 0; i < num_elements; ++i) {
         payloads.push_back(MakePayload(payload_sizes[i], static_cast<uint8_t>(0x10 + i)));
-        buffer.setElement(i, tcb::span<const uint8_t>(payloads.back()));
+        buffer.SetElement(i, tcb::span<const uint8_t>(payloads.back()));
     }
 
     EXPECT_EQ(buffer.GetWriteBuffer().size(), exact_hint_bytes);
@@ -287,7 +296,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
     EXPECT_EQ(buffer.GetWriteBuffer().data(), initial_data_ptr);
 
     for (size_t i = 0; i < num_elements; ++i) {
-        const auto value = buffer.getElement(i);
+        const auto value = buffer.GetElement(i);
         ASSERT_EQ(value.size(), payloads[i].size());
         for (size_t j = 0; j < payloads[i].size(); ++j) {
             EXPECT_EQ(value[j], payloads[i][j]);
@@ -306,7 +315,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
     payloads.reserve(num_elements);
     for (size_t i = 0; i < num_elements; ++i) {
         payloads.push_back(MakePayload(64u + (i * 9u), static_cast<uint8_t>(0x40 + i)));
-        buffer.setElement(i, tcb::span<const uint8_t>(payloads.back()));
+        buffer.SetElement(i, tcb::span<const uint8_t>(payloads.back()));
     }
 
     EXPECT_GT(buffer.GetWriteBuffer().size(), initial_capacity);
@@ -314,7 +323,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
     EXPECT_NE(buffer.GetWriteBuffer().data(), initial_data_ptr);
 
     for (size_t i = 0; i < num_elements; ++i) {
-        const auto value = buffer.getElement(i);
+        const auto value = buffer.GetElement(i);
         ASSERT_EQ(value.size(), payloads[i].size());
         for (size_t j = 0; j < payloads[i].size(); ++j) {
             EXPECT_EQ(value[j], payloads[i][j]);
@@ -326,18 +335,18 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAl
     ByteBufferTestProxy buffer(2u, 8u, true);
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
 
     EXPECT_THROW((void)buffer.FinalizeAndTakeBuffer(), InvalidInputException);
 
-    buffer.setElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
     const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
     std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented after retry).
 
     ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
-    const auto r0 = read_back.getElement(0);
-    const auto r1 = read_back.getElement(1);
+    const auto r0 = read_back.GetElement(0);
+    const auto r1 = read_back.GetElement(1);
     ASSERT_EQ(r0.size(), first.size());
     ASSERT_EQ(r1.size(), second.size());
     EXPECT_EQ(r0[0], 0x10);
@@ -352,9 +361,9 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) 
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> third = {0x30};
 
-    buffer.setElement(0, tcb::span<const uint8_t>(first));
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
-    buffer.setElement(2, tcb::span<const uint8_t>(third));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(2, tcb::span<const uint8_t>(third));
 
     const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
     const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
@@ -370,9 +379,9 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) 
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> third = {0x30};
 
-    buffer.setElement(2, tcb::span<const uint8_t>(third));
-    buffer.setElement(0, tcb::span<const uint8_t>(first));
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(2, tcb::span<const uint8_t>(third));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
 
     const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
     const uint8_t* const data_ptr_before = buffer.GetWriteBuffer().data();
@@ -382,9 +391,9 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) 
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
 
     ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
-    const auto r0 = read_back.getElement(0);
-    const auto r1 = read_back.getElement(1);
-    const auto r2 = read_back.getElement(2);
+    const auto r0 = read_back.GetElement(0);
+    const auto r1 = read_back.GetElement(1);
+    const auto r2 = read_back.GetElement(2);
     ASSERT_EQ(r0.size(), first.size());
     ASSERT_EQ(r1.size(), second.size());
     ASSERT_EQ(r2.size(), third.size());
@@ -405,9 +414,9 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) 
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> first_overwrite = {0x30, 0x31, 0x32, 0x33};
 
-    buffer.setElement(0, tcb::span<const uint8_t>(first_initial));
-    buffer.setElement(1, tcb::span<const uint8_t>(second));
-    buffer.setElement(0, tcb::span<const uint8_t>(first_overwrite));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first_initial));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(0, tcb::span<const uint8_t>(first_overwrite));
 
     const size_t raw_size_before_finalize = buffer.GetWriteBuffer().size();
     const std::vector<uint8_t> raw_before_finalize = buffer.GetWriteBuffer();
@@ -419,8 +428,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) 
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
 
     ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
-    const auto r0 = read_back.getElement(0);
-    const auto r1 = read_back.getElement(1);
+    const auto r0 = read_back.GetElement(0);
+    const auto r1 = read_back.GetElement(1);
     ASSERT_EQ(r0.size(), first_overwrite.size());
     ASSERT_EQ(r1.size(), second.size());
     for (size_t i = 0; i < first_overwrite.size(); ++i) {
@@ -441,13 +450,13 @@ TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestVa
     std::vector<uint8_t> v2_second = {0xE0, 0xE1};
 
     // Write in non-sequential order.
-    buffer.setElement(2, tcb::span<const uint8_t>(v2_first));
-    buffer.setElement(0, tcb::span<const uint8_t>(v0_first));
-    buffer.setElement(1, tcb::span<const uint8_t>(v1_first));
+    buffer.SetElement(2, tcb::span<const uint8_t>(v2_first));
+    buffer.SetElement(0, tcb::span<const uint8_t>(v0_first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(v1_first));
 
-    const auto e0_before = buffer.getElement(0);
-    const auto e1_before = buffer.getElement(1);
-    const auto e2_before = buffer.getElement(2);
+    const auto e0_before = buffer.GetElement(0);
+    const auto e1_before = buffer.GetElement(1);
+    const auto e2_before = buffer.GetElement(2);
     ASSERT_EQ(e0_before.size(), 2u);
     ASSERT_EQ(e1_before.size(), 2u);
     ASSERT_EQ(e2_before.size(), 2u);
@@ -459,12 +468,12 @@ TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestVa
     EXPECT_EQ(e2_before[1], v2_first[1]);
 
     // Overwrite previously written positions; latest fixed-size bytes should win.
-    buffer.setElement(0, tcb::span<const uint8_t>(v0_second));
-    buffer.setElement(2, tcb::span<const uint8_t>(v2_second));
+    buffer.SetElement(0, tcb::span<const uint8_t>(v0_second));
+    buffer.SetElement(2, tcb::span<const uint8_t>(v2_second));
 
-    const auto e0 = buffer.getElement(0);
-    const auto e1 = buffer.getElement(1);
-    const auto e2 = buffer.getElement(2);
+    const auto e0 = buffer.GetElement(0);
+    const auto e1 = buffer.GetElement(1);
+    const auto e2 = buffer.GetElement(2);
 
     ASSERT_EQ(e0.size(), 2u);
     ASSERT_EQ(e1.size(), 2u);
@@ -480,14 +489,14 @@ TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestVa
 TEST(ByteBufferTest, SetElement_FixedSize_WrongPayloadSize_Throws) {
     ByteBufferTestProxy buffer(1u, 4u);
     std::vector<uint8_t> wrong = {0x01, 0x02};
-    EXPECT_THROW((void)buffer.setElement(0, tcb::span<const uint8_t>(wrong)), InvalidInputException);
+    EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(wrong)), InvalidInputException);
 }
 
 TEST(ByteBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
     std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21};
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
     std::vector<uint8_t> replacement = {0xAA, 0xBB};
-    EXPECT_THROW((void)buffer.setElement(0, tcb::span<const uint8_t>(replacement)), InvalidInputException);
+    EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(replacement)), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {

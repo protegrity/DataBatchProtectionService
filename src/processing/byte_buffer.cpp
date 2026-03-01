@@ -19,6 +19,7 @@
 
 #include "bytes_utils.h"
 #include "exceptions.h"
+#include <algorithm>
 #include <cstring>
 #include <limits>
 
@@ -26,7 +27,7 @@ namespace dbps::processing {
 
 namespace {
 // Reads the element size at the given offset.
-inline size_t ReadElementSizeAt(tcb::span<const uint8_t> bytes, size_t offset) {
+inline size_t ReadSizeAt(tcb::span<const uint8_t> bytes, size_t offset) {
     return static_cast<size_t>(read_u32_le(bytes, offset));
 }
 }
@@ -70,7 +71,7 @@ void ByteBuffer::InitializeFromSpan() {
             throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
         }
         if ((elements_span_.size() % element_size_) != 0) {
-            throw InvalidInputException("Malformed fixed-size buffer: size is not divisible by element_size");
+            throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
         }
         num_elements_ = elements_span_.size() / element_size_;
         offsets_.clear();
@@ -78,43 +79,34 @@ void ByteBuffer::InitializeFromSpan() {
     }
 
     // Variable-size layout stores [u32 size][element value] back-to-back.
-    // First pass counts elements and validates shape.
+    // Single pass validates shape and captures per-element prefix offsets.
+    offsets_.clear();
+    // TODO: consider a heuristic reserve estimate to reduce offsets_ reallocations.
     size_t cursor = 0;
-    size_t count = 0;
     while (cursor < elements_span_.size()) {
         if (elements_span_.size() - cursor < 4) {
             throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
         }
-        const size_t current_element_size = ReadElementSizeAt(elements_span_, cursor);
+        offsets_.push_back(cursor);
+        const size_t current_element_size = ReadSizeAt(elements_span_, cursor);
         cursor += 4;
         if (elements_span_.size() - cursor < current_element_size) {
             throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
         }
         cursor += current_element_size;
-        ++count;
     }
 
-    // Set the number of elements.
-    num_elements_ = count;
-
-    // Set the offsets for variable-size elements on the second pass.
-    offsets_.clear();
-    offsets_.reserve(num_elements_);
-    cursor = 0;
-    while (cursor < elements_span_.size()) {
-        offsets_.push_back(cursor);
-        const size_t current_element_size = ReadElementSizeAt(elements_span_, cursor);
-        cursor += 4 + current_element_size;
-    }
+    // Set the number of elements from parsed offsets.
+    num_elements_ = offsets_.size();
 }
 
 // -----------------------------------------------------------------------------
 // Span reader methods
 // -----------------------------------------------------------------------------
 
-size_t ByteBuffer::GetOffsetOfElement(size_t position) const {
+size_t ByteBuffer::CalculateOffsetOfElement(size_t position) const {
     if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during GetOffsetOfElement");
+        throw InvalidInputException("Element position out of range during CalculateOffsetOfElement");
     }
     if (has_fixed_sized_elements_) {
         return position * element_size_;
@@ -122,11 +114,11 @@ size_t ByteBuffer::GetOffsetOfElement(size_t position) const {
     return offsets_[position];
 }
 
-tcb::span<const uint8_t> ByteBuffer::getElement(size_t position) const {
+tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
     if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during getElement");
+        throw InvalidInputException("Element position out of range during GetElement");
     }
-    const size_t offset = GetOffsetOfElement(position);
+    const size_t offset = CalculateOffsetOfElement(position);
     
     // For fixed-size elemments are stored contiguously.
     if (has_fixed_sized_elements_) {
@@ -137,7 +129,7 @@ tcb::span<const uint8_t> ByteBuffer::getElement(size_t position) const {
     if (offset == kUnsetVariableElementOffset) {
         throw InvalidInputException("Element position has not been written yet");
     }
-    const size_t element_size = ReadElementSizeAt(elements_span_, offset);
+    const size_t element_size = ReadSizeAt(elements_span_, offset);
     return elements_span_.subspan(offset + 4, element_size);
 }
 
@@ -193,12 +185,9 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
 
     // Reserve write_buffer to at least the size of the prefix [u32 size] bytes for all elements,
     //  and use a larger reserved-bytes hint if given as a best guess to reduce reallocations.
-    // write_buffer is not initialized to anything since we will be appending to it during setElement, just reserving capacity.
-    const size_t min_required_prefix_bytes = num_elements_ * static_cast<size_t>(4);
-    const size_t variable_size_reserved_bytes =
-        (variable_size_reserved_bytes_hint < min_required_prefix_bytes)
-            ? min_required_prefix_bytes
-            : variable_size_reserved_bytes_hint;
+    // write_buffer is not initialized to anything since we will be appending to it during SetElement, just reserving capacity.
+    const size_t min_required_prefix_bytes = num_elements_ * static_cast<size_t>(sizeof(uint32_t));
+    const size_t variable_size_reserved_bytes = std::max(variable_size_reserved_bytes_hint, min_required_prefix_bytes);
     write_buffer_.clear();
     write_buffer_.reserve(variable_size_reserved_bytes);
 
@@ -214,17 +203,17 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
 // Buffer writer methods
 // -----------------------------------------------------------------------------
 
-void ByteBuffer::setElement(size_t position, tcb::span<const uint8_t> element) {
+void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
     if (write_buffer_finalized_) {
-        throw InvalidInputException("Cannot set element: write buffer has been finalized");
+        throw InvalidInputException("Cannot SetElement: write buffer has been finalized");
     }
 
     if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during setElement");
+        throw InvalidInputException("Element position out of range during SetElement");
     }
 
     if (write_buffer_.empty() && write_buffer_.capacity() == 0) {
-        throw InvalidInputException("Cannot set element: write buffer is not initialized");
+        throw InvalidInputException("Cannot SetElement: write buffer is not initialized");
     }
 
     // For fixed-size elements, we write the element to buffer at the offset. No need to re-bind the span.
@@ -232,7 +221,7 @@ void ByteBuffer::setElement(size_t position, tcb::span<const uint8_t> element) {
         if (element.size() != element_size_) {
             throw InvalidInputException("Fixed-size element payload size mismatch");
         }
-        const size_t offset = GetOffsetOfElement(position);
+        const size_t offset = CalculateOffsetOfElement(position);
         std::memcpy(write_buffer_.data() + offset, element.data(), element_size_);
         return;
     }
@@ -243,6 +232,10 @@ void ByteBuffer::setElement(size_t position, tcb::span<const uint8_t> element) {
     }
 
     // For variable-size elements, we append the element to the write buffer and update offsets_.
+    //
+    // This can result on orphaned bytes if a position is set multiple times or positions written out of order.
+    // This is intentional to allow random writes of elements while the buffer is built.
+    // During FinalizeAndTakeBuffer, the buffer is rebuilt to be sequential and orphaned bytes are removed.
     const size_t offset = write_buffer_.size();
     offsets_[position] = offset;
     append_u32_le(write_buffer_, static_cast<uint32_t>(element.size()));
@@ -279,7 +272,7 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
             throw InvalidInputException("Cannot finalize variable-size buffer: invalid element offset");
         }
 
-        const size_t element_size = ReadElementSizeAt(elements_span_, element_offset);
+        const size_t element_size = ReadSizeAt(elements_span_, element_offset);
         if (element_size > (write_buffer_.size() - element_offset - 4)) {
             throw InvalidInputException("Cannot finalize variable-size buffer: malformed element payload");
         }
@@ -305,7 +298,7 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
     result.reserve(current_offset);
     for (size_t i = 0; i < num_elements_; ++i) {
         const size_t element_offset = offsets_[i];
-        const size_t elem_size = ReadElementSizeAt(elements_span_, element_offset);
+        const size_t elem_size = ReadSizeAt(elements_span_, element_offset);
         const uint8_t* start = write_buffer_.data() + element_offset;
         result.insert(result.end(), start, start + 4 + elem_size);
     }
