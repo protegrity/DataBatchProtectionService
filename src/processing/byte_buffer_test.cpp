@@ -247,6 +247,28 @@ TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
     EXPECT_FALSE(buffer.GetIsInitializedFromSpan());
 }
 
+TEST(ByteBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
+    std::vector<uint8_t> empty_bytes;
+
+    // Fixed-size empty span.
+    ByteBufferTestProxy fixed_buffer(tcb::span<const uint8_t>(empty_bytes), 2);
+    size_t fixed_count = 0;
+    for (const auto element : fixed_buffer) {
+        (void)element;
+        ++fixed_count;
+    }
+    EXPECT_EQ(fixed_count, 0u);
+
+    // Variable-size empty span.
+    ByteBufferTestProxy variable_buffer{tcb::span<const uint8_t>(empty_bytes)};
+    size_t variable_count = 0;
+    for (const auto element : variable_buffer) {
+        (void)element;
+        ++variable_count;
+    }
+    EXPECT_EQ(variable_count, 0u);
+}
+
 TEST(ByteBufferTest, GetElement_OutOfRange_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
