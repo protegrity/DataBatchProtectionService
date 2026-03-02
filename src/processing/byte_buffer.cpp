@@ -20,6 +20,7 @@
 #include "bytes_utils.h"
 #include "exceptions.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 
@@ -81,15 +82,15 @@ void ByteBuffer::InitializeFromSpan() {
     // Variable-size layout stores [u32 size][element value] back-to-back.
     // Single pass validates shape and captures per-element prefix offsets.
     offsets_.clear();
-    // TODO: consider a heuristic reserve estimate to reduce offsets_ reallocations.
+    offsets_.reserve(EstimateOffsetsReserveCountFromSample(elements_span_));
     size_t cursor = 0;
     while (cursor < elements_span_.size()) {
-        if (elements_span_.size() - cursor < 4) {
+        if (elements_span_.size() - cursor < kSizePrefixBytes) {
             throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
         }
         offsets_.push_back(cursor);
         const size_t current_element_size = ReadSizeAt(elements_span_, cursor);
-        cursor += 4;
+        cursor += kSizePrefixBytes;
         if (elements_span_.size() - cursor < current_element_size) {
             throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
         }
@@ -98,6 +99,46 @@ void ByteBuffer::InitializeFromSpan() {
 
     // Set the number of elements from parsed offsets.
     num_elements_ = offsets_.size();
+}
+
+size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
+    if (bytes.empty())
+        return 0;
+
+    // Sample the first 10 elements to estimate the total element count.
+    size_t cursor = 0;
+    size_t sampled_elements = 0;
+    while (cursor < bytes.size() && sampled_elements < 10) {
+        if (bytes.size() - cursor < kSizePrefixBytes) {
+            throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
+        }
+        const size_t current_element_size = ReadSizeAt(bytes, cursor);
+        cursor += kSizePrefixBytes;
+        if (bytes.size() - cursor < current_element_size) {
+            throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
+        }
+        cursor += current_element_size;
+        ++sampled_elements;
+    }
+
+    if (sampled_elements == 0 || cursor == 0)
+        return 0;
+
+    // If sampling consumed the full buffer (<= sample window), we already know the exact count.
+    if (cursor == bytes.size())
+        return sampled_elements;
+
+    // Estimate total element count from sample density:
+    //   (sampled_elements / sampled_bytes) * total_bytes.
+    // - sampled_elements / sampled_bytes gives "elements per byte" in the sampled prefix,
+    // - then multiplying by total_bytes extrapolates a full-buffer estimate.
+    const long double estimated =
+        (static_cast<long double>(bytes.size()) * static_cast<long double>(sampled_elements)) /
+        static_cast<long double>(cursor);
+    const size_t estimated_count = static_cast<size_t>(std::ceil(estimated));
+    const size_t estimated_with_headroom =
+        static_cast<size_t>(std::ceil(static_cast<long double>(estimated_count) * 1.1L));
+    return std::max(estimated_with_headroom, sampled_elements);
 }
 
 // -----------------------------------------------------------------------------
@@ -130,7 +171,7 @@ tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
         throw InvalidInputException("Element position has not been written yet");
     }
     const size_t element_size = ReadSizeAt(elements_span_, offset);
-    return elements_span_.subspan(offset + 4, element_size);
+    return elements_span_.subspan(offset + kSizePrefixBytes, element_size);
 }
 
 // -----------------------------------------------------------------------------
@@ -186,7 +227,7 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
     // Reserve write_buffer to at least the size of the prefix [u32 size] bytes for all elements,
     //  and use a larger reserved-bytes hint if given as a best guess to reduce reallocations.
     // write_buffer is not initialized to anything since we will be appending to it during SetElement, just reserving capacity.
-    const size_t min_required_prefix_bytes = num_elements_ * static_cast<size_t>(sizeof(uint32_t));
+    const size_t min_required_prefix_bytes = num_elements_ * kSizePrefixBytes;
     const size_t variable_size_reserved_bytes = std::max(variable_size_reserved_bytes_hint, min_required_prefix_bytes);
     write_buffer_.clear();
     write_buffer_.reserve(variable_size_reserved_bytes);
@@ -194,6 +235,9 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
     // offsets_ is initialized so the vector is fully allocated and have random-ish access during writes.
     offsets_.clear();
     offsets_.resize(num_elements_, kUnsetVariableElementOffset);
+
+    // next_expected_sequential_position_ is initialized to 0 for sequential write checking.
+    next_expected_sequential_position_ = 0;
 
     // elements_span_ is re-bound to the write buffer.
     RebindSpanToWriteBuffer();
@@ -239,7 +283,16 @@ void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
     const size_t offset = write_buffer_.size();
     offsets_[position] = offset;
     append_u32_le(write_buffer_, static_cast<uint32_t>(element.size()));
-    write_buffer_.insert(write_buffer_.end(), element.begin(), element.end());
+    write_buffer_.insert(write_buffer_.end(), element.begin(), element.end());  // Appends at the end of the buffer.
+
+    // Update next_expected_sequential_position_ for sequential write checking.
+    if (next_expected_sequential_position_ != kUnsetVariableElementOffset) {
+        if (position == next_expected_sequential_position_) {
+            next_expected_sequential_position_ += 1;
+        } else {
+            next_expected_sequential_position_ = kUnsetVariableElementOffset;
+        }
+    }
 
     RebindSpanToWriteBuffer();
 }
@@ -259,49 +312,51 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
         return std::move(write_buffer_);
     }
 
-    // Variable-size: validate all offsets and records first, and detect whether
-    // the buffer is already sequential/unfragmented.
-    bool is_sequential = true;
-    size_t current_offset = 0;
+    // For variable-size when all elements were written exactly once and in sequential order,
+    // we can skip out-of-order or fragmentation checks.  This is the fast path.
+    // This is the most common behavior when writing elements in single threaded mode.
+    if (next_expected_sequential_position_ == num_elements_) {
+        if (num_elements_ > 0) {
+            const size_t last_element_offset = offsets_[num_elements_ - 1];
+            const size_t last_element_size = ReadSizeAt(elements_span_, last_element_offset);
+            const size_t logical_size = last_element_offset + kSizePrefixBytes + last_element_size;
+            if (logical_size != write_buffer_.size()) {
+                throw InvalidInputException("FinalizeAndTakeBuffer: trailing bytes detected beyond last element");
+            }
+        }
+        write_buffer_finalized_ = true;
+        return std::move(write_buffer_);
+    }
+
+    // For variable-size, when elements are written out of order, assume the buffer is fragmented and potentially with orphaned bytes
+    // The buffer is validated and rebuilt into a compact buffer in one pass.
+    std::vector<uint8_t> result;
+    result.reserve(write_buffer_.size());
     for (size_t i = 0; i < num_elements_; ++i) {
         const size_t element_offset = offsets_[i];
         if (element_offset == kUnsetVariableElementOffset) {
             throw InvalidInputException("Cannot finalize variable-size buffer: not all elements were written");
         }
-        if (element_offset > write_buffer_.size() || (write_buffer_.size() - element_offset) < 4) {
+        if (element_offset > write_buffer_.size() || (write_buffer_.size() - element_offset) < kSizePrefixBytes) {
             throw InvalidInputException("Cannot finalize variable-size buffer: invalid element offset");
         }
 
         const size_t element_size = ReadSizeAt(elements_span_, element_offset);
-        if (element_size > (write_buffer_.size() - element_offset - 4)) {
+        if (element_size > (write_buffer_.size() - element_offset - kSizePrefixBytes)) {
             throw InvalidInputException("Cannot finalize variable-size buffer: malformed element payload");
         }
 
-        if (element_offset != current_offset) {
-            is_sequential = false;
-        }
-        current_offset += 4 + element_size;
-    }
-    // Detect trailing/orphan bytes in write_buffer_ and force rewrite if present.
-    if (current_offset != write_buffer_.size()) {
-        is_sequential = false;
+        const size_t record_size = kSizePrefixBytes + element_size;
+        result.insert(
+            result.end(),
+            write_buffer_.data() + element_offset,
+            write_buffer_.data() + element_offset + record_size);
     }
 
-    // If sequential, transfer ownership of write_buffer_ directly.
-    if (is_sequential) {
-        write_buffer_finalized_ = true;
-        return std::move(write_buffer_);
-    }
+    // Defrag path returns a new buffer; release the original fragmented write buffer.
+    write_buffer_.clear();
+    write_buffer_.shrink_to_fit();
 
-    // Fragmented: rebuild a compact buffer in element order.
-    std::vector<uint8_t> result;
-    result.reserve(current_offset);
-    for (size_t i = 0; i < num_elements_; ++i) {
-        const size_t element_offset = offsets_[i];
-        const size_t elem_size = ReadSizeAt(elements_span_, element_offset);
-        const uint8_t* start = write_buffer_.data() + element_offset;
-        result.insert(result.end(), start, start + 4 + elem_size);
-    }
     write_buffer_finalized_ = true;
     return result;
 }

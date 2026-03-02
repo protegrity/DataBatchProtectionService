@@ -21,6 +21,7 @@
 #include <vector>
 #include <cstdint>
 
+#include "bytes_utils.h"
 #include "exceptions.h"
 
 using dbps::processing::ByteBuffer;
@@ -44,12 +45,16 @@ public:
         : ByteBuffer(num_elements, reserved_bytes_hint, use_reserve_hint) {}
     ByteBufferTestProxy(size_t num_elements, size_t element_size)
         : ByteBuffer(num_elements, element_size) {}
+    using ByteBuffer::EstimateOffsetsReserveCountFromSample;
 
     size_t GetNumElements() const { return num_elements_; }
     bool GetHasFixedSizedElements() const { return has_fixed_sized_elements_; }
     size_t GetElementSize() const { return element_size_; }
     const std::vector<size_t>& GetOffsets() const { return offsets_; }
     const std::vector<uint8_t>& GetWriteBuffer() const { return write_buffer_; }
+    void AppendTrailingBytesForTest(tcb::span<const uint8_t> bytes) {
+        write_buffer_.insert(write_buffer_.end(), bytes.begin(), bytes.end());
+    }
 };
 
 namespace {
@@ -121,6 +126,60 @@ TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpecte
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
     EXPECT_EQ(buffer.GetOffsets()[1], 9u);  // 4 bytes length prefix + 5 bytes first payload.
+}
+
+TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
+    const auto make_variable_size_bytes = [](const std::vector<size_t>& sizes) {
+        std::vector<uint8_t> bytes;
+        for (size_t idx = 0; idx < sizes.size(); ++idx) {
+            append_u32_le(bytes, static_cast<uint32_t>(sizes[idx]));
+            for (size_t j = 0; j < sizes[idx]; ++j) {
+                bytes.push_back(static_cast<uint8_t>((idx + j) & 0xFF));
+            }
+        }
+        return bytes;
+    };
+
+    // Empty buffer.
+    {
+        const std::vector<size_t> sizes = {};
+        const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
+        const size_t estimated = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        EXPECT_EQ(estimated, 0u);
+    }
+
+    // Buffer with less than sample size (5 vs 10): exact count, no extrapolation/headroom needed.
+    {
+        const std::vector<size_t> sizes = {1u, 2u, 50u, 4u, 7u};
+        const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
+        const size_t estimated = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        EXPECT_EQ(estimated, sizes.size());
+    }
+
+    // Buffer with uniform record sizes. Base estimate is exact, then +10% headroom is applied.
+    {
+        // 30 elements, each 6 bytes long.
+        const size_t num_elements = 30u;
+        const size_t payload_size = 6u;
+        std::vector<uint8_t> bytes;
+        for (size_t i = 0; i < num_elements; ++i) {
+            append_u32_le(bytes, static_cast<uint32_t>(payload_size));
+            for (size_t j = 0; j < payload_size; ++j) {
+                bytes.push_back(static_cast<uint8_t>((i + j) & 0xFF));
+            }
+        }
+        const size_t estimate = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        EXPECT_EQ(estimate, 33u);  //33 = 30 elements + 10% headroom.
+    }
+
+    // Buffer to estimate intentionally overshoots the true element count.
+    {
+        // First 10 elements are very small, tail elements are very large:
+        const std::vector<size_t> sizes = {1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 100u, 100u};
+        const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
+        const size_t estimate = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        EXPECT_GT(estimate, sizes.size());
+    }
 }
 
 TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
@@ -293,6 +352,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
 
     EXPECT_EQ(buffer.GetWriteBuffer().size(), exact_hint_bytes);
     EXPECT_EQ(buffer.GetWriteBuffer().capacity(), initial_capacity);
+    EXPECT_EQ(buffer.GetWriteBuffer().capacity(), exact_hint_bytes);
     EXPECT_EQ(buffer.GetWriteBuffer().data(), initial_data_ptr);
 
     for (size_t i = 0; i < num_elements; ++i) {
@@ -302,6 +362,10 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
             EXPECT_EQ(value[j], payloads[i][j]);
         }
     }
+
+    const uint8_t* const data_ptr_before_finalize = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+    EXPECT_EQ(final_buffer.data(), data_ptr_before_finalize);  // Same allocation: finalize returned write_buffer_ as-is.
 }
 
 TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
@@ -371,6 +435,26 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) 
 
     EXPECT_EQ(final_buffer, raw_before_finalize);     // Same byte content.
     EXPECT_EQ(final_buffer.data(), data_ptr_before);  // Same allocation (moved, not copied).
+}
+
+TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_SequentialWithTrailingBytes_Throws) {
+    ByteBufferTestProxy buffer(3u, 64u, true);
+    std::vector<uint8_t> first = {0x10, 0x11};
+    std::vector<uint8_t> second = {0x20, 0x21, 0x22};
+    std::vector<uint8_t> third = {0x30};
+
+    buffer.SetElement(0, tcb::span<const uint8_t>(first));
+    buffer.SetElement(1, tcb::span<const uint8_t>(second));
+    buffer.SetElement(2, tcb::span<const uint8_t>(third));
+
+    const size_t expected_trimmed_size =
+        (4u + first.size()) + (4u + second.size()) + (4u + third.size());
+
+    std::vector<uint8_t> trailing = {0xEE, 0xEF, 0xF0};
+    buffer.AppendTrailingBytesForTest(tcb::span<const uint8_t>(trailing));
+    EXPECT_EQ(buffer.GetWriteBuffer().size(), expected_trimmed_size + trailing.size());
+
+    EXPECT_THROW((void)buffer.FinalizeAndTakeBuffer(), InvalidInputException);
 }
 
 TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) {
@@ -484,6 +568,17 @@ TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestVa
     EXPECT_EQ(e1[1], v1_first[1]);
     EXPECT_EQ(e2[0], v2_second[0]);
     EXPECT_EQ(e2[1], v2_second[1]);
+
+    const uint8_t* const data_ptr_before_finalize = buffer.GetWriteBuffer().data();
+    std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
+    EXPECT_EQ(final_buffer.data(), data_ptr_before_finalize);  // Fixed-size finalize should move write_buffer_ directly.
+    ASSERT_EQ(final_buffer.size(), 6u);
+    EXPECT_EQ(final_buffer[0], v0_second[0]);
+    EXPECT_EQ(final_buffer[1], v0_second[1]);
+    EXPECT_EQ(final_buffer[2], v1_first[0]);
+    EXPECT_EQ(final_buffer[3], v1_first[1]);
+    EXPECT_EQ(final_buffer[4], v2_second[0]);
+    EXPECT_EQ(final_buffer[5], v2_second[1]);
 }
 
 TEST(ByteBufferTest, SetElement_FixedSize_WrongPayloadSize_Throws) {

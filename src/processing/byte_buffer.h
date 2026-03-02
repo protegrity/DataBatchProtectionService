@@ -58,6 +58,10 @@ public:
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
 protected:
+    // Helper for reserve heuristics in variable-size parsing.
+    static size_t EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes);
+
+    // Helper for calculating the offset of an element by position.
     size_t CalculateOffsetOfElement(size_t position) const;
 
     // Variables for span elements reading
@@ -73,6 +77,11 @@ protected:
     std::vector<uint8_t> write_buffer_;
     bool write_buffer_finalized_ = false;
 
+    // Variable for sequential variable-size writes.
+    // Tracks next expected position for sequential variable-size writes.
+    // Value is invalidated to kUnsetVariableElementOffset once order is violated.
+    size_t next_expected_sequential_position_ = 0;
+
 private:
     // Initialization methods for read-only buffer
     void InitializeFromSpan();
@@ -83,5 +92,6 @@ private:
 };
 
 inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t>::max();
+inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);  // [u32 size] prefix for variable-size elements.
 
 } // namespace dbps::processing
