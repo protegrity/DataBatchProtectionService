@@ -33,23 +33,27 @@ public:
     // Elements are stored contiguously in the span.
     ByteBuffer(
         tcb::span<const uint8_t> elements_span,
-        size_t element_size);
+        size_t element_size,
+        size_t prefix_size);
 
     // Constructor for read-only buffer with variable-size elements.
     // Elements are encoded as [u32 size][element value] contiguously in the span.
     ByteBuffer(
-        tcb::span<const uint8_t> elements_span);
+        tcb::span<const uint8_t> elements_span,
+        size_t prefix_size = 0);
 
     // Constructor for a new write buffer with fixed-size elements.
     ByteBuffer(
         size_t num_elements,
-        size_t element_size);
+        size_t element_size,
+        size_t prefix_size = 0);
     
     // Constructor for a new write buffer with variable-size elements.
     ByteBuffer(
         size_t num_elements,
         size_t reserved_bytes_hint,
-        bool use_reserve_hint);
+        bool use_reserve_hint,
+        size_t prefix_size = 0);
 
     // Get and set elements by position
     tcb::span<const uint8_t> GetElement(size_t position) const;
@@ -103,6 +107,7 @@ protected:
     bool has_fixed_sized_elements_;
     
     // Variables for determining offset of elements.
+    size_t prefix_size_ = 0;
     size_t element_size_;                   // for fixed-size elements
     mutable std::vector<size_t> offsets_;   // for variable-size elements
 

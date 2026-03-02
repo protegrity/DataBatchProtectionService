@@ -40,27 +40,37 @@ inline size_t ReadSizeAt(tcb::span<const uint8_t> bytes, size_t offset) {
 // Constructor for read-only buffer with fixed-size elements.
 ByteBuffer::ByteBuffer(
     tcb::span<const uint8_t> elements_span,
-    size_t element_size)
+    size_t element_size,
+    size_t prefix_size)
     : elements_span_(elements_span),
       num_elements_(0),
       has_fixed_sized_elements_(true),
       element_size_(element_size),
+      prefix_size_(prefix_size),
       is_initialized_from_span_(false) {}
 
 // Constructor for read-only buffer with variable-size elements.
 ByteBuffer::ByteBuffer(
-    tcb::span<const uint8_t> elements_span)
+    tcb::span<const uint8_t> elements_span,
+    size_t prefix_size)
     : elements_span_(elements_span),
       num_elements_(0),
       has_fixed_sized_elements_(false),
       element_size_(0),
+      prefix_size_(prefix_size),
       is_initialized_from_span_(false) {}
 
 // Initializes `num_elements_` and `offsets_` from the span.
 // Called in a lazy manner when the buffer is accessed with GetElement, avoiding unnecessary initialization.
 void ByteBuffer::InitializeFromSpan() const {
+    if (elements_span_.size() < prefix_size_) {
+        throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
+    }
+
+    const size_t readable_size = elements_span_.size() - prefix_size_;
+
     // No elements to index. Initialize with empty values.
-    if (elements_span_.empty()) {
+    if (readable_size == 0) {
         num_elements_ = 0;
         offsets_.clear();
         is_initialized_from_span_ = true;
@@ -73,10 +83,10 @@ void ByteBuffer::InitializeFromSpan() const {
         if (element_size_ <= 0) {
             throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
         }
-        if ((elements_span_.size() % element_size_) != 0) {
+        if ((readable_size % element_size_) != 0) {
             throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
         }
-        num_elements_ = elements_span_.size() / element_size_;
+        num_elements_ = readable_size / element_size_;
         offsets_.clear();
         is_initialized_from_span_ = true;
         return;
@@ -85,8 +95,8 @@ void ByteBuffer::InitializeFromSpan() const {
     // Variable-size layout stores [u32 size][element value] back-to-back.
     // Single pass validates shape and captures per-element prefix offsets.
     offsets_.clear();
-    offsets_.reserve(EstimateOffsetsReserveCountFromSample(elements_span_));
-    size_t cursor = 0;
+    offsets_.reserve(EstimateOffsetsReserveCountFromSample(elements_span_.subspan(prefix_size_)));
+    size_t cursor = prefix_size_;
     while (cursor < elements_span_.size()) {
         if (elements_span_.size() - cursor < kSizePrefixBytes) {
             throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
@@ -167,7 +177,7 @@ size_t ByteBuffer::CalculateOffsetOfElement(size_t position) const {
         throw InvalidInputException("Element position out of range during CalculateOffsetOfElement");
     }
     if (has_fixed_sized_elements_) {
-        return position * element_size_;
+        return prefix_size_ + (position * element_size_);
     }
     return offsets_[position];
 }
@@ -265,11 +275,15 @@ void ByteBuffer::ValidateIteratorReadPreconditions() const {
     if (is_write_buffer_initialized_) {
         throw InvalidInputException("Iterator is only available for read buffers");
     }
+    if (elements_span_.size() < prefix_size_) {
+        throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
+    }
     if (has_fixed_sized_elements_) {
         if (element_size_ <= 0) {
             throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
         }
-        if ((elements_span_.size() % element_size_) != 0) {
+        const size_t readable_size = elements_span_.size() - prefix_size_;
+        if ((readable_size % element_size_) != 0) {
             throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
         }
     }
@@ -277,7 +291,7 @@ void ByteBuffer::ValidateIteratorReadPreconditions() const {
 
 ByteBuffer::ConstIterator ByteBuffer::begin() const {
     ValidateIteratorReadPreconditions();
-    return ConstIterator(this, 0u);
+    return ConstIterator(this, prefix_size_);
 }
 
 ByteBuffer::ConstIterator ByteBuffer::end() const {
@@ -292,10 +306,12 @@ ByteBuffer::ConstIterator ByteBuffer::end() const {
 // Constructor for a new write buffer with fixed-size elements.
 ByteBuffer::ByteBuffer(
     size_t num_elements,
-    size_t element_size)
+    size_t element_size,
+    size_t prefix_size)
     : num_elements_(num_elements),
       has_fixed_sized_elements_(true),
-      element_size_(element_size) {
+      element_size_(element_size),
+      prefix_size_(prefix_size) {
     InitializeForWriteBuffer(0);
 }
 
@@ -303,16 +319,17 @@ ByteBuffer::ByteBuffer(
 ByteBuffer::ByteBuffer(
     size_t num_elements,
     size_t reserved_bytes_hint,
-    bool use_reserve_hint)
+    bool use_reserve_hint,
+    size_t prefix_size)
     : num_elements_(num_elements),
       has_fixed_sized_elements_(false),
-      element_size_(0) {
+      element_size_(0),
+      prefix_size_(prefix_size) {
     InitializeForWriteBuffer(use_reserve_hint ? reserved_bytes_hint : 0);
 }
 
 // Initializes `write_buffer_`, `offsets_` and `elements_span_`
 void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint) {
-
     // Fixed-size elements
     if (has_fixed_sized_elements_) {
         if (element_size_ <= 0) {
@@ -321,7 +338,7 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
 
         // write_buffer can be allocated to precise size since the element size and number of elements are known.
         // We initialize it to 0s to have random-ish access during writes.
-        const size_t fixed_size_total_bytes = num_elements_ * element_size_;
+        const size_t fixed_size_total_bytes = prefix_size_ + (num_elements_ * element_size_);
         write_buffer_.clear();
         write_buffer_.resize(fixed_size_total_bytes, static_cast<uint8_t>(0));
         is_write_buffer_initialized_ = true;
@@ -339,9 +356,11 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
     // Reserve write_buffer to at least the size of the prefix [u32 size] bytes for all elements,
     //  and use a larger reserved-bytes hint if given as a best guess to reduce reallocations.
     // write_buffer is not initialized to anything since we will be appending to it during SetElement, just reserving capacity.
-    const size_t min_required_prefix_bytes = num_elements_ * kSizePrefixBytes;
-    const size_t variable_size_reserved_bytes = std::max(variable_size_reserved_bytes_hint, min_required_prefix_bytes);
+    const size_t min_required_record_bytes = num_elements_ * kSizePrefixBytes;
+    const size_t variable_size_reserved_bytes =
+        prefix_size_ + std::max(variable_size_reserved_bytes_hint, min_required_record_bytes);
     write_buffer_.clear();
+    write_buffer_.resize(prefix_size_, static_cast<uint8_t>(0));
     write_buffer_.reserve(variable_size_reserved_bytes);
     is_write_buffer_initialized_ = true;
 
@@ -445,6 +464,11 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
     // The buffer is validated and rebuilt into an ordered compact buffer in one pass.
     std::vector<uint8_t> result;
     result.reserve(write_buffer_.size());
+    // Copy the prefix bytes at the beginning of the result.
+    result.insert(
+        result.end(),
+        write_buffer_.begin(),
+        write_buffer_.begin() + static_cast<std::ptrdiff_t>(prefix_size_));
     for (size_t i = 0; i < num_elements_; ++i) {
         const size_t element_offset = offsets_[i];
         if (element_offset == kUnsetVariableElementOffset) {
