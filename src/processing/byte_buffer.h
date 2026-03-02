@@ -97,9 +97,6 @@ protected:
     // Helper to validate the preconditions for reading the buffer with an iterator.
     void ValidateIteratorReadPreconditions() const;
 
-    // Helper to check if the buffer is initialized from a span.
-    bool IsInitializedFromSpan() const { return is_initialized_from_span_; }
-
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
     mutable size_t num_elements_;

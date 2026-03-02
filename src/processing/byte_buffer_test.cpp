@@ -51,7 +51,6 @@ public:
     bool GetHasFixedSizedElements() const { return has_fixed_sized_elements_; }
     size_t GetElementSize() const { return element_size_; }
     const std::vector<size_t>& GetOffsets() const { return offsets_; }
-    bool GetIsInitializedFromSpan() const { return IsInitializedFromSpan(); }
     const std::vector<uint8_t>& GetWriteBuffer() const { return write_buffer_; }
     void AppendTrailingBytesForTest(tcb::span<const uint8_t> bytes) {
         write_buffer_.insert(write_buffer_.end(), bytes.begin(), bytes.end());
@@ -221,9 +220,26 @@ TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
     EXPECT_EQ(collected[0], (std::vector<uint8_t>{0x10, 0x11}));
     EXPECT_EQ(collected[1], (std::vector<uint8_t>{0x20, 0x21}));
     EXPECT_EQ(collected[2], (std::vector<uint8_t>{0x30, 0x31}));
+
+    // Check InitializeFromSpan was not called yet.
     EXPECT_TRUE(buffer.GetOffsets().empty());
-    EXPECT_EQ(buffer.GetNumElements(), 0u);
-    EXPECT_FALSE(buffer.GetIsInitializedFromSpan());
+    EXPECT_EQ(buffer.GetNumElements(), 0);
+
+    // Now read the elemennts through GetElement. It calls the InitializeFromSpan method.
+    std::vector<std::vector<uint8_t>> collected_with_get_element;
+    for (size_t i = 0; i < collected.size(); ++i) {
+        const auto element = buffer.GetElement(i);
+        collected_with_get_element.push_back(std::vector<uint8_t>(element.begin(), element.end()));
+    }
+
+    // Check elements read with GetElement are the same as the ones collected with the iterator.
+    EXPECT_EQ(collected_with_get_element, collected);
+
+    // Offsets should still be empty after the iteration because these fixed-size elements.
+    // However, the number of elements is now known.
+    EXPECT_TRUE(buffer.GetOffsets().empty());
+    EXPECT_EQ(buffer.GetNumElements(), 3u);
+
 }
 
 TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
@@ -242,9 +258,136 @@ TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
     ASSERT_EQ(collected.size(), 2u);
     EXPECT_EQ(collected[0], (std::vector<uint8_t>{0x41, 0x42, 0x43, 0x44, 0x45}));
     EXPECT_EQ(collected[1], (std::vector<uint8_t>{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37}));
+    
+    // Check InitializeFromSpan was not called yet.
     EXPECT_TRUE(buffer.GetOffsets().empty());
-    EXPECT_EQ(buffer.GetNumElements(), 0u);
-    EXPECT_FALSE(buffer.GetIsInitializedFromSpan());
+    EXPECT_EQ(buffer.GetNumElements(), 0);
+
+    // Now read the elemennts through GetElement. It calls the InitializeFromSpan method.
+    std::vector<std::vector<uint8_t>> collected_with_get_element;
+    for (size_t i = 0; i < collected.size(); ++i) {
+        const auto element = buffer.GetElement(i);
+        collected_with_get_element.push_back(std::vector<uint8_t>(element.begin(), element.end()));
+    }
+
+    // Check elements read with GetElement are the same as the ones collected with the iterator.
+    EXPECT_EQ(collected_with_get_element, collected);
+
+    // Offsets and number of elements should now be initialized.
+    ASSERT_EQ(buffer.GetOffsets().size(), 2u);
+    EXPECT_EQ(buffer.GetOffsets()[0], 0u);
+    EXPECT_EQ(buffer.GetOffsets()[1], 9u); // 4 bytes length prefix + 5 bytes first payload.
+    EXPECT_EQ(buffer.GetNumElements(), 2u);
+
+}
+
+TEST(ByteBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
+    constexpr size_t kElementSize = 2u;
+    std::vector<uint8_t> source_bytes = {
+        0x10, 0x11,
+        0x20, 0x21,
+        0x30, 0x31
+    };
+
+    // Create a source buffer to read the elements from.
+    ByteBufferTestProxy source_buffer(tcb::span<const uint8_t>(source_bytes), kElementSize);
+
+    // Create a new buffer to write the transformed elements.
+    ByteBufferTestProxy transformed_buffer(3u, kElementSize);
+    size_t position = 0;
+    for (const auto element : source_buffer) {
+        std::vector<uint8_t> source_element(element.begin(), element.end());
+        std::vector<uint8_t> transformed_element = source_element;
+        transformed_element[0] = static_cast<uint8_t>(transformed_element[0] + 1u);
+        transformed_buffer.SetElement(position, tcb::span<const uint8_t>(transformed_element));
+        ++position;
+    }
+
+    ASSERT_EQ(position, 3u);
+
+    // Compare source and transformed buffers before finalization.
+    for (size_t i = 0; i < position; ++i) {
+        const auto source_element = source_buffer.GetElement(i);
+        const auto transformed_element = transformed_buffer.GetElement(i);
+
+        std::vector<uint8_t> expected_transformed(source_element.begin(), source_element.end());
+        expected_transformed[0] = static_cast<uint8_t>(expected_transformed[0] + 1u);
+
+        EXPECT_EQ(std::vector<uint8_t>(transformed_element.begin(), transformed_element.end()), expected_transformed);
+        // Check that transformed element differs from source after applying the mutation.
+        EXPECT_NE(std::vector<uint8_t>(source_element.begin(), source_element.end()),
+                  std::vector<uint8_t>(transformed_element.begin(), transformed_element.end()));
+    }
+
+    // Now finalize the transformed buffer and populate a third buffer to read the elements from.
+    std::vector<uint8_t> finalized_bytes = transformed_buffer.FinalizeAndTakeBuffer();
+    ByteBufferTestProxy finalized_read_buffer(tcb::span<const uint8_t>(finalized_bytes), kElementSize);
+
+    // Compare source and finalized read buffer using the same transformation rule.
+    for (size_t i = 0; i < position; ++i) {
+        const auto source_element = source_buffer.GetElement(i);
+        const auto finalized_element = finalized_read_buffer.GetElement(i);
+
+        std::vector<uint8_t> expected_transformed(source_element.begin(), source_element.end());
+        expected_transformed[0] = static_cast<uint8_t>(expected_transformed[0] + 1u);
+
+        EXPECT_EQ(std::vector<uint8_t>(finalized_element.begin(), finalized_element.end()), expected_transformed);
+        EXPECT_NE(std::vector<uint8_t>(source_element.begin(), source_element.end()),
+                  std::vector<uint8_t>(finalized_element.begin(), finalized_element.end()));
+    }
+}
+
+TEST(ByteBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
+    std::vector<uint8_t> source_bytes;
+    append_u32_le(source_bytes, 5u);
+    source_bytes.insert(source_bytes.end(), {0x41, 0x42, 0x43, 0x44, 0x45});  // "ABCDE"
+    append_u32_le(source_bytes, 7u);
+    source_bytes.insert(source_bytes.end(), {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37});  // "1234567"
+    append_u32_le(source_bytes, 3u);
+    source_bytes.insert(source_bytes.end(), {0x61, 0x62, 0x63});  // "abc"
+
+    ByteBufferTestProxy source_buffer{tcb::span<const uint8_t>(source_bytes)};
+    ByteBufferTestProxy transformed_buffer(3u, source_bytes.size(), true);
+    size_t position = 0;
+
+    for (const auto element : source_buffer) {
+        std::vector<uint8_t> source_element(element.begin(), element.end());
+        std::vector<uint8_t> transformed_element = source_element;
+        transformed_element[0] = static_cast<uint8_t>(transformed_element[0] + 1u);
+        transformed_buffer.SetElement(position, tcb::span<const uint8_t>(transformed_element));
+        ++position;
+    }
+
+    ASSERT_EQ(position, 3u);
+
+    // Compare source and transformed buffers before finalization.
+    for (size_t i = 0; i < position; ++i) {
+        const auto source_element = source_buffer.GetElement(i);
+        const auto transformed_element = transformed_buffer.GetElement(i);
+
+        std::vector<uint8_t> expected_transformed(source_element.begin(), source_element.end());
+        expected_transformed[0] = static_cast<uint8_t>(expected_transformed[0] + 1u);
+
+        EXPECT_EQ(std::vector<uint8_t>(transformed_element.begin(), transformed_element.end()), expected_transformed);
+        EXPECT_NE(std::vector<uint8_t>(source_element.begin(), source_element.end()),
+                  std::vector<uint8_t>(transformed_element.begin(), transformed_element.end()));
+    }
+
+    std::vector<uint8_t> finalized_bytes = transformed_buffer.FinalizeAndTakeBuffer();
+    ByteBufferTestProxy finalized_read_buffer{tcb::span<const uint8_t>(finalized_bytes)};
+
+    // Compare source and finalized read buffer using the same transformation rule.
+    for (size_t i = 0; i < position; ++i) {
+        const auto source_element = source_buffer.GetElement(i);
+        const auto finalized_element = finalized_read_buffer.GetElement(i);
+
+        std::vector<uint8_t> expected_transformed(source_element.begin(), source_element.end());
+        expected_transformed[0] = static_cast<uint8_t>(expected_transformed[0] + 1u);
+
+        EXPECT_EQ(std::vector<uint8_t>(finalized_element.begin(), finalized_element.end()), expected_transformed);
+        EXPECT_NE(std::vector<uint8_t>(source_element.begin(), source_element.end()),
+                  std::vector<uint8_t>(finalized_element.begin(), finalized_element.end()));
+    }
 }
 
 TEST(ByteBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {

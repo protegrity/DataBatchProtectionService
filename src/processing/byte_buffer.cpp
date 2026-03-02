@@ -57,6 +57,7 @@ ByteBuffer::ByteBuffer(
       is_initialized_from_span_(false) {}
 
 // Initializes `num_elements_` and `offsets_` from the span.
+// Called in a lazy manner when the buffer is accessed with GetElement, avoiding unnecessary initialization.
 void ByteBuffer::InitializeFromSpan() const {
     // No elements to index. Initialize with empty values.
     if (elements_span_.empty()) {
@@ -360,16 +361,16 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
 // -----------------------------------------------------------------------------
 
 void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
+    if (!is_write_buffer_initialized_) {
+        throw InvalidInputException("Cannot SetElement: write buffer is not initialized.");
+    }
+
     if (is_write_buffer_finalized_) {
         throw InvalidInputException("Cannot SetElement: write buffer has been finalized");
     }
 
     if (position >= num_elements_) {
         throw InvalidInputException("Element position out of range during SetElement");
-    }
-
-    if (!is_write_buffer_initialized_) {
-        throw InvalidInputException("Cannot SetElement: write buffer is not initialized.");
     }
 
     // For fixed-size elements, we write the element to buffer at the offset. No need to re-bind the span.
