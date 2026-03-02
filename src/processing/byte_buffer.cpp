@@ -189,7 +189,7 @@ tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
     }
     const size_t offset = CalculateOffsetOfElement(position);
     
-    // For fixed-size elemments are stored contiguously.
+    // For fixed-size elements are stored contiguously.
     if (has_fixed_sized_elements_) {
         return elements_span_.subspan(offset, element_size_);
     }
@@ -203,7 +203,7 @@ tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
 }
 
 // -----------------------------------------------------------------------------
-// Elemment span iterator
+// Element span iterator
 //
 // Allows an alternative read of elements_span_ without need for lazy initialization of offsets_,
 // so saving execution time when the traversal of the buffer is strictly sequential.
