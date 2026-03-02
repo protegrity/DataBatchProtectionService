@@ -30,6 +30,8 @@
 #include <cassert>
 #include <cstring>
 #include <memory>
+#include <chrono>
+#include <cstdlib>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
@@ -42,6 +44,11 @@ namespace {
     constexpr const char* ENCRYPTION_MODE_KEY_DATA_PAGE = "encrypt_mode_data_page";
     constexpr const char* ENCRYPTION_MODE_PER_BLOCK = "per_block";
     constexpr const char* ENCRYPTION_MODE_PER_VALUE = "per_value";
+
+    bool ShouldLogStepTimings() {
+        const char* env = std::getenv("DBPS_LOG_ENCRYPT_TIMING");
+        return env == nullptr || std::string(env) == "1";
+    }
 }
 
 // Helper function to create encryptor instance
@@ -126,6 +133,24 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& 
 
     auto encryption_mode_key = GetEncryptionModeKey();
     
+    // ++++++ FORCED PER-BLOCK ENCRYPTION ++++++  vvvvvv
+    if (false) {
+        std::cout << "+++++ FORCED PER-BLOCK ENCRYPTION +++++" << " datatype_: " << to_string(datatype_) << std::endl;
+        std::cout << "+++++ FORCED PER-BLOCK ENCRYPTION +++++" << " compression_: " << to_string(compression_) << std::endl;
+        std::cout << "+++++ FORCED PER-BLOCK ENCRYPTION +++++" << " encoding_: " << to_string(encoding_) << std::endl;
+        std::cout << "+++++ FORCED PER-BLOCK ENCRYPTION +++++" << " page_type_: " << std::get<std::string>(encoding_attributes_converted_.at("page_type")) << std::endl;
+        encrypted_result_ = encryptor_->EncryptBlock(plaintext);
+        if (encrypted_result_.empty()) {
+            error_stage_ = "encryption";
+            error_message_ = "Failed to encrypt data";
+            return false;
+        }
+        encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_BLOCK;
+        encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+        return true;
+    }
+    // ++++++ FORCED PER-BLOCK ENCRYPTION ++++++  ^^^^^^
+
     /*
      * Note on try-catch block:
      * - When fully done, DecodeAndEncrypt will support per-value encryption for all cases, except for
@@ -137,24 +162,74 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& 
      * - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
      */
     try {
-        // Decompress and split plaintext into level and value bytes
-        auto [level_bytes, value_bytes] = DecompressAndSplit(
-            plaintext, compression_, encoding_attributes_converted_);
-        
-        // Parse value bytes into typed list
-        auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, encoding_);
-        
-        // Encrypt the typed list and level bytes, then join them into a single encrypted byte vector.
-        auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
-        auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
-        auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
-        
-        // Compress the joined encrypted bytes
-        encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
+        const bool log_timings = ShouldLogStepTimings();
+        using Clock = std::chrono::steady_clock;
+        std::vector<std::pair<std::string, long long>> timings;
+
+        std::vector<uint8_t> level_bytes;
+        std::vector<uint8_t> value_bytes;
+        TypedListValues typed_list;
+        std::vector<uint8_t> encrypted_value_bytes;
+        std::vector<uint8_t> encrypted_level_bytes;
+        std::vector<uint8_t> joined_encrypted_bytes;
+
+        auto time_step = [&](const char* label, const std::function<void()>& fn) {
+            if (!log_timings) {
+                fn();
+                return;
+            }
+            auto start = Clock::now();
+            fn();
+            auto end = Clock::now();
+            auto micros = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            timings.emplace_back(label, micros);
+        };
+
+        time_step("DecompressAndSplit", [&]() {
+            auto split = DecompressAndSplit(plaintext, compression_, encoding_attributes_converted_);
+            level_bytes = std::move(split.level_bytes);
+            value_bytes = std::move(split.value_bytes);
+        });
+
+        time_step("ParseValueBytesIntoTypedList", [&]() {
+            typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, encoding_);
+        });
+
+        time_step("EncryptValueList", [&]() {
+            encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
+        });
+
+        time_step("EncryptBlock(level_bytes)", [&]() {
+            encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
+        });
+
+        time_step("JoinWithLengthPrefix", [&]() {
+            joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
+        });
+
+        time_step("Compress", [&]() {
+            encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
+        });
 
         // Set the encryption type to per-value
         encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_VALUE;
         encryption_metadata_[DBPS_VERSION_KEY] = DBPS_VERSION;
+
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " datatype_: " << to_string(datatype_) << std::endl;
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " compression_: " << to_string(compression_) << std::endl;
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " encoding_: " << to_string(encoding_) << std::endl;
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " page_type_: " << std::get<std::string>(encoding_attributes_converted_.at("page_type")) << std::endl;
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " encrypted_compression_: " << to_string(encrypted_compression_) << std::endl;
+        const auto typed_list_size = std::visit([](const auto& values) { return values.size(); }, typed_list);
+        std::cout << "+++++ PER-VALUE ENCRYPTION +++++" << " typed_list size: " << typed_list_size << std::endl;
+
+        if (log_timings) {
+            std::cout << "+++++ DecodeAndEncrypt timings (microseconds) +++++\n";
+            for (const auto& entry : timings) {
+                std::cout << "  " << entry.first << ": " << entry.second << "\n";
+            }
+        }
+
         return true;
     }
     // Allow fallback to per-block encryption, only for explicitly unsupported conditions. See note above.

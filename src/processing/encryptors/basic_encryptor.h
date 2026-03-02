@@ -63,6 +63,10 @@ public:
     std::vector<uint8_t> EncryptValueList(
         const TypedListValues& typed_list) override;
 
+    // Legacy implementation kept for reference/perf comparison
+    std::vector<uint8_t> EncryptValueList_OLD(
+        const TypedListValues& typed_list);
+
     TypedListValues DecryptValueList(
         const std::vector<uint8_t>& encrypted_bytes) override;
 };
