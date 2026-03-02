@@ -133,6 +133,16 @@ target_include_directories(dbps_common_lib PUBLIC
 )
 target_link_libraries(dbps_common_lib PUBLIC tcb_span)
 
+# Byte buffer processing library
+add_library(dbps_byte_buffer_lib STATIC
+  src/processing/byte_buffer.cpp
+)
+target_include_directories(dbps_byte_buffer_lib PUBLIC
+  src/processing
+  src/common
+)
+target_link_libraries(dbps_byte_buffer_lib PUBLIC tcb_span)
+
 # Server components library
 add_library(dbps_server_lib STATIC 
   src/processing/encryption_sequencer.cpp
@@ -205,7 +215,7 @@ target_include_directories(dbps_local_lib PUBLIC
 )
 
 # Ensure PIC on static libs that are linked into shared libraries
-set_target_properties(dbps_common_lib dbps_server_lib dbps_local_lib
+set_target_properties(dbps_common_lib dbps_byte_buffer_lib dbps_server_lib dbps_local_lib
   PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # =============================================================================
@@ -324,6 +334,14 @@ if(BUILD_TESTS)
     gtest_main
   )
   target_include_directories(compression_utils_test PRIVATE src/processing)
+
+  # Byte buffer tests
+  add_executable(byte_buffer_test src/processing/byte_buffer_test.cpp)
+  target_link_libraries(byte_buffer_test
+    dbps_byte_buffer_lib
+    gtest_main
+  )
+  target_include_directories(byte_buffer_test PRIVATE src/processing src/common)
 
   # Basic encryptor tests
   add_executable(basic_encryptor_test src/processing/encryptors/basic_encryptor_test.cpp)
@@ -482,6 +500,7 @@ endif()
 add_custom_target(libraries
   DEPENDS 
     dbps_common_lib
+    dbps_byte_buffer_lib
     dbps_server_lib
     dbps_client_lib
     dbps_remote_lib
@@ -517,6 +536,7 @@ if(BUILD_TESTS)
       parquet_utils_test
       bytes_utils_test
       compression_utils_test
+      byte_buffer_test
       basic_encryptor_test
       auth_utils_test
       dbpa_interface_test
@@ -539,6 +559,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(parquet_utils_test)
   gtest_discover_tests(bytes_utils_test)
   gtest_discover_tests(compression_utils_test)
+  gtest_discover_tests(byte_buffer_test)
   gtest_discover_tests(basic_encryptor_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)

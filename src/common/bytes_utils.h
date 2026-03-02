@@ -25,15 +25,18 @@
 #include <string>
 #include <variant>
 #include <cassert>
+#include <tcb/span.hpp>
 #include "exceptions.h"
 
 // Utility functions for little-endian number reading and writing.
 
 inline void append_u32_le(std::vector<uint8_t>& out, uint32_t v) {
-    out.push_back(static_cast<uint8_t>(v & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+    const size_t offset = out.size();
+    out.resize(offset + 4);
+    out[offset + 0] = static_cast<uint8_t>(v & 0xFF);
+    out[offset + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+    out[offset + 2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+    out[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
 }
 
 inline void append_i32_le(std::vector<uint8_t>& out, int32_t v) {
@@ -41,14 +44,16 @@ inline void append_i32_le(std::vector<uint8_t>& out, int32_t v) {
 }
 
 inline void append_u64_le(std::vector<uint8_t>& out, uint64_t v) {
-    out.push_back(static_cast<uint8_t>(v & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 32) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 40) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 48) & 0xFF));
-    out.push_back(static_cast<uint8_t>((v >> 56) & 0xFF));
+    const size_t offset = out.size();
+    out.resize(offset + 8);
+    out[offset + 0] = static_cast<uint8_t>(v & 0xFF);
+    out[offset + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+    out[offset + 2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+    out[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+    out[offset + 4] = static_cast<uint8_t>((v >> 32) & 0xFF);
+    out[offset + 5] = static_cast<uint8_t>((v >> 40) & 0xFF);
+    out[offset + 6] = static_cast<uint8_t>((v >> 48) & 0xFF);
+    out[offset + 7] = static_cast<uint8_t>((v >> 56) & 0xFF);
 }
 
 inline void append_i64_le(std::vector<uint8_t>& out, int64_t v) {
@@ -68,6 +73,13 @@ inline void append_f64_le(std::vector<uint8_t>& out, double v) {
 }
 
 inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
+    return static_cast<uint32_t>(in[offset]) |
+        (static_cast<uint32_t>(in[offset + 1]) << 8) |
+        (static_cast<uint32_t>(in[offset + 2]) << 16) |
+        (static_cast<uint32_t>(in[offset + 3]) << 24);
+}
+
+inline uint32_t read_u32_le(tcb::span<const uint8_t> in, size_t offset) {
     return static_cast<uint32_t>(in[offset]) |
         (static_cast<uint32_t>(in[offset + 1]) << 8) |
         (static_cast<uint32_t>(in[offset + 2]) << 16) |
