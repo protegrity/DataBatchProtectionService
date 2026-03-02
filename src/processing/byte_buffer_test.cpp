@@ -51,6 +51,7 @@ public:
     bool GetHasFixedSizedElements() const { return has_fixed_sized_elements_; }
     size_t GetElementSize() const { return element_size_; }
     const std::vector<size_t>& GetOffsets() const { return offsets_; }
+    bool GetIsInitializedFromSpan() const { return IsInitializedFromSpan(); }
     const std::vector<uint8_t>& GetWriteBuffer() const { return write_buffer_; }
     void AppendTrailingBytesForTest(tcb::span<const uint8_t> bytes) {
         write_buffer_.insert(write_buffer_.end(), bytes.begin(), bytes.end());
@@ -205,6 +206,45 @@ TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
     EXPECT_EQ(first[4], 0x45);
     EXPECT_EQ(second[0], 0x31);
     EXPECT_EQ(second[6], 0x37);
+}
+
+TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
+    std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21, 0x30, 0x31};
+    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+
+    std::vector<std::vector<uint8_t>> collected;
+    for (const auto element : buffer) {
+        collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
+    }
+
+    ASSERT_EQ(collected.size(), 3u);
+    EXPECT_EQ(collected[0], (std::vector<uint8_t>{0x10, 0x11}));
+    EXPECT_EQ(collected[1], (std::vector<uint8_t>{0x20, 0x21}));
+    EXPECT_EQ(collected[2], (std::vector<uint8_t>{0x30, 0x31}));
+    EXPECT_TRUE(buffer.GetOffsets().empty());
+    EXPECT_EQ(buffer.GetNumElements(), 0u);
+    EXPECT_FALSE(buffer.GetIsInitializedFromSpan());
+}
+
+TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
+    // [len=5]["ABCDE"][len=7]["1234567"]
+    std::vector<uint8_t> bytes = {
+        0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
+        0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
+    };
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+
+    std::vector<std::vector<uint8_t>> collected;
+    for (const auto element : buffer) {
+        collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
+    }
+
+    ASSERT_EQ(collected.size(), 2u);
+    EXPECT_EQ(collected[0], (std::vector<uint8_t>{0x41, 0x42, 0x43, 0x44, 0x45}));
+    EXPECT_EQ(collected[1], (std::vector<uint8_t>{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37}));
+    EXPECT_TRUE(buffer.GetOffsets().empty());
+    EXPECT_EQ(buffer.GetNumElements(), 0u);
+    EXPECT_FALSE(buffer.GetIsInitializedFromSpan());
 }
 
 TEST(ByteBufferTest, GetElement_OutOfRange_Throws) {
@@ -598,6 +638,12 @@ TEST(ByteBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
     std::vector<uint8_t> replacement = {0xAA, 0xBB};
     EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(replacement)), InvalidInputException);
+}
+
+TEST(ByteBufferTest, Iterate_OnWriteBuffer_Throws) {
+    ByteBufferTestProxy buffer(3u, 2u);
+    EXPECT_THROW((void)buffer.begin(), InvalidInputException);
+    EXPECT_THROW((void)buffer.end(), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {

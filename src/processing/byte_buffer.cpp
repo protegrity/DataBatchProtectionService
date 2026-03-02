@@ -134,6 +134,7 @@ size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t
         ++sampled_elements;
     }
 
+    // If no elements were sampled or the cursor didn't move, it means the buffer is empty. So return 0.
     if (sampled_elements == 0 || cursor == 0)
         return 0;
 
@@ -141,8 +142,7 @@ size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t
     if (cursor == bytes.size())
         return sampled_elements;
 
-    // Estimate total element count from sample density:
-    //   (sampled_elements / sampled_bytes) * total_bytes.
+    // Estimate total element count from sample density: (sampled_elements / sampled_bytes) * total_bytes.
     // - sampled_elements / sampled_bytes gives "elements per byte" in the sampled prefix,
     // - then multiplying by total_bytes extrapolates a full-buffer estimate.
     const long double estimated =
@@ -151,11 +151,13 @@ size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t
     const size_t estimated_count = static_cast<size_t>(std::ceil(estimated));
     const size_t estimated_with_headroom =
         static_cast<size_t>(std::ceil(static_cast<long double>(estimated_count) * 1.1L));
+
+    // If the count of sampled elements is more than the estimated, conservatively return actual count.
     return std::max(estimated_with_headroom, sampled_elements);
 }
 
 // -----------------------------------------------------------------------------
-// Span reader methods
+// Element span reader methods
 // -----------------------------------------------------------------------------
 
 size_t ByteBuffer::CalculateOffsetOfElement(size_t position) const {
@@ -187,6 +189,99 @@ tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
     }
     const size_t element_size = ReadSizeAt(elements_span_, offset);
     return elements_span_.subspan(offset + kSizePrefixBytes, element_size);
+}
+
+// -----------------------------------------------------------------------------
+// Elemment span iterator
+//
+// Allows an alternative read of elements_span_ without need for lazy initialization of offsets_,
+// so saving execution time when the traversal of the buffer is strictly sequential.
+// This is the most common behavior when reading elements in single threaded mode.
+// -----------------------------------------------------------------------------
+
+ByteBuffer::ConstIterator::ConstIterator(const ByteBuffer* buffer, size_t cursor_offset)
+    : buffer_(buffer), cursor_offset_(cursor_offset) {}
+
+void ByteBuffer::ConstIterator::ValidateFixedSizeElementAtCursor() const {
+    if (buffer_->element_size_ <= 0) {
+        throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
+    }
+    if ((buffer_->elements_span_.size() - cursor_offset_) < buffer_->element_size_) {
+        throw InvalidInputException("Malformed fixed-size buffer: truncated element payload");
+    }
+}
+
+size_t ByteBuffer::ConstIterator::ReadAndValidateVariableElementSizeAtCursor() const {
+    if ((buffer_->elements_span_.size() - cursor_offset_) < kSizePrefixBytes) {
+        throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
+    }
+    const size_t current_element_size = ReadSizeAt(buffer_->elements_span_, cursor_offset_);
+    const size_t payload_offset = cursor_offset_ + kSizePrefixBytes;
+    if ((buffer_->elements_span_.size() - payload_offset) < current_element_size) {
+        throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
+    }
+    return current_element_size;
+}
+
+ByteBuffer::ConstIterator::value_type ByteBuffer::ConstIterator::operator*() const {
+    if (buffer_ == nullptr || cursor_offset_ >= buffer_->elements_span_.size()) {
+        throw InvalidInputException("Cannot dereference ByteBuffer iterator at end position");
+    }
+    if (buffer_->has_fixed_sized_elements_) {
+        ValidateFixedSizeElementAtCursor();
+        return buffer_->elements_span_.subspan(cursor_offset_, buffer_->element_size_);
+    }
+
+    const size_t current_element_size = ReadAndValidateVariableElementSizeAtCursor();
+    const size_t payload_offset = cursor_offset_ + kSizePrefixBytes;
+    return buffer_->elements_span_.subspan(payload_offset, current_element_size);
+}
+
+ByteBuffer::ConstIterator& ByteBuffer::ConstIterator::operator++() {
+    if (buffer_ == nullptr || cursor_offset_ >= buffer_->elements_span_.size()) {
+        return *this;
+    }
+    if (buffer_->has_fixed_sized_elements_) {
+        ValidateFixedSizeElementAtCursor();
+        cursor_offset_ += buffer_->element_size_;
+        return *this;
+    }
+
+    const size_t current_element_size = ReadAndValidateVariableElementSizeAtCursor();
+    cursor_offset_ += (kSizePrefixBytes + current_element_size);
+    return *this;
+}
+
+bool ByteBuffer::ConstIterator::operator==(const ConstIterator& other) const {
+    return buffer_ == other.buffer_ && cursor_offset_ == other.cursor_offset_;
+}
+
+bool ByteBuffer::ConstIterator::operator!=(const ConstIterator& other) const {
+    return !(*this == other);
+}
+
+void ByteBuffer::ValidateIteratorReadPreconditions() const {
+    if (is_write_buffer_initialized_) {
+        throw InvalidInputException("Iterator is only available for read buffers");
+    }
+    if (has_fixed_sized_elements_) {
+        if (element_size_ <= 0) {
+            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
+        }
+        if ((elements_span_.size() % element_size_) != 0) {
+            throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
+        }
+    }
+}
+
+ByteBuffer::ConstIterator ByteBuffer::begin() const {
+    ValidateIteratorReadPreconditions();
+    return ConstIterator(this, 0u);
+}
+
+ByteBuffer::ConstIterator ByteBuffer::end() const {
+    ValidateIteratorReadPreconditions();
+    return ConstIterator(this, elements_span_.size());
 }
 
 // -----------------------------------------------------------------------------

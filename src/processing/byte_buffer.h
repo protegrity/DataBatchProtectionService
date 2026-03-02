@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <vector>
 
@@ -57,12 +58,47 @@ public:
     // Finalizes the write path and transfers the resulting buffer ownership.
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
+    // Iterator for read-only elements.
+    class ConstIterator {
+        public:
+            // Iterator traits consumed indirectly by STL iterator machinery.
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = tcb::span<const uint8_t>;
+            using difference_type = std::ptrdiff_t;
+            using pointer = void;
+            using reference = value_type;
+    
+            // Basic forward-iterator operations over encoded elements in elements_span_.
+            ConstIterator(const ByteBuffer* buffer, size_t cursor_offset);
+            value_type operator*() const;
+            ConstIterator& operator++();
+            bool operator==(const ConstIterator& other) const;
+            bool operator!=(const ConstIterator& other) const;
+    
+        private:
+            void ValidateFixedSizeElementAtCursor() const;
+            size_t ReadAndValidateVariableElementSizeAtCursor() const;
+
+            const ByteBuffer* buffer_ = nullptr;
+            size_t cursor_offset_ = 0;
+        };
+    
+    // Methods used by the STL iterator machinery to iterate over the buffer.
+    ConstIterator begin() const;
+    ConstIterator end() const;
+
 protected:
     // Helper for reserve heuristics in variable-size parsing.
     static size_t EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes);
 
     // Helper for calculating the offset of an element by position.
     size_t CalculateOffsetOfElement(size_t position) const;
+
+    // Helper to validate the preconditions for reading the buffer with an iterator.
+    void ValidateIteratorReadPreconditions() const;
+
+    // Helper to check if the buffer is initialized from a span.
+    bool IsInitializedFromSpan() const { return is_initialized_from_span_; }
 
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
@@ -94,7 +130,10 @@ private:
     bool is_write_buffer_finalized_ = false;    
 };
 
+// Constant to mark an offset value as unset.
 inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t>::max();
-inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);  // [u32 size] prefix for variable-size elements.
+
+// Constant for the size of the [u32 size] prefix for variable-size elements.
+inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);
 
 } // namespace dbps::processing
