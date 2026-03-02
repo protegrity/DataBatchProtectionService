@@ -82,6 +82,8 @@ std::vector<uint8_t> MakePayload(size_t size, uint8_t seed) {
 TEST(ByteBufferTest, ConstructFixedSize_ValidBuffer_InitializesExpectedState) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    // Trigger lazy span initialization.
+    EXPECT_NO_THROW((void)buffer.GetElement(0));
     ExpectCommonState(buffer, 3u, true, 2u);
     EXPECT_TRUE(buffer.GetOffsets().empty());
 }
@@ -107,12 +109,14 @@ TEST(ByteBufferTest, GetElement_FixedSize_ReturnsExpectedSlices) {
 
 TEST(ByteBufferTest, ConstructFixedSize_ZeroElementSize_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
-    EXPECT_THROW((void)ByteBufferTestProxy(tcb::span<const uint8_t>(bytes), 0), InvalidInputException);
+    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 0);
+    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructFixedSize_NonDivisibleSize_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    EXPECT_THROW((void)ByteBufferTestProxy(tcb::span<const uint8_t>(bytes), 2), InvalidInputException);
+    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpectedState) {
@@ -122,6 +126,8 @@ TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpecte
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
     ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    // Trigger lazy variable-size index parsing.
+    EXPECT_NO_THROW((void)buffer.GetElement(0));
     ExpectCommonState(buffer, 2u, false, 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
@@ -603,7 +609,8 @@ TEST(ByteBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {
 
 TEST(ByteBufferTest, ConstructVariableSize_TruncatedLengthPrefix_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x00, 0x00}; // only 3 bytes
-    EXPECT_THROW((void)ByteBufferTestProxy(tcb::span<const uint8_t>(bytes)), InvalidInputException);
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
 TEST(ByteBufferTest, ConstructVariableSize_TruncatedPayload_Throws) {
@@ -611,5 +618,6 @@ TEST(ByteBufferTest, ConstructVariableSize_TruncatedPayload_Throws) {
     std::vector<uint8_t> bytes = {
         0x05, 0x00, 0x00, 0x00, 0xAA, 0xBB
     };
-    EXPECT_THROW((void)ByteBufferTestProxy(tcb::span<const uint8_t>(bytes)), InvalidInputException);
+    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }

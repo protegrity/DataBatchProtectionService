@@ -66,29 +66,32 @@ protected:
 
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
-    size_t num_elements_;
+    mutable size_t num_elements_;
     bool has_fixed_sized_elements_;
     
     // Variables for determining offset of elements.
-    size_t element_size_;           // for fixed-size elements
-    std::vector<size_t> offsets_;   // for variable-size elements
+    size_t element_size_;                   // for fixed-size elements
+    mutable std::vector<size_t> offsets_;   // for variable-size elements
 
     // Variables for write buffer.
     std::vector<uint8_t> write_buffer_;
-    bool write_buffer_finalized_ = false;
 
     // Variable for sequential variable-size writes.
     // Tracks next expected position for sequential variable-size writes.
     // Value is invalidated to kUnsetVariableElementOffset once order is violated.
-    size_t next_expected_sequential_position_ = 0;
+    size_t next_expected_write_position_ = 0;
 
 private:
-    // Initialization methods for read-only buffer
-    void InitializeFromSpan();
+    // Initialization methods and flags for read-only buffer
+    void InitializeFromSpan() const;
+    void EnsureInitializedFromSpan() const;
+    mutable bool is_initialized_from_span_ = false;
 
-    // Initialization methods for write buffer
+    // Initialization methods and flags for write buffer
     void InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint);
     void RebindSpanToWriteBuffer();
+    bool is_write_buffer_initialized_ = false;
+    bool is_write_buffer_finalized_ = false;    
 };
 
 inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t>::max();

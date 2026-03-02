@@ -42,26 +42,27 @@ ByteBuffer::ByteBuffer(
     tcb::span<const uint8_t> elements_span,
     size_t element_size)
     : elements_span_(elements_span),
+      num_elements_(0),
       has_fixed_sized_elements_(true),
-      element_size_(element_size) {
-    InitializeFromSpan();
-}
+      element_size_(element_size),
+      is_initialized_from_span_(false) {}
 
 // Constructor for read-only buffer with variable-size elements.
 ByteBuffer::ByteBuffer(
     tcb::span<const uint8_t> elements_span)
     : elements_span_(elements_span),
+      num_elements_(0),
       has_fixed_sized_elements_(false),
-      element_size_(0) {
-    InitializeFromSpan();
-}
+      element_size_(0),
+      is_initialized_from_span_(false) {}
 
 // Initializes `num_elements_` and `offsets_` from the span.
-void ByteBuffer::InitializeFromSpan() {
+void ByteBuffer::InitializeFromSpan() const {
     // No elements to index. Initialize with empty values.
     if (elements_span_.empty()) {
         num_elements_ = 0;
         offsets_.clear();
+        is_initialized_from_span_ = true;
         return;
     }
 
@@ -76,6 +77,7 @@ void ByteBuffer::InitializeFromSpan() {
         }
         num_elements_ = elements_span_.size() / element_size_;
         offsets_.clear();
+        is_initialized_from_span_ = true;
         return;
     }
 
@@ -96,9 +98,20 @@ void ByteBuffer::InitializeFromSpan() {
         }
         cursor += current_element_size;
     }
-
-    // Set the number of elements from parsed offsets.
     num_elements_ = offsets_.size();
+    is_initialized_from_span_ = true;
+}
+
+void ByteBuffer::EnsureInitializedFromSpan() const {
+    // If the span is already initialized, skip it.
+    if (is_initialized_from_span_) {
+        return;
+    }
+    // If the write buffer is initialized, we don't need to initialize from the span.
+    if (is_write_buffer_initialized_) {
+        return;
+    }
+    InitializeFromSpan();
 }
 
 size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
@@ -146,6 +159,7 @@ size_t ByteBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t
 // -----------------------------------------------------------------------------
 
 size_t ByteBuffer::CalculateOffsetOfElement(size_t position) const {
+    EnsureInitializedFromSpan();
     if (position >= num_elements_) {
         throw InvalidInputException("Element position out of range during CalculateOffsetOfElement");
     }
@@ -156,6 +170,7 @@ size_t ByteBuffer::CalculateOffsetOfElement(size_t position) const {
 }
 
 tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
+    EnsureInitializedFromSpan();
     if (position >= num_elements_) {
         throw InvalidInputException("Element position out of range during GetElement");
     }
@@ -213,6 +228,7 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
         const size_t fixed_size_total_bytes = num_elements_ * element_size_;
         write_buffer_.clear();
         write_buffer_.resize(fixed_size_total_bytes, static_cast<uint8_t>(0));
+        is_write_buffer_initialized_ = true;
 
         // offsets_ are not used for fixed-size elements.
         offsets_.clear();
@@ -231,13 +247,14 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
     const size_t variable_size_reserved_bytes = std::max(variable_size_reserved_bytes_hint, min_required_prefix_bytes);
     write_buffer_.clear();
     write_buffer_.reserve(variable_size_reserved_bytes);
+    is_write_buffer_initialized_ = true;
 
     // offsets_ is initialized so the vector is fully allocated and have random-ish access during writes.
     offsets_.clear();
     offsets_.resize(num_elements_, kUnsetVariableElementOffset);
 
     // next_expected_sequential_position_ is initialized to 0 for sequential write checking.
-    next_expected_sequential_position_ = 0;
+    next_expected_write_position_ = 0;
 
     // elements_span_ is re-bound to the write buffer.
     RebindSpanToWriteBuffer();
@@ -248,7 +265,7 @@ void ByteBuffer::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hi
 // -----------------------------------------------------------------------------
 
 void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
-    if (write_buffer_finalized_) {
+    if (is_write_buffer_finalized_) {
         throw InvalidInputException("Cannot SetElement: write buffer has been finalized");
     }
 
@@ -256,8 +273,8 @@ void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
         throw InvalidInputException("Element position out of range during SetElement");
     }
 
-    if (write_buffer_.empty() && write_buffer_.capacity() == 0) {
-        throw InvalidInputException("Cannot SetElement: write buffer is not initialized");
+    if (!is_write_buffer_initialized_) {
+        throw InvalidInputException("Cannot SetElement: write buffer is not initialized.");
     }
 
     // For fixed-size elements, we write the element to buffer at the offset. No need to re-bind the span.
@@ -285,12 +302,12 @@ void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
     append_u32_le(write_buffer_, static_cast<uint32_t>(element.size()));
     write_buffer_.insert(write_buffer_.end(), element.begin(), element.end());  // Appends at the end of the buffer.
 
-    // Update next_expected_sequential_position_ for sequential write checking.
-    if (next_expected_sequential_position_ != kUnsetVariableElementOffset) {
-        if (position == next_expected_sequential_position_) {
-            next_expected_sequential_position_ += 1;
+    // Update next_expected_write_position_ for sequential write checking.
+    if (next_expected_write_position_ != kUnsetVariableElementOffset) {
+        if (position == next_expected_write_position_) {
+            next_expected_write_position_ += 1;
         } else {
-            next_expected_sequential_position_ = kUnsetVariableElementOffset;
+            next_expected_write_position_ = kUnsetVariableElementOffset;
         }
     }
 
@@ -298,24 +315,24 @@ void ByteBuffer::SetElement(size_t position, tcb::span<const uint8_t> element) {
 }
 
 std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
-    if (write_buffer_finalized_) {
+    if (is_write_buffer_finalized_) {
         throw InvalidInputException("FinalizeAndTakeBuffer: write buffer has already been finalized");
     }
 
-    if (write_buffer_.empty() && write_buffer_.capacity() == 0) {
+    if (!is_write_buffer_initialized_) {
         throw InvalidInputException("FinalizeAndTakeBuffer: write buffer is not initialized");
     }
 
     // Fixed-size: write_buffer_ is always in element order, transfer ownership directly.
     if (has_fixed_sized_elements_) {
-        write_buffer_finalized_ = true;
+        is_write_buffer_finalized_ = true;
         return std::move(write_buffer_);
     }
 
     // For variable-size when all elements were written exactly once and in sequential order,
     // we can skip out-of-order or fragmentation checks.  This is the fast path.
     // This is the most common behavior when writing elements in single threaded mode.
-    if (next_expected_sequential_position_ == num_elements_) {
+    if (next_expected_write_position_ == num_elements_) {
         if (num_elements_ > 0) {
             const size_t last_element_offset = offsets_[num_elements_ - 1];
             const size_t last_element_size = ReadSizeAt(elements_span_, last_element_offset);
@@ -324,12 +341,12 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
                 throw InvalidInputException("FinalizeAndTakeBuffer: trailing bytes detected beyond last element");
             }
         }
-        write_buffer_finalized_ = true;
+        is_write_buffer_finalized_ = true;
         return std::move(write_buffer_);
     }
 
     // For variable-size, when elements are written out of order, assume the buffer is fragmented and potentially with orphaned bytes
-    // The buffer is validated and rebuilt into a compact buffer in one pass.
+    // The buffer is validated and rebuilt into an ordered compact buffer in one pass.
     std::vector<uint8_t> result;
     result.reserve(write_buffer_.size());
     for (size_t i = 0; i < num_elements_; ++i) {
@@ -356,8 +373,9 @@ std::vector<uint8_t> ByteBuffer::FinalizeAndTakeBuffer() {
     // Defrag path returns a new buffer; release the original fragmented write buffer.
     write_buffer_.clear();
     write_buffer_.shrink_to_fit();
-
-    write_buffer_finalized_ = true;
+    is_write_buffer_initialized_ = false;
+    is_write_buffer_finalized_ = true;
+    
     return result;
 }
 
