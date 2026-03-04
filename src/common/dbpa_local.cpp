@@ -201,11 +201,8 @@ std::unique_ptr<EncryptionResult> LocalDataBatchProtectionAgent::Encrypt(
         {}  // encryption_metadata, which is empty for the Encryption call.
     );
     
-    // Convert plaintext span to vector for the sequencer
-    std::vector<uint8_t> plaintext_vec(plaintext.begin(), plaintext.end());
-    
     // Call the sequencer to encrypt
-    bool encrypt_result = sequencer.DecodeAndEncrypt(plaintext_vec);
+    bool encrypt_result = sequencer.DecodeAndEncrypt(plaintext);
     if (!encrypt_result) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Encrypt() - Encryption failed: " 
                   << sequencer.error_stage_ << " - " << sequencer.error_message_ << std::endl;
@@ -252,11 +249,8 @@ std::unique_ptr<DecryptionResult> LocalDataBatchProtectionAgent::Decrypt(
         column_encryption_metadata_.value_or(std::map<std::string, std::string>{})
     );
     
-    // Convert ciphertext span to vector for the sequencer
-    std::vector<uint8_t> ciphertext_vec(ciphertext.begin(), ciphertext.end());
-    
     // Call the sequencer to decrypt
-    bool decrypt_result = sequencer.DecryptAndEncode(ciphertext_vec);
+    bool decrypt_result = sequencer.DecryptAndEncode(ciphertext);
     if (!decrypt_result) {
         std::cerr << "ERROR: LocalDataBatchProtectionAgent::Decrypt() - Decryption failed: " 
                   << sequencer.error_stage_ << " - " << sequencer.error_message_ << std::endl;

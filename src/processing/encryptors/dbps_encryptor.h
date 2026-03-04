@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tcb/span.hpp>
 #include <utility>
 #include <vector>
 #include "../../common/exceptions.h"
@@ -71,7 +72,7 @@ public:
      * @return The encrypted data as a vector of bytes
      * @throws InvalidInputException if the input data is invalid or empty
      */
-    virtual std::vector<uint8_t> EncryptBlock(const std::vector<uint8_t>& data) = 0;
+    virtual std::vector<uint8_t> EncryptBlock(tcb::span<const uint8_t> data) = 0;
 
     /**
      * Decrypts a block of data using block-level decryption.
@@ -80,7 +81,7 @@ public:
      * @return The decrypted data as a vector of bytes
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
      */
-    virtual std::vector<uint8_t> DecryptBlock(const std::vector<uint8_t>& data) = 0;
+    virtual std::vector<uint8_t> DecryptBlock(tcb::span<const uint8_t> data) = 0;
 
     /**
      * Integration point: Encryption function based on list of values that will be implemented by Protegrity.
@@ -107,7 +108,7 @@ public:
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
      */
     virtual TypedListValues DecryptValueList(
-        const std::vector<uint8_t>& encrypted_bytes) = 0;
+        tcb::span<const uint8_t> encrypted_bytes) = 0;
 
 protected:
     // Context parameters stored from constructor

@@ -59,7 +59,7 @@ std::vector<uint8_t> ConcatenateEncryptedValues(const std::vector<EncryptedValue
     return out;
 }
 
-std::vector<EncryptedValue> ParseConcatenatedEncryptedValues(const std::vector<uint8_t>& blob) {
+std::vector<EncryptedValue> ParseConcatenatedEncryptedValues(tcb::span<const uint8_t> blob) {
     size_t offset = 0;
     if (blob.size() < 4) {
         throw InvalidInputException("Malformed input: missing element count");
@@ -104,8 +104,7 @@ std::vector<EncryptedValue> EncryptTypedListValues(
     
     for (size_t i = 0; i < raw_values.size(); ++i) {
         const RawValueBytes& raw = raw_values[i];
-        std::vector<uint8_t> payload = fn_encrypt_byte_array(raw);
-        encrypted_elements.push_back(std::move(payload));
+        encrypted_elements.push_back(fn_encrypt_byte_array(raw));
     }
     return encrypted_elements;
 }
@@ -120,13 +119,11 @@ TypedListValues DecryptTypedListValues(
     decrypted_values.reserve(encrypted_values.size());
     for (size_t i = 0; i < encrypted_values.size(); ++i) {
         const EncryptedValue& ev = encrypted_values[i];
-        RawValueBytes decrypted = fn_decrypt_byte_array(ev);
-        decrypted_values.push_back(std::move(decrypted));
+        decrypted_values.push_back(fn_decrypt_byte_array(ev));
     }
 
     // 2) Convert all decrypted bytes to a TypedListValues according to datatype
-    TypedListValues result = BuildTypedListFromRawBytes(datatype, decrypted_values);
-    return result;
+    return BuildTypedListFromRawBytes(datatype, decrypted_values);
 }
 
 } // namespace dbps::value_encryption_utils

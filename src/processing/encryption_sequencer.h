@@ -25,6 +25,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <tcb/span.hpp>
 
 #include "enums.h"
 #include "parquet_utils.h"
@@ -103,8 +104,8 @@ public:
     ~DataBatchEncryptionSequencer() = default;
     
     // Main processing methods
-    bool DecodeAndEncrypt(const std::vector<uint8_t>& plaintext);
-    bool DecryptAndEncode(const std::vector<uint8_t>& ciphertext);
+    bool DecodeAndEncrypt(tcb::span<const uint8_t> plaintext);
+    bool DecryptAndEncode(tcb::span<const uint8_t> ciphertext);
 
 protected:
     // Parameters for encryption/decryption operations

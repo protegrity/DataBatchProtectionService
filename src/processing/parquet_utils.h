@@ -23,6 +23,7 @@
 #include <map>
 #include <variant>
 #include <cstdint>
+#include <tcb/span.hpp>
 #include "enums.h"
 #include "../common/exceptions.h"
 #include "enum_utils.h"
@@ -44,7 +45,7 @@ using namespace dbps::external;
  * @param encoding_attribs Converted encoding attributes map
  * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
  */
-int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
+int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs);
 
 /**
@@ -82,7 +83,7 @@ std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>
  * and DICTIONARY_PAGE.
  */
 LevelAndValueBytes DecompressAndSplit(
-    const std::vector<uint8_t>& plaintext,
+    tcb::span<const uint8_t> plaintext,
     CompressionCodec::type compression,
     const AttributesMap& encoding_attributes);
 

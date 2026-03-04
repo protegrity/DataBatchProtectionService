@@ -174,8 +174,7 @@ std::vector<RawValueBytes> BuildRawBytesFromTypedListValues(const TypedListValue
         raw_values.reserve(vec.size());
         for (size_t i = 0; i < vec.size(); ++i) {
             const ElemT& elem = vec[i];
-            std::vector<uint8_t> bytes = serialize(elem);
-            raw_values.push_back(std::move(bytes));
+            raw_values.push_back(serialize(elem));
         }
     }, elements);
     return raw_values;

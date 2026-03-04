@@ -80,11 +80,11 @@ public:
             bool operator!=(const ConstIterator& other) const;
     
         private:
-            void ValidateFixedSizeElementAtCursor() const;
             size_t ReadAndValidateVariableElementSizeAtCursor() const;
 
             const ByteBuffer* buffer_ = nullptr;
             size_t cursor_offset_ = 0;
+            size_t elements_span_size_ = 0;
         };
     
     // Methods used by the STL iterator machinery to iterate over the buffer.

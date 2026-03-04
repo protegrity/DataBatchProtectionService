@@ -25,7 +25,7 @@
 using namespace dbps::value_encryption_utils;
 
 namespace {
-	std::vector<uint8_t> EncryptByteArray(const std::vector<uint8_t>& data, const std::string& key_id) {
+	std::vector<uint8_t> EncryptByteArray(tcb::span<const uint8_t> data, const std::string& key_id) {
 		if (data.empty()) {
 			return std::vector<uint8_t>();
 		}
@@ -49,16 +49,16 @@ namespace {
         return encrypted_data;
 	}
 
-    std::vector<uint8_t> DecryptByteArray(const std::vector<uint8_t>& data, const std::string& key_id) {
+    std::vector<uint8_t> DecryptByteArray(tcb::span<const uint8_t> data, const std::string& key_id) {
         return EncryptByteArray(data, key_id); // for XOR encryption, decryption is the same as encryption
     }
 }
 
-std::vector<uint8_t> BasicEncryptor::EncryptBlock(const std::vector<uint8_t>& data) {
+std::vector<uint8_t> BasicEncryptor::EncryptBlock(tcb::span<const uint8_t> data) {
 	return EncryptByteArray(data, key_id_);
 }
 
-std::vector<uint8_t> BasicEncryptor::DecryptBlock(const std::vector<uint8_t>& data) {
+std::vector<uint8_t> BasicEncryptor::DecryptBlock(tcb::span<const uint8_t> data) {
     // For XOR encryption, decryption is the same as encryption
     return DecryptByteArray(data, key_id_);
 }
@@ -108,7 +108,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
 } // EncryptValueList
 
 TypedListValues BasicEncryptor::DecryptValueList(
-    const std::vector<uint8_t>& encrypted_bytes) {
+    tcb::span<const uint8_t> encrypted_bytes) {
 
     // create a closure for the decrypt function (to be used below)
     // the closure captures the key_bytes and calls the DecryptByteArray function.

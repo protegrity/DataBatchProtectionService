@@ -24,7 +24,7 @@
 
 TEST(BytesUtils, Split_Normal) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    SplitBytesPair result = Split(bytes, 3);
+    BytesPair result = Split(bytes, 3);
     
     EXPECT_EQ(3, result.leading.size());
     EXPECT_EQ(3, result.trailing.size());
@@ -34,7 +34,7 @@ TEST(BytesUtils, Split_Normal) {
 
 TEST(BytesUtils, Split_AtBeginning) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    SplitBytesPair result = Split(bytes, 0);
+    BytesPair result = Split(bytes, 0);
     
     EXPECT_EQ(0, result.leading.size());
     EXPECT_EQ(3, result.trailing.size());
@@ -43,7 +43,7 @@ TEST(BytesUtils, Split_AtBeginning) {
 
 TEST(BytesUtils, Split_AtEnd) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    SplitBytesPair result = Split(bytes, 3);
+    BytesPair result = Split(bytes, 3);
     
     EXPECT_EQ(3, result.leading.size());
     EXPECT_EQ(0, result.trailing.size());
@@ -97,7 +97,7 @@ TEST(BytesUtils, Join_BothEmpty) {
 
 TEST(BytesUtils, SplitAndJoin_RoundTrip) {
     std::vector<uint8_t> original = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    SplitBytesPair split_result = Split(original, 3);
+    BytesPair split_result = Split(original, 3);
     std::vector<uint8_t> joined = Join(split_result.leading, split_result.trailing);
     
     EXPECT_EQ(original, joined);
@@ -168,7 +168,7 @@ TEST(BytesUtils, SplitWithLengthPrefix_Normal) {
     std::vector<uint8_t> leading = {0x01, 0x02, 0x03};
     std::vector<uint8_t> trailing = {0x04, 0x05, 0x06};
     std::vector<uint8_t> combined = JoinWithLengthPrefix(leading, trailing);
-    SplitBytesPair result = SplitWithLengthPrefix(combined);
+    BytesPair result = SplitWithLengthPrefix(combined);
     
     EXPECT_EQ(leading, result.leading);
     EXPECT_EQ(trailing, result.trailing);
@@ -196,7 +196,7 @@ TEST(BytesUtils, JoinWithLengthPrefixAndSplit_RoundTrip) {
     std::vector<uint8_t> trailing = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60};
     
     std::vector<uint8_t> joined = JoinWithLengthPrefix(leading, trailing);
-    SplitBytesPair parsed = SplitWithLengthPrefix(joined);
+    BytesPair parsed = SplitWithLengthPrefix(joined);
     
     EXPECT_EQ(leading, parsed.leading);
     EXPECT_EQ(trailing, parsed.trailing);
