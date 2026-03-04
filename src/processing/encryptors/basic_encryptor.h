@@ -55,15 +55,15 @@ public:
     ~BasicEncryptor() override = default;
 
     // Block encryption methods
-    std::vector<uint8_t> EncryptBlock(const std::vector<uint8_t>& data) override;
+    std::vector<uint8_t> EncryptBlock(tcb::span<const uint8_t> data) override;
 
-    std::vector<uint8_t> DecryptBlock(const std::vector<uint8_t>& data) override;
+    std::vector<uint8_t> DecryptBlock(tcb::span<const uint8_t> data) override;
 
     // Value encryption methods
     std::vector<uint8_t> EncryptValueList(
         const TypedListValues& typed_list) override;
 
     TypedListValues DecryptValueList(
-        const std::vector<uint8_t>& encrypted_bytes) override;
+        tcb::span<const uint8_t> encrypted_bytes) override;
 };
 

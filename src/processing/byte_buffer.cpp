@@ -211,35 +211,27 @@ tcb::span<const uint8_t> ByteBuffer::GetElement(size_t position) const {
 // -----------------------------------------------------------------------------
 
 ByteBuffer::ConstIterator::ConstIterator(const ByteBuffer* buffer, size_t cursor_offset)
-    : buffer_(buffer), cursor_offset_(cursor_offset) {}
-
-void ByteBuffer::ConstIterator::ValidateFixedSizeElementAtCursor() const {
-    if (buffer_->element_size_ <= 0) {
-        throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
-    }
-    if ((buffer_->elements_span_.size() - cursor_offset_) < buffer_->element_size_) {
-        throw InvalidInputException("Malformed fixed-size buffer: truncated element payload");
-    }
-}
+    : buffer_(buffer),
+      cursor_offset_(cursor_offset),
+      elements_span_size_(buffer != nullptr ? buffer->elements_span_.size() : 0u) {}
 
 size_t ByteBuffer::ConstIterator::ReadAndValidateVariableElementSizeAtCursor() const {
-    if ((buffer_->elements_span_.size() - cursor_offset_) < kSizePrefixBytes) {
+    if ((elements_span_size_ - cursor_offset_) < kSizePrefixBytes) {
         throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
     }
     const size_t current_element_size = ReadSizeAt(buffer_->elements_span_, cursor_offset_);
     const size_t payload_offset = cursor_offset_ + kSizePrefixBytes;
-    if ((buffer_->elements_span_.size() - payload_offset) < current_element_size) {
+    if ((elements_span_size_ - payload_offset) < current_element_size) {
         throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
     }
     return current_element_size;
 }
 
 ByteBuffer::ConstIterator::value_type ByteBuffer::ConstIterator::operator*() const {
-    if (buffer_ == nullptr || cursor_offset_ >= buffer_->elements_span_.size()) {
+    if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
         throw InvalidInputException("Cannot dereference ByteBuffer iterator at end position");
     }
     if (buffer_->has_fixed_sized_elements_) {
-        ValidateFixedSizeElementAtCursor();
         return buffer_->elements_span_.subspan(cursor_offset_, buffer_->element_size_);
     }
 
@@ -249,11 +241,10 @@ ByteBuffer::ConstIterator::value_type ByteBuffer::ConstIterator::operator*() con
 }
 
 ByteBuffer::ConstIterator& ByteBuffer::ConstIterator::operator++() {
-    if (buffer_ == nullptr || cursor_offset_ >= buffer_->elements_span_.size()) {
+    if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
         return *this;
     }
     if (buffer_->has_fixed_sized_elements_) {
-        ValidateFixedSizeElementAtCursor();
         cursor_offset_ += buffer_->element_size_;
         return *this;
     }

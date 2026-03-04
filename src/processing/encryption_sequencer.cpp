@@ -111,7 +111,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
 
 // Top level encryption/decryption methods.
 
-bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& plaintext) {
+bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> plaintext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;
@@ -198,7 +198,7 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(const std::vector<uint8_t>& 
     }
 }
 
-bool DataBatchEncryptionSequencer::DecryptAndEncode(const std::vector<uint8_t>& ciphertext) {
+bool DataBatchEncryptionSequencer::DecryptAndEncode(tcb::span<const uint8_t> ciphertext) {
     // Validate all parameters and key_id
     if (!ValidateParameters()) {
         return false;
@@ -234,7 +234,8 @@ bool DataBatchEncryptionSequencer::DecryptAndEncode(const std::vector<uint8_t>& 
         auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
         
         // Split the joined encrypted bytes, then decrypt the level and value bytes separately.
-        auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(decompressed_encrypted_bytes);
+        auto [encrypted_level_bytes, encrypted_value_bytes] =
+            SplitWithLengthPrefix(tcb::span<const uint8_t>(decompressed_encrypted_bytes));
         auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
         auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
         

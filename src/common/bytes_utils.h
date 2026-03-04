@@ -93,6 +93,11 @@ struct SplitBytesPair {
     std::vector<uint8_t> trailing;
 };
 
+struct SplitSpansPair {
+    tcb::span<const uint8_t> leading;
+    tcb::span<const uint8_t> trailing;
+};
+
 /**
  * Join two byte vectors into a single vector.
  * This is the converse operation of Split - concatenates leading and trailing bytes.
@@ -127,6 +132,24 @@ inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
     result.trailing = std::vector<uint8_t>(bytes.begin() + index, bytes.end());
 
     return result;
+}
+
+/**
+ * Split a span into two non-owning spans at index.
+ *
+ * @param bytes The span to split
+ * @param index The index at which to split (bytes before index go to leading, bytes from index go to trailing)
+ * @return SplitSpansPair structure with split spans
+ * @throws InvalidInputException if index is invalid
+ */
+inline SplitSpansPair Split(tcb::span<const uint8_t> bytes, int index) {
+    if (index < 0 || index > static_cast<int>(bytes.size())) {
+        throw InvalidInputException("Invalid index for splitting bytes: " + std::to_string(index));
+    }
+    const size_t split_index = static_cast<size_t>(index);
+    return SplitSpansPair{
+        tcb::span<const uint8_t>(bytes.data(), split_index),
+        tcb::span<const uint8_t>(bytes.data() + split_index, bytes.size() - split_index)};
 }
 
 /**
@@ -189,6 +212,31 @@ inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
     result.trailing = std::vector<uint8_t>(bytes.begin() + 4 + leading_length, bytes.end());
     
     return result;
+}
+
+/**
+ * Parse a self-contained byte span that was created with JoinWithLengthPrefix.
+ * Extracts leading and trailing span views based on the embedded length prefix.
+ *
+ * @param bytes The combined bytes with length prefix
+ * @return SplitSpansPair structure with leading and trailing span views
+ * @throws InvalidInputException if the data is invalid or malformed
+ */
+inline SplitSpansPair SplitWithLengthPrefix(tcb::span<const uint8_t> bytes) {
+    if (bytes.size() < 4) {
+        throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for length prefix");
+    }
+
+    uint32_t leading_length = read_u32_le(bytes, 0);
+
+    if (bytes.size() < 4 + leading_length) {
+        throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for leading data (expected " +
+                                   std::to_string(4 + leading_length) + ", got " + std::to_string(bytes.size()) + ")");
+    }
+
+    return SplitSpansPair{
+        tcb::span<const uint8_t>(bytes.data() + 4, leading_length),
+        tcb::span<const uint8_t>(bytes.data() + 4 + leading_length, bytes.size() - 4 - leading_length)};
 }
 
 // Utility functions for creating an AttributesMap

@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <tcb/span.hpp>
 #include "enums.h"
 #include "enum_utils.h"
 #include "../common/exceptions.h"
@@ -36,7 +37,7 @@ namespace dbps::compression {
  * @return Compressed bytes, or original bytes if UNCOMPRESSED
  * @throws DBPSUnsupportedException if the compression codec is not supported
  */
-std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression);
+std::vector<uint8_t> Compress(tcb::span<const uint8_t> bytes, CompressionCodec::type compression);
 
 /**
  * Decompress bytes using the compression codec.
@@ -46,6 +47,6 @@ std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCode
  * @return Decompressed bytes, or original bytes if UNCOMPRESSED
  * @throws DBPSUnsupportedException if the compression codec is not supported
  */
-std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression);
+std::vector<uint8_t> Decompress(tcb::span<const uint8_t> bytes, CompressionCodec::type compression);
 
 } // namespace dbps::compression

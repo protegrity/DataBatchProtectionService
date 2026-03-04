@@ -22,6 +22,7 @@
 #include <vector>
 #include <utility>
 #include <functional>
+#include <tcb/span.hpp>
 
 #include "typed_list_values.h"
 #include "enums.h"
@@ -58,7 +59,7 @@ std::vector<uint8_t> ConcatenateEncryptedValues(const std::vector<EncryptedValue
  *
  * @throws std::runtime_error on malformed input (truncated or inconsistent sizes)
  */
-std::vector<EncryptedValue> ParseConcatenatedEncryptedValues(const std::vector<uint8_t>& blob);
+std::vector<EncryptedValue> ParseConcatenatedEncryptedValues(tcb::span<const uint8_t> blob);
 
 /**
  * Encrypt each element contained across a list of TypedListValues.

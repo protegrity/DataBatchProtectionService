@@ -23,20 +23,25 @@ using namespace dbps::enum_utils;
 
 namespace dbps::compression {
 
-std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
+std::vector<uint8_t> Compress(tcb::span<const uint8_t> bytes, CompressionCodec::type compression) {
     if (compression == CompressionCodec::UNCOMPRESSED) {
-        return bytes;
+        return std::vector<uint8_t>(bytes.begin(), bytes.end());
     }
     
     if (compression == CompressionCodec::SNAPPY) {
         if (bytes.empty()) {
-            return bytes;
+            return std::vector<uint8_t>();
         }
-        // `compressed` is a std::string because Snappy's API requires it.
-        // It is used as a binary buffer (not text), and immediately converted back to std::vector<uint8_t> to preserve binary semantics.
-        std::string compressed;
-        snappy::Compress(reinterpret_cast<const char*>(bytes.data()), bytes.size(), &compressed);
-        return std::vector<uint8_t>(compressed.begin(), compressed.end());
+        std::vector<uint8_t> out_buffer;
+        out_buffer.resize(snappy::MaxCompressedLength(bytes.size()));
+        size_t compressed_size = 0;
+        snappy::RawCompress(
+            reinterpret_cast<const char*>(bytes.data()),
+            bytes.size(),
+            reinterpret_cast<char*>(out_buffer.data()),
+            &compressed_size);
+        out_buffer.resize(compressed_size);
+        return out_buffer;
     }
     
     // Note for future implementations: If compression fails because of invalid or corrupt input,
@@ -45,23 +50,29 @@ std::vector<uint8_t> Compress(const std::vector<uint8_t>& bytes, CompressionCode
         "Unsupported compression codec: " + std::string(to_string(compression)));
 }
 
-std::vector<uint8_t> Decompress(const std::vector<uint8_t>& bytes, CompressionCodec::type compression) {
+std::vector<uint8_t> Decompress(tcb::span<const uint8_t> bytes, CompressionCodec::type compression) {
     if (compression == CompressionCodec::UNCOMPRESSED) {
-        return bytes;
+        return std::vector<uint8_t>(bytes.begin(), bytes.end());
     }
     
     if (compression == CompressionCodec::SNAPPY) {
         if (bytes.empty()) {
-            return bytes;
+            return std::vector<uint8_t>();
         }
-        // `decompressed` is a std::string because Snappy's API requires it.
-        // It is used as a binary buffer (not text), and immediately converted back to std::vector<uint8_t> to preserve binary semantics.
-        std::string decompressed;
-        bool success = snappy::Uncompress(reinterpret_cast<const char*>(bytes.data()), bytes.size(), &decompressed);
-        if (!success) {
+        std::vector<uint8_t> out_buffer;
+        size_t uncompressed_size = 0;
+        if (!snappy::GetUncompressedLength(
+                reinterpret_cast<const char*>(bytes.data()), bytes.size(), &uncompressed_size)) {
             throw InvalidInputException("Failed to decompress data: invalid or corrupt Snappy-compressed input");
         }
-        return std::vector<uint8_t>(decompressed.begin(), decompressed.end());
+        out_buffer.resize(uncompressed_size);
+        if (!snappy::RawUncompress(
+                reinterpret_cast<const char*>(bytes.data()),
+                bytes.size(),
+                reinterpret_cast<char*>(out_buffer.data()))) {
+            throw InvalidInputException("Failed to decompress data: invalid or corrupt Snappy-compressed input");
+        }
+        return out_buffer;
     }
     
     // Note for future implementations: If decompression fails because of invalid or corrupt input,
