@@ -28,6 +28,8 @@
 #include <tcb/span.hpp>
 #include "exceptions.h"
 
+inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);
+
 // Utility functions for little-endian number reading and writing.
 
 inline void append_u32_le(std::vector<uint8_t>& out, uint32_t v) {
@@ -88,12 +90,12 @@ inline uint32_t read_u32_le(tcb::span<const uint8_t> in, size_t offset) {
 
 // Utility functions for splitting and joining byte vectors.
 
-struct SplitBytesPair {
+struct BytesPair {
     std::vector<uint8_t> leading;
     std::vector<uint8_t> trailing;
 };
 
-struct SplitSpansPair {
+struct SpansPair {
     tcb::span<const uint8_t> leading;
     tcb::span<const uint8_t> trailing;
 };
@@ -119,11 +121,11 @@ inline std::vector<uint8_t> Join(const std::vector<uint8_t>& leading, const std:
  * 
  * @param bytes The bytes to split
  * @param index The index at which to split (bytes before index go to leading, bytes from index go to trailing)
- * @return SplitBytesPair structure with split bytes
+ * @return BytesPair structure with split bytes
  * @throws InvalidInputException if index is invalid
  */
-inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
-    SplitBytesPair result;
+inline BytesPair Split(const std::vector<uint8_t>& bytes, int index) {
+    BytesPair result;
 
     if (index < 0 || index > static_cast<int>(bytes.size())) {
         throw InvalidInputException("Invalid index for splitting bytes: " + std::to_string(index));
@@ -139,15 +141,15 @@ inline SplitBytesPair Split(const std::vector<uint8_t>& bytes, int index) {
  *
  * @param bytes The span to split
  * @param index The index at which to split (bytes before index go to leading, bytes from index go to trailing)
- * @return SplitSpansPair structure with split spans
+ * @return SpansPair structure with split spans
  * @throws InvalidInputException if index is invalid
  */
-inline SplitSpansPair Split(tcb::span<const uint8_t> bytes, int index) {
+inline SpansPair Split(tcb::span<const uint8_t> bytes, int index) {
     if (index < 0 || index > static_cast<int>(bytes.size())) {
         throw InvalidInputException("Invalid index for splitting bytes: " + std::to_string(index));
     }
     const size_t split_index = static_cast<size_t>(index);
-    return SplitSpansPair{
+    return SpansPair{
         tcb::span<const uint8_t>(bytes.data(), split_index),
         tcb::span<const uint8_t>(bytes.data() + split_index, bytes.size() - split_index)};
 }
@@ -170,7 +172,7 @@ inline std::vector<uint8_t> JoinWithLengthPrefix(const std::vector<uint8_t>& lea
     // Calculate the length of the leading bytes
     uint32_t leading_length = static_cast<uint32_t>(leading.size());
     std::vector<uint8_t> result;
-    result.reserve(4 + leading.size() + trailing.size());
+    result.reserve(kSizePrefixBytes + leading.size() + trailing.size());
     
     // Prepend 4-byte length
     append_u32_le(result, leading_length);
@@ -183,60 +185,44 @@ inline std::vector<uint8_t> JoinWithLengthPrefix(const std::vector<uint8_t>& lea
 }
 
 /**
- * Parse a self-contained byte vector that was created with JoinWithLengthPrefix.
- * Extracts the leading and trailing parts based on the embedded length prefix.
- * 
- * @param bytes The combined bytes with length prefix
- * @return SplitBytesPair structure with leading and trailing bytes
- * @throws InvalidInputException if the data is invalid or malformed
- */
-inline SplitBytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
-    if (bytes.size() < 4) {
-        throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for length prefix");
-    }
-    
-    // Read 4-byte length
-    uint32_t leading_length = read_u32_le(bytes, 0);
-    
-    if (bytes.size() < 4 + leading_length) {
-        throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for leading data (expected " +
-                                   std::to_string(4 + leading_length) + ", got " + std::to_string(bytes.size()) + ")");
-    }
-    
-    SplitBytesPair result;
-    
-    // Extract leading bytes (skip the 4-byte length prefix)
-    result.leading = std::vector<uint8_t>(bytes.begin() + 4, bytes.begin() + 4 + leading_length);
-
-    // Extract trailing bytes (everything after leading)
-    result.trailing = std::vector<uint8_t>(bytes.begin() + 4 + leading_length, bytes.end());
-    
-    return result;
-}
-
-/**
  * Parse a self-contained byte span that was created with JoinWithLengthPrefix.
  * Extracts leading and trailing span views based on the embedded length prefix.
  *
  * @param bytes The combined bytes with length prefix
- * @return SplitSpansPair structure with leading and trailing span views
+ * @return SpansPair structure with leading and trailing span views
  * @throws InvalidInputException if the data is invalid or malformed
  */
-inline SplitSpansPair SplitWithLengthPrefix(tcb::span<const uint8_t> bytes) {
-    if (bytes.size() < 4) {
+inline SpansPair SplitWithLengthPrefix(tcb::span<const uint8_t> bytes) {
+    if (bytes.size() < kSizePrefixBytes) {
         throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for length prefix");
     }
 
     uint32_t leading_length = read_u32_le(bytes, 0);
 
-    if (bytes.size() < 4 + leading_length) {
+    if (bytes.size() < kSizePrefixBytes + leading_length) {
         throw InvalidInputException("Invalid length-prefixed data: insufficient bytes for leading data (expected " +
-                                   std::to_string(4 + leading_length) + ", got " + std::to_string(bytes.size()) + ")");
+                                   std::to_string(kSizePrefixBytes + leading_length) + ", got " + std::to_string(bytes.size()) + ")");
     }
 
-    return SplitSpansPair{
-        tcb::span<const uint8_t>(bytes.data() + 4, leading_length),
-        tcb::span<const uint8_t>(bytes.data() + 4 + leading_length, bytes.size() - 4 - leading_length)};
+    auto payload = tcb::span<const uint8_t>(
+        bytes.data() + kSizePrefixBytes,
+        bytes.size() - kSizePrefixBytes);
+    return Split(payload, static_cast<int>(leading_length));
+}
+
+/**
+ * Parse a self-contained byte vector that was created with JoinWithLengthPrefix.
+ * Extracts the leading and trailing parts based on the embedded length prefix.
+ * 
+ * @param bytes The combined bytes with length prefix
+ * @return BytesPair structure with leading and trailing bytes
+ * @throws InvalidInputException if the data is invalid or malformed
+ */
+ inline BytesPair SplitWithLengthPrefix(const std::vector<uint8_t>& bytes) {
+    const auto spans = SplitWithLengthPrefix(tcb::span<const uint8_t>(bytes));
+    return BytesPair{
+        std::vector<uint8_t>(spans.leading.begin(), spans.leading.end()),
+        std::vector<uint8_t>(spans.trailing.begin(), spans.trailing.end())};
 }
 
 // Utility functions for creating an AttributesMap
