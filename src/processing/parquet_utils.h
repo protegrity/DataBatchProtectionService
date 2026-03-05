@@ -49,6 +49,26 @@ int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs);
 
 /**
+ * Decompresses and splits a Parquet page into level and value bytes.
+ * Handles DATA_PAGE_V1, DATA_PAGE_V2 (including optional compression on value bytes),
+ * and DICTIONARY_PAGE.
+ */
+ LevelAndValueBytes DecompressAndSplit(
+    tcb::span<const uint8_t> plaintext,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes);
+
+/**
+ * Reverse of DecompressAndSplit: joins level/value bytes and applies compression
+ * based on page type and encoding attributes.
+ */
+std::vector<uint8_t> CompressAndJoin(
+    const std::vector<uint8_t>& level_bytes,
+    const std::vector<uint8_t>& value_bytes,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes);
+
+/**
  * Slice a flat byte buffer into RawValueBytes elements according to datatype/encoding.
  * This follows the Parquet specific encoding.
  */
@@ -76,26 +96,6 @@ std::vector<uint8_t> BuildByteArrayValueBytes(const std::string& payload);
  * Parse BYTE_ARRAY value bytes into a list of string payloads.
  */
 std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>& bytes);
-
-/**
- * Decompresses and splits a Parquet page into level and value bytes.
- * Handles DATA_PAGE_V1, DATA_PAGE_V2 (including optional compression on value bytes),
- * and DICTIONARY_PAGE.
- */
-LevelAndValueBytes DecompressAndSplit(
-    tcb::span<const uint8_t> plaintext,
-    CompressionCodec::type compression,
-    const AttributesMap& encoding_attributes);
-
-/**
- * Reverse of DecompressAndSplit: joins level/value bytes and applies compression
- * based on page type and encoding attributes.
- */
-std::vector<uint8_t> CompressAndJoin(
-    const std::vector<uint8_t>& level_bytes,
-    const std::vector<uint8_t>& value_bytes,
-    CompressionCodec::type compression,
-    const AttributesMap& encoding_attributes);
 
 /**
  * Parse the value bytes into a typed list based on the data type and encoding.

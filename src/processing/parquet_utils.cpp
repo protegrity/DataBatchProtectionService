@@ -25,6 +25,10 @@ using namespace dbps::external;
 using namespace dbps::enum_utils;
 using namespace dbps::compression;
 
+// -----------------------------------------------------------------------------
+// Process Parquet formatted Dictionary and Data pages
+// -----------------------------------------------------------------------------
+
 int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs) {
     
@@ -100,6 +104,98 @@ int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     }
     return total_level_bytes;
 }
+
+LevelAndValueBytes DecompressAndSplit(
+    tcb::span<const uint8_t> plaintext,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes) {
+
+    // Get the page type from the encoding attributes.
+    auto page_type = std::get<std::string>(encoding_attributes.at("page_type"));
+
+    // On DATA_PAGE_V1, the whole payload is compressed.
+    // So the split of level and value byte requires to
+    // (1) decompress the whole payload, (2) calculate length of level bytes, (3) split into level and value bytes.
+    if (page_type == "DATA_PAGE_V1") {
+        auto decompressed_bytes = Decompress(plaintext, compression);
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            decompressed_bytes, encoding_attributes);
+        auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+    }
+
+    // On DATA_PAGE_V2, only the value bytes are compressed.
+    // So the split of level and value byte requires to
+    // (1) calculate length of level bytes, (2) split into level, (3) decompress only the value bytes.
+    if (page_type == "DATA_PAGE_V2") {
+        int leading_bytes_to_strip = CalculateLevelBytesLength(
+            plaintext, encoding_attributes);
+        auto [level_bytes_span, compressed_value_bytes_span] = Split(plaintext, leading_bytes_to_strip);
+        std::vector<uint8_t> level_bytes(level_bytes_span.begin(), level_bytes_span.end());
+
+        bool page_v2_is_compressed = std::get<bool>(
+            encoding_attributes.at("page_v2_is_compressed"));
+        std::vector<uint8_t> value_bytes;
+        if (page_v2_is_compressed) {
+            value_bytes = Decompress(compressed_value_bytes_span, compression);
+        } else {
+            value_bytes = std::vector<uint8_t>(compressed_value_bytes_span.begin(), compressed_value_bytes_span.end());
+        }
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+    }
+
+    // DICTIONARY_PAGE has no level bytes.
+    if (page_type == "DICTIONARY_PAGE") {
+        auto level_bytes = std::vector<uint8_t>();
+        auto value_bytes = Decompress(plaintext, compression);
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+    }
+
+    throw InvalidInputException("Unexpected page type: " + page_type);
+}
+
+std::vector<uint8_t> CompressAndJoin(
+    const std::vector<uint8_t>& level_bytes,
+    const std::vector<uint8_t>& value_bytes,
+    CompressionCodec::type compression,
+    const AttributesMap& encoding_attributes) {
+
+    // Get the page type from the encoding attributes.
+    const auto& page_type = std::get<std::string>(encoding_attributes.at("page_type"));
+    
+    // Check that the calculated level bytes size == the size of the actual level bytes.
+    int expected_level_bytes = CalculateLevelBytesLength(level_bytes, encoding_attributes);
+    if (static_cast<size_t>(expected_level_bytes) != level_bytes.size()) {
+        throw InvalidInputException("Level bytes size does not match encoding attributes");
+    }
+
+    if (page_type == "DATA_PAGE_V1") {
+        auto joined = Join(level_bytes, value_bytes);
+        return Compress(joined, compression);
+    }
+
+    if (page_type == "DATA_PAGE_V2") {
+        bool page_v2_is_compressed =
+            std::get<bool>(encoding_attributes.at("page_v2_is_compressed"));
+        if (page_v2_is_compressed) {
+            auto compressed_values = Compress(value_bytes, compression);
+            return Join(level_bytes, compressed_values);
+        } else {
+            return Join(level_bytes, value_bytes);
+        }
+    }
+
+    // DICTIONARY_PAGE has no level bytes.
+    if (page_type == "DICTIONARY_PAGE") {
+        return Compress(value_bytes, compression);
+    }
+
+    throw InvalidInputException("Unexpected page type: " + page_type);
+}
+
+// -----------------------------------------------------------------------------
+// Parse and build Parquet formatted value bytes into vectors -- version materialized-vectors
+// -----------------------------------------------------------------------------
 
 inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
     switch (datatype) {
@@ -261,94 +357,6 @@ std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>
     return std::move(*values);
 }
 
-LevelAndValueBytes DecompressAndSplit(
-    tcb::span<const uint8_t> plaintext,
-    CompressionCodec::type compression,
-    const AttributesMap& encoding_attributes) {
-
-    // Get the page type from the encoding attributes.
-    auto page_type = std::get<std::string>(encoding_attributes.at("page_type"));
-
-    // On DATA_PAGE_V1, the whole payload is compressed.
-    // So the split of level and value byte requires to
-    // (1) decompress the whole payload, (2) calculate length of level bytes, (3) split into level and value bytes.
-    if (page_type == "DATA_PAGE_V1") {
-        auto decompressed_bytes = Decompress(plaintext, compression);
-        int leading_bytes_to_strip = CalculateLevelBytesLength(
-            decompressed_bytes, encoding_attributes);
-        auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
-    }
-
-    // On DATA_PAGE_V2, only the value bytes are compressed.
-    // So the split of level and value byte requires to
-    // (1) calculate length of level bytes, (2) split into level, (3) decompress only the value bytes.
-    if (page_type == "DATA_PAGE_V2") {
-        int leading_bytes_to_strip = CalculateLevelBytesLength(
-            plaintext, encoding_attributes);
-        auto [level_bytes_span, compressed_value_bytes_span] = Split(plaintext, leading_bytes_to_strip);
-        std::vector<uint8_t> level_bytes(level_bytes_span.begin(), level_bytes_span.end());
-
-        bool page_v2_is_compressed = std::get<bool>(
-            encoding_attributes.at("page_v2_is_compressed"));
-        std::vector<uint8_t> value_bytes;
-        if (page_v2_is_compressed) {
-            value_bytes = Decompress(compressed_value_bytes_span, compression);
-        } else {
-            value_bytes = std::vector<uint8_t>(compressed_value_bytes_span.begin(), compressed_value_bytes_span.end());
-        }
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
-    }
-
-    // DICTIONARY_PAGE has no level bytes.
-    if (page_type == "DICTIONARY_PAGE") {
-        auto level_bytes = std::vector<uint8_t>();
-        auto value_bytes = Decompress(plaintext, compression);
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
-    }
-
-    throw InvalidInputException("Unexpected page type: " + page_type);
-}
-
-std::vector<uint8_t> CompressAndJoin(
-    const std::vector<uint8_t>& level_bytes,
-    const std::vector<uint8_t>& value_bytes,
-    CompressionCodec::type compression,
-    const AttributesMap& encoding_attributes) {
-
-    // Get the page type from the encoding attributes.
-    const auto& page_type = std::get<std::string>(encoding_attributes.at("page_type"));
-    
-    // Check that the calculated level bytes size == the size of the actual level bytes.
-    int expected_level_bytes = CalculateLevelBytesLength(level_bytes, encoding_attributes);
-    if (static_cast<size_t>(expected_level_bytes) != level_bytes.size()) {
-        throw InvalidInputException("Level bytes size does not match encoding attributes");
-    }
-
-    if (page_type == "DATA_PAGE_V1") {
-        auto joined = Join(level_bytes, value_bytes);
-        return Compress(joined, compression);
-    }
-
-    if (page_type == "DATA_PAGE_V2") {
-        bool page_v2_is_compressed =
-            std::get<bool>(encoding_attributes.at("page_v2_is_compressed"));
-        if (page_v2_is_compressed) {
-            auto compressed_values = Compress(value_bytes, compression);
-            return Join(level_bytes, compressed_values);
-        } else {
-            return Join(level_bytes, value_bytes);
-        }
-    }
-
-    // DICTIONARY_PAGE has no level bytes.
-    if (page_type == "DICTIONARY_PAGE") {
-        return Compress(value_bytes, compression);
-    }
-
-    throw InvalidInputException("Unexpected page type: " + page_type);
-}
-
 TypedListValues ParseValueBytesIntoTypedList(
     const std::vector<uint8_t>& bytes,
     Type::type datatype,
@@ -367,3 +375,5 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     std::vector<RawValueBytes> raw_values = BuildRawBytesFromTypedListValues(list);
     return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, encoding);
 }
+
+// -----------------------------------------------------------------------------
