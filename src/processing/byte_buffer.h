@@ -27,37 +27,37 @@
 
 namespace dbps::processing {
 
+template <class Codec>
 class ByteBuffer {
 public:
-    // Constructor for read-only buffer with fixed-size elements.
+    using value_type = typename Codec::value_type;
+    static constexpr bool is_fixed_sized = Codec::is_fixed_sized;
+
+    // Constructor for read-only buffer for both fixed-sized and variable-sized elements.
     // Elements are stored contiguously in the span.
     ByteBuffer(
         tcb::span<const uint8_t> elements_span,
-        size_t element_size,
-        size_t prefix_size);
+        size_t prefix_size = 0,
+        Codec codec = Codec{});
 
-    // Constructor for read-only buffer with variable-size elements.
-    // Elements are encoded as [u32 size][element value] contiguously in the span.
-    ByteBuffer(
-        tcb::span<const uint8_t> elements_span,
-        size_t prefix_size = 0);
-
-    // Constructor for a new write buffer with fixed-size elements.
+    // Constructor for a new write buffer with both fixed-sized and variable-sized elements.
     ByteBuffer(
         size_t num_elements,
-        size_t element_size,
-        size_t prefix_size = 0);
+        size_t prefix_size = 0,
+        Codec codec = Codec{});
     
     // Constructor for a new write buffer with variable-size elements.
     ByteBuffer(
         size_t num_elements,
         size_t reserved_bytes_hint,
         bool use_reserve_hint,
-        size_t prefix_size = 0);
+        size_t prefix_size = 0,
+        Codec codec = Codec{});
 
-    // Get and set elements by position
-    tcb::span<const uint8_t> GetElement(size_t position) const;
-    void SetElement(size_t position, tcb::span<const uint8_t> element);
+    // Get and set elements by position with type access from Codec
+    value_type GetElement(size_t position) const;
+    tcb::span<const uint8_t> GetRawElement(size_t position) const;
+    void SetElement(size_t position, const value_type& element);
 
     // Finalizes the write path and transfers the resulting buffer ownership.
     std::vector<uint8_t> FinalizeAndTakeBuffer();
@@ -67,7 +67,7 @@ public:
         public:
             // Iterator traits consumed indirectly by STL iterator machinery.
             using iterator_category = std::forward_iterator_tag;
-            using value_type = tcb::span<const uint8_t>;
+            using value_type = typename ByteBuffer::value_type;
             using difference_type = std::ptrdiff_t;
             using pointer = void;
             using reference = value_type;
@@ -104,7 +104,7 @@ protected:
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
     mutable size_t num_elements_;
-    bool has_fixed_sized_elements_;
+    Codec codec_;
     
     // Variables for determining offset of elements.
     size_t prefix_size_ = 0;
