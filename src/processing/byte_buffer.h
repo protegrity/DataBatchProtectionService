@@ -55,8 +55,8 @@ public:
         Codec codec = Codec{});
 
     // Get and set elements by position with type access from Codec
-    value_type GetElement(size_t position) const;
     tcb::span<const uint8_t> GetRawElement(size_t position) const;
+    value_type GetElement(size_t position) const;
     void SetElement(size_t position, const value_type& element);
 
     // Finalizes the write path and transfers the resulting buffer ownership.
