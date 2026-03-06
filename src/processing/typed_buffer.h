@@ -17,14 +17,8 @@
 
 #pragma once
 
-#include "bytes_utils.h"
-#include "exceptions.h"
 #include <algorithm>
 #include <cmath>
-#include <cstring>
-#include <limits>
-#include <type_traits>
-
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -32,6 +26,9 @@
 #include <vector>
 
 #include <tcb/span.hpp>
+
+#include "bytes_utils.h"
+#include "exceptions.h"
 
 namespace dbps::processing {
 
@@ -150,15 +147,8 @@ inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t
 // Constant for the size of the [u32 size] prefix for variable-size elements.
 inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);
 
-// -----------------------------------------------------------------------------
-// Helper inline functions
-// -----------------------------------------------------------------------------
-
-namespace {
-// Reads the element size at the given offset.
 inline size_t ReadSizeAt(tcb::span<const uint8_t> bytes, size_t offset) {
     return static_cast<size_t>(read_u32_le(bytes, offset));
-}
 }
 
 // -----------------------------------------------------------------------------
@@ -335,7 +325,7 @@ tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const
 }
 
 template <class Codec>
-value_type ByteBuffer<Codec>::GetElement(size_t position) const {
+typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t position) const {
     return codec_.Decode(GetRawElement(position));
 }
 

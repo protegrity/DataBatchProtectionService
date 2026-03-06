@@ -23,6 +23,8 @@
 #include <tcb/span.hpp>
 #include "exceptions.h"
 
+namespace dbps::processing {
+
 template <class T, const char* TypeName>
 struct PlainValueCodec {
     using value_type = T;
@@ -61,17 +63,17 @@ struct StringFixedSizedCodec {
     using value_type = std::string_view;
     static constexpr bool is_fixed_sized = true;
 
-    explicit StringFixedSizedCodec(size_t element_size_bytes = 0) : element_size_bytes_(element_size_bytes) {
+    explicit StringFixedSizedCodec(size_t element_size_bytes) : element_size_bytes_(element_size_bytes) {
         if (element_size_bytes_ <= 0) {
             throw InvalidInputException("StringFixedSizedCodec requires element_size_bytes > 0");
-        }            
+        }
     }
 
     static constexpr std::string_view type_name() noexcept {
         return "string (fixed-length)";
     }
 
-    constexpr size_t element_size() const noexcept {
+    size_t element_size() const noexcept {
         return element_size_bytes_;
     }
 
@@ -123,3 +125,5 @@ struct StringVariableSizedCodec {
         std::memcpy(write_span.data(), value.data(), write_span.size());
     }
 };
+
+} // namespace dbps::processing

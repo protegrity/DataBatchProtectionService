@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <variant>
 #include "typed_buffer_codecs.h"
 #include "typed_buffer.h"
 
