@@ -535,39 +535,42 @@ void ByteBuffer<Codec>::SetElement(size_t position, const value_type& element) {
         codec_.Encode(element, write_span);
         return;
     }
+    
+    // Variable-sized elements - `else` is needed because it's a compile-time check.
+    else {
+        const size_t element_size = static_cast<size_t>(element.size());
 
-    const size_t element_size = static_cast<size_t>(element.size());
-
-    // Defensive check for unlikely extremely large element size that exceeds uint32.
-    if (element_size > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
-        throw InvalidInputException("Variable-size element payload exceeds uint32 capacity.. Woohhh!!");
-    }
-
-    // For variable-size elements, we append the element to the write buffer and update offsets_.
-    //
-    // We append the element to the write buffer and update offsets_.
-    //
-    // This can result on orphaned bytes if a position is set multiple times or positions written out of order.
-    // This is intentional to allow random writes of elements while the buffer is built.
-    // During FinalizeAndTakeBuffer, the buffer is rebuilt to be sequential and orphaned bytes are removed.
-    const size_t offset = write_buffer_.size();
-    offsets_[position] = offset;
-    append_u32_le(write_buffer_, static_cast<uint32_t>(element_size));
-    const size_t payload_offset = write_buffer_.size();
-    write_buffer_.resize(payload_offset + element_size);
-    auto write_span = tcb::span<uint8_t>(write_buffer_.data() + payload_offset, element_size);
-    codec_.Encode(element, write_span);
-
-    // Update next_expected_write_position_ for sequential write checking.
-    if (next_expected_write_position_ != kUnsetVariableElementOffset) {
-        if (position == next_expected_write_position_) {
-            next_expected_write_position_ += 1;
-        } else {
-            next_expected_write_position_ = kUnsetVariableElementOffset;
+        // Defensive check for unlikely extremely large element size that exceeds uint32.
+        if (element_size > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
+            throw InvalidInputException("Variable-size element payload exceeds uint32 capacity.. Woohhh!!");
         }
-    }
 
-    RebindSpanToWriteBuffer();
+        // For variable-size elements, we append the element to the write buffer and update offsets_.
+        //
+        // We append the element to the write buffer and update offsets_.
+        //
+        // This can result on orphaned bytes if a position is set multiple times or positions written out of order.
+        // This is intentional to allow random writes of elements while the buffer is built.
+        // During FinalizeAndTakeBuffer, the buffer is rebuilt to be sequential and orphaned bytes are removed.
+        const size_t offset = write_buffer_.size();
+        offsets_[position] = offset;
+        append_u32_le(write_buffer_, static_cast<uint32_t>(element_size));
+        const size_t payload_offset = write_buffer_.size();
+        write_buffer_.resize(payload_offset + element_size);
+        auto write_span = tcb::span<uint8_t>(write_buffer_.data() + payload_offset, element_size);
+        codec_.Encode(element, write_span);
+
+        // Update next_expected_write_position_ for sequential write checking.
+        if (next_expected_write_position_ != kUnsetVariableElementOffset) {
+            if (position == next_expected_write_position_) {
+                next_expected_write_position_ += 1;
+            } else {
+                next_expected_write_position_ = kUnsetVariableElementOffset;
+            }
+        }
+
+        RebindSpanToWriteBuffer();
+    }
 }
 
 template <class Codec>

@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string_view>
 #include <tcb/span.hpp>
 #include "exceptions.h"

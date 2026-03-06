@@ -341,6 +341,14 @@ if(BUILD_TESTS)
   )
   target_include_directories(typed_buffer_test PRIVATE src/processing src/common)
 
+  # Typed buffer values tests
+  add_executable(typed_buffer_values_test src/processing/typed_buffer_values_test.cpp)
+  target_link_libraries(typed_buffer_values_test
+    dbps_byte_buffer_lib
+    gtest_main
+  )
+  target_include_directories(typed_buffer_values_test PRIVATE src/processing src/common)
+
   # Basic encryptor tests
   add_executable(basic_encryptor_test src/processing/encryptors/basic_encryptor_test.cpp)
   target_link_libraries(basic_encryptor_test
@@ -535,6 +543,7 @@ if(BUILD_TESTS)
       bytes_utils_test
       compression_utils_test
       typed_buffer_test
+      typed_buffer_values_test
       basic_encryptor_test
       auth_utils_test
       dbpa_interface_test
@@ -558,6 +567,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(bytes_utils_test)
   gtest_discover_tests(compression_utils_test)
   gtest_discover_tests(typed_buffer_test)
+  gtest_discover_tests(typed_buffer_values_test)
   gtest_discover_tests(basic_encryptor_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)
