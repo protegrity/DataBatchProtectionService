@@ -501,3 +501,46 @@ TEST(TypedBufferValuesTest, StringVariableSized_EmptyStringsMixedWithNonEmpty) {
     EXPECT_EQ(collected[6], "bravo");
     EXPECT_EQ(collected[7], "charlie");
 }
+
+TEST(TypedBufferValuesTest, StringVariableSized_UTF8_ReadBack) {
+    // Variable-sized strings with UTF-8 content
+    std::vector<uint8_t> bytes;
+    
+    // "Привет" (Russian, 12 bytes)
+    std::string russian = "Привет";
+    append_u32_le(bytes, static_cast<uint32_t>(russian.size()));
+    bytes.insert(bytes.end(), russian.begin(), russian.end());
+    
+    // "مرحبا" (Arabic, 10 bytes)
+    std::string arabic = "مرحبا";
+    append_u32_le(bytes, static_cast<uint32_t>(arabic.size()));
+    bytes.insert(bytes.end(), arabic.begin(), arabic.end());
+    
+    // "🎉🎊🎈" (Emojis, 12 bytes)
+    std::string emojis = "🎉🎊🎈";
+    append_u32_le(bytes, static_cast<uint32_t>(emojis.size()));
+    bytes.insert(bytes.end(), emojis.begin(), emojis.end());
+
+    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes)};
+
+    EXPECT_EQ(buffer.GetElement(0), "Привет");
+    EXPECT_EQ(buffer.GetElement(1), "مرحبا");
+    EXPECT_EQ(buffer.GetElement(2), "🎉🎊🎈");
+}
+
+TEST(TypedBufferValuesTest, StringVariableSized_UTF8_WriteRoundTrip) {
+    TypedBufferStringVariableSized writer(4u, 256u, true);
+
+    writer.SetElement(0, std::string_view("Héllo Wörld"));
+    writer.SetElement(1, std::string_view("中文测试"));
+    writer.SetElement(2, std::string_view("Emoji: 🚀🌟💻"));
+    writer.SetElement(3, std::string_view("Ελληνικά"));
+
+    std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
+    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized)};
+
+    EXPECT_EQ(reader.GetElement(0), "Héllo Wörld");
+    EXPECT_EQ(reader.GetElement(1), "中文测试");
+    EXPECT_EQ(reader.GetElement(2), "Emoji: 🚀🌟💻");
+    EXPECT_EQ(reader.GetElement(3), "Ελληνικά");
+}
