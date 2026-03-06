@@ -361,6 +361,8 @@ typename ByteBuffer<Codec>::ConstIterator::value_type ByteBuffer<Codec>::ConstIt
     if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
         throw InvalidInputException("Cannot dereference ByteBuffer iterator at end position");
     }
+    // Decode converts raw bytes into the codec's value_type (e.g. int32_t, float, string_view).
+    // This keeps the iterator's return type consistent with GetElement across all codecs.
     if constexpr (is_fixed_sized) {
         return buffer_->codec_.Decode(buffer_->elements_span_.subspan(cursor_offset_, buffer_->element_size_));
     }

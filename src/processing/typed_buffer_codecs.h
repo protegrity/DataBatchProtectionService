@@ -43,6 +43,7 @@ struct PlainValueCodec {
         return sizeof(T);
     }
 
+    // TODO: Make explicit endianness conversions to prevent architecture/in-memory representation incompatibility issues.
     value_type Decode(tcb::span<const uint8_t> read_span) const {
         if (read_span.size() != sizeof(T)) {
             throw InvalidInputException("Decode: read_span size does not match sizeof(T)");
@@ -120,6 +121,8 @@ struct StringVariableSizedCodec {
     }
 
     void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
+        // Exact match required to prevent short values to leave uninitialized trailing bytes in the buffer
+        // and prevent longer values from overflowing.
         if (value.size() != write_span.size()) {
             throw InvalidInputException("Encode: value size does not match write_span size");
         }
