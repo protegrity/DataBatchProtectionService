@@ -33,7 +33,6 @@
 
 #include <tcb/span.hpp>
 
-
 namespace dbps::processing {
 
 // -----------------------------------------------------------------------------
@@ -150,123 +149,6 @@ inline constexpr size_t kUnsetVariableElementOffset = std::numeric_limits<size_t
 
 // Constant for the size of the [u32 size] prefix for variable-size elements.
 inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);
-
-// -----------------------------------------------------------------------------
-// Templates for codecs for ByteBuffer
-// -----------------------------------------------------------------------------
-
-template <class T, const char* TypeName>
-struct PlainValueCodec {
-    using value_type = T;
-    static constexpr bool is_fixed_sized = true;
-
-    // Compile-time check that the type is trivially copyable (can be copied simply by memcpy)
-    static_assert(std::is_trivially_copyable_v<T>,
-                  "PlainValueCodec requires trivially copyable T");
-
-    static constexpr std::string_view type_name() noexcept {
-        return std::string_view(TypeName);
-    }
-
-    constexpr size_t element_size() const noexcept {
-        return sizeof(T);
-    }
-
-    value_type Decode(tcb::span<const uint8_t> read_span) const {
-        if (read_span.size() != sizeof(T)) {
-            throw InvalidInputException("Decode: read_span size does not match sizeof(T)");
-        }
-        T value;
-        std::memcpy(&value, read_span.data(), sizeof(T));
-        return value;
-    }
-
-    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
-        if (write_span.size() != sizeof(T)) {
-            throw InvalidInputException("Encode: write_span size does not match sizeof(T)");
-        }
-        std::memcpy(write_span.data(), &value, sizeof(T));
-    }
-};
-
-struct StringFixedSizedCodec {
-    using value_type = std::string_view;
-    static constexpr bool is_fixed_sized = true;
-
-    explicit StringFixedSizedCodec(size_t element_size_bytes = 0) : element_size_bytes_(element_size_bytes) {
-        if (element_size_bytes_ <= 0) {
-            throw InvalidInputException("StringFixedSizedCodec requires element_size_bytes > 0");
-        }            
-    }
-
-    static constexpr std::string_view type_name() noexcept {
-        return "string (FIXED_LEN_BYTE_ARRAY)";
-    }
-
-    constexpr size_t element_size() const noexcept {
-        return element_size_bytes_;
-    }
-
-    value_type Decode(tcb::span<const uint8_t> read_span) const {
-        if (read_span.size() != element_size_bytes_) {
-            throw InvalidInputException("Decode: read_span size does not match element_size_bytes");
-        }
-        return std::string_view(
-            reinterpret_cast<const char*>(read_span.data()),
-            read_span.size());
-    }
-
-    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
-        if (write_span.size() != element_size_bytes_) {
-            throw InvalidInputException("Encode: write_span size does not match element_size_bytes");
-        }
-        if (value.size() != write_span.size()) {
-            throw InvalidInputException("Encode: value size does not match write_span size");
-        }
-        std::memcpy(write_span.data(), value.data(), write_span.size());
-    }
-
-    private:
-        size_t element_size_bytes_;
-};
-
-struct StringVariableSizedCodec {
-    using value_type = std::string_view;
-    static constexpr bool is_fixed_sized = false;
-
-    static constexpr std::string_view type_name() noexcept {
-        return "string (BYTE_ARRAY)";
-    }
-
-    size_t element_size() const {
-        throw InvalidInputException("StringVariableSizedCodec does not have a fixed element size");
-    }
-
-    value_type Decode(tcb::span<const uint8_t> read_span) const noexcept {
-        return std::string_view(
-            reinterpret_cast<const char*>(read_span.data()),
-            read_span.size());
-    }
-
-    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
-        if (value.size() != write_span.size()) {
-            throw InvalidInputException("Encode: value size does not match write_span size");
-        }
-        std::memcpy(write_span.data(), value.data(), write_span.size());
-    }
-};
-
-
-
-
-
-
-
-
-
-
-
-
 
 // -----------------------------------------------------------------------------
 // Helper inline functions
@@ -773,19 +655,5 @@ template <class Codec>
 void ByteBuffer<Codec>::RebindSpanToWriteBuffer() {
     elements_span_ = tcb::span<const uint8_t>(write_buffer_.data(), write_buffer_.size());
 }
-
-namespace {
-inline constexpr char kI32TypeName[] = "int32";
-inline constexpr char kI64TypeName[] = "int64";
-inline constexpr char kF32TypeName[] = "float";
-inline constexpr char kF64TypeName[] = "double";
-} // namespace
-
-template class ByteBuffer<PlainValueCodec<int32_t, kI32TypeName>>;
-template class ByteBuffer<PlainValueCodec<int64_t, kI64TypeName>>;
-template class ByteBuffer<PlainValueCodec<float, kF32TypeName>>;
-template class ByteBuffer<PlainValueCodec<double, kF64TypeName>>;
-template class ByteBuffer<StringFixedSizedCodec>;
-template class ByteBuffer<StringVariableSizedCodec>;
 
 } // namespace dbps::processing
