@@ -42,6 +42,8 @@ using TypedBufferDouble = ByteBuffer<PlainValueCodec<double, kF64TypeName>>;
 using TypedBufferInt96 = ByteBuffer<PlainValueCodec<Int96, kInt96TypeName>>;
 using TypedBufferStringFixedSized = ByteBuffer<StringFixedSizedCodec>;
 using TypedBufferStringVariableSized = ByteBuffer<StringVariableSizedCodec>;
+using TypedBufferRawBytesFixedSized = ByteBuffer<RawBytesFixedSizedCodec>;
+using TypedBufferRawBytesVariableSized = ByteBuffer<RawBytesVariableSizedCodec>;
 
 using TypedValuesBuffer = std::variant<
     TypedBufferI32,
@@ -50,6 +52,8 @@ using TypedValuesBuffer = std::variant<
     TypedBufferDouble,
     TypedBufferInt96,
     TypedBufferStringFixedSized,
-    TypedBufferStringVariableSized
+    TypedBufferStringVariableSized,
+    TypedBufferRawBytesFixedSized,
+    TypedBufferRawBytesVariableSized
 >;
 } // namespace dbps::processing

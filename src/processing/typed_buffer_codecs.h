@@ -126,4 +126,61 @@ struct StringVariableSizedCodec {
     }
 };
 
+struct RawBytesFixedSizedCodec {
+    using value_type = tcb::span<const uint8_t>;
+    static constexpr bool is_fixed_sized = true;
+
+    explicit RawBytesFixedSizedCodec(size_t element_size_bytes) : element_size_bytes_(element_size_bytes) {
+        if (element_size_bytes_ == 0) {
+            throw InvalidInputException("RawBytesFixedSizedCodec requires element_size_bytes > 0");
+        }
+    }
+
+    static constexpr std::string_view type_name() noexcept {
+        return "raw bytes (fixed-length)";
+    }
+
+    size_t element_size() const noexcept {
+        return element_size_bytes_;
+    }
+
+    value_type Decode(tcb::span<const uint8_t> read_span) const noexcept {
+        return read_span;
+    }
+
+    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
+        if (value.size() != write_span.size()) {
+            throw InvalidInputException("Encode: value size does not match write_span size");
+        }
+        std::memcpy(write_span.data(), value.data(), write_span.size());
+    }
+
+    private:
+        size_t element_size_bytes_;
+};
+
+struct RawBytesVariableSizedCodec {
+    using value_type = tcb::span<const uint8_t>;
+    static constexpr bool is_fixed_sized = false;
+
+    static constexpr std::string_view type_name() noexcept {
+        return "raw bytes (variable-length)";
+    }
+
+    size_t element_size() const {
+        throw InvalidInputException("RawBytesVariableSizedCodec does not have a fixed element size");
+    }
+
+    value_type Decode(tcb::span<const uint8_t> read_span) const noexcept {
+        return read_span;
+    }
+
+    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
+        if (value.size() != write_span.size()) {
+            throw InvalidInputException("Encode: value size does not match write_span size");
+        }
+        std::memcpy(write_span.data(), value.data(), write_span.size());
+    }
+};
+
 } // namespace dbps::processing

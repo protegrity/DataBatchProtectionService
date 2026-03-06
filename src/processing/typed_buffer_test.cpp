@@ -15,7 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "byte_buffer.h"
+#include "typed_buffer.h"
+#include "typed_buffer_codecs.h"
 
 #include <gtest/gtest.h>
 #include <vector>
@@ -25,52 +26,60 @@
 #include "exceptions.h"
 
 using dbps::processing::ByteBuffer;
+using dbps::processing::RawBytesFixedSizedCodec;
+using dbps::processing::RawBytesVariableSizedCodec;
 using dbps::processing::kUnsetVariableElementOffset;
 
-class ByteBufferTestProxy : public ByteBuffer {
+template <class Codec>
+class TypedBufferTestProxy : public ByteBuffer<Codec> {
+    using Base = ByteBuffer<Codec>;
 public:
-    ByteBufferTestProxy(
-        tcb::span<const uint8_t> elements_span)
-        : ByteBuffer(elements_span) {}
-    ByteBufferTestProxy(
+    explicit TypedBufferTestProxy(
         tcb::span<const uint8_t> elements_span,
-        size_t element_size,
-        size_t prefix_size = 0)
-        : ByteBuffer(elements_span, element_size, prefix_size) {}
-    ByteBufferTestProxy(size_t num_elements)
-        : ByteBuffer(num_elements, 0, false) {}
-    ByteBufferTestProxy(
+        size_t prefix_size = 0,
+        Codec codec = Codec{})
+        : Base(elements_span, prefix_size, std::move(codec)) {}
+
+    TypedBufferTestProxy(
+        size_t num_elements,
+        size_t prefix_size,
+        Codec codec = Codec{})
+        : Base(num_elements, prefix_size, std::move(codec)) {}
+
+    TypedBufferTestProxy(
         size_t num_elements,
         size_t reserved_bytes_hint,
         bool use_reserve_hint,
-        size_t prefix_size = 0)
-        : ByteBuffer(num_elements, reserved_bytes_hint, use_reserve_hint, prefix_size) {}
-    ByteBufferTestProxy(size_t num_elements, size_t element_size, size_t prefix_size = 0)
-        : ByteBuffer(num_elements, element_size, prefix_size) {}
-    using ByteBuffer::EstimateOffsetsReserveCountFromSample;
+        size_t prefix_size = 0,
+        Codec codec = Codec{})
+        : Base(num_elements, reserved_bytes_hint, use_reserve_hint,
+               prefix_size, std::move(codec)) {}
 
-    size_t GetNumElements() const { return num_elements_; }
-    bool GetHasFixedSizedElements() const { return has_fixed_sized_elements_; }
-    size_t GetElementSize() const { return element_size_; }
-    const std::vector<size_t>& GetOffsets() const { return offsets_; }
-    const std::vector<uint8_t>& GetWriteBuffer() const { return write_buffer_; }
+    using Base::EstimateOffsetsReserveCountFromSample;
+    size_t GetNumElements() const { return Base::num_elements_; }
+    size_t GetElementSize() const { return Base::element_size_; }
+    const std::vector<size_t>& GetOffsets() const { return Base::offsets_; }
+    const std::vector<uint8_t>& GetWriteBuffer() const { return Base::write_buffer_; }
     void SetWriteBufferByteForTest(size_t idx, uint8_t value) {
-        write_buffer_[idx] = value;
+        Base::write_buffer_[idx] = value;
     }
     void AppendTrailingBytesForTest(tcb::span<const uint8_t> bytes) {
-        write_buffer_.insert(write_buffer_.end(), bytes.begin(), bytes.end());
+        Base::write_buffer_.insert(Base::write_buffer_.end(),
+                                   bytes.begin(), bytes.end());
     }
 };
 
+using RawBytesFixedSizedBuffer = TypedBufferTestProxy<RawBytesFixedSizedCodec>;
+using RawBytesVariableSizedBuffer = TypedBufferTestProxy<RawBytesVariableSizedCodec>;
+
 namespace {
 
+template <class Codec>
 void ExpectCommonState(
-    const ByteBufferTestProxy& buffer,
+    const TypedBufferTestProxy<Codec>& buffer,
     size_t expected_num_elements,
-    bool expected_fixed_size_flag,
     size_t expected_element_size) {
     EXPECT_EQ(buffer.GetNumElements(), expected_num_elements);
-    EXPECT_EQ(buffer.GetHasFixedSizedElements(), expected_fixed_size_flag);
     EXPECT_EQ(buffer.GetElementSize(), expected_element_size);
 }
 
@@ -84,18 +93,18 @@ std::vector<uint8_t> MakePayload(size_t size, uint8_t seed) {
 
 } // namespace
 
-TEST(ByteBufferTest, ConstructFixedSize_ValidBuffer_InitializesExpectedState) {
+TEST(TypedBufferTest, ConstructFixedSize_ValidBuffer_InitializesExpectedState) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
     // Trigger lazy span initialization.
     EXPECT_NO_THROW((void)buffer.GetElement(0));
-    ExpectCommonState(buffer, 3u, true, 2u);
+    ExpectCommonState(buffer, 3u, 2u);
     EXPECT_TRUE(buffer.GetOffsets().empty());
 }
 
-TEST(ByteBufferTest, GetElement_FixedSize_ReturnsExpectedSlices) {
+TEST(TypedBufferTest, GetElement_FixedSize_ReturnsExpectedSlices) {
     std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21, 0x30, 0x31};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
 
     const auto first = buffer.GetElement(0);
     const auto second = buffer.GetElement(1);
@@ -112,12 +121,12 @@ TEST(ByteBufferTest, GetElement_FixedSize_ReturnsExpectedSlices) {
     EXPECT_EQ(third[1], 0x31);
 }
 
-TEST(ByteBufferTest, GetElement_FixedSize_WithPrefixSize_SkipsPrefix) {
+TEST(TypedBufferTest, GetElement_FixedSize_WithPrefixSize_SkipsPrefix) {
     std::vector<uint8_t> bytes = {
         0xFE, 0xFD, 0xFC, // prefix
         0x10, 0x11, 0x20, 0x21, 0x30, 0x31
     };
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2u, 3u);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 3u, RawBytesFixedSizedCodec{2u});
 
     const auto first = buffer.GetElement(0);
     const auto second = buffer.GetElement(1);
@@ -128,13 +137,13 @@ TEST(ByteBufferTest, GetElement_FixedSize_WithPrefixSize_SkipsPrefix) {
     EXPECT_EQ(std::vector<uint8_t>(third.begin(), third.end()), (std::vector<uint8_t>{0x30, 0x31}));
 }
 
-TEST(ByteBufferTest, GetElement_VariableSize_WithPrefixSize_SkipsPrefix) {
+TEST(TypedBufferTest, GetElement_VariableSize_WithPrefixSize_SkipsPrefix) {
     std::vector<uint8_t> bytes = {
         0xEE, 0xDD, // prefix
         0x02, 0x00, 0x00, 0x00, 0x41, 0x42,
         0x03, 0x00, 0x00, 0x00, 0x78, 0x79, 0x7A
     };
-    ByteBuffer buffer(tcb::span<const uint8_t>(bytes), 2u);
+    ByteBuffer<RawBytesVariableSizedCodec> buffer(tcb::span<const uint8_t>(bytes), 2u);
 
     const auto first = buffer.GetElement(0);
     const auto second = buffer.GetElement(1);
@@ -143,34 +152,32 @@ TEST(ByteBufferTest, GetElement_VariableSize_WithPrefixSize_SkipsPrefix) {
     EXPECT_EQ(std::vector<uint8_t>(second.begin(), second.end()), (std::vector<uint8_t>{0x78, 0x79, 0x7A}));
 }
 
-TEST(ByteBufferTest, ConstructFixedSize_ZeroElementSize_Throws) {
-    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 0);
-    EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
+TEST(TypedBufferTest, ConstructFixedSize_ZeroElementSize_Throws) {
+    EXPECT_THROW(RawBytesFixedSizedCodec{0}, InvalidInputException);
 }
 
-TEST(ByteBufferTest, ConstructFixedSize_NonDivisibleSize_Throws) {
+TEST(TypedBufferTest, ConstructFixedSize_NonDivisibleSize_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
     EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
-TEST(ByteBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpectedState) {
+TEST(TypedBufferTest, ConstructVariableSize_ValidEncodedBuffer_InitializesExpectedState) {
     // [len=5]["ABCDE"][len=7]["1234567"]
     std::vector<uint8_t> bytes = {
         0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
     // Trigger lazy variable-size index parsing.
     EXPECT_NO_THROW((void)buffer.GetElement(0));
-    ExpectCommonState(buffer, 2u, false, 0u);
+    ExpectCommonState(buffer, 2u, 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], 0u);
     EXPECT_EQ(buffer.GetOffsets()[1], 9u);  // 4 bytes length prefix + 5 bytes first payload.
 }
 
-TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
+TEST(TypedBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
     const auto make_variable_size_bytes = [](const std::vector<size_t>& sizes) {
         std::vector<uint8_t> bytes;
         for (size_t idx = 0; idx < sizes.size(); ++idx) {
@@ -186,7 +193,7 @@ TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
     {
         const std::vector<size_t> sizes = {};
         const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
-        const size_t estimated = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        const size_t estimated = RawBytesVariableSizedBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
         EXPECT_EQ(estimated, 0u);
     }
 
@@ -194,7 +201,7 @@ TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
     {
         const std::vector<size_t> sizes = {1u, 2u, 50u, 4u, 7u};
         const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
-        const size_t estimated = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        const size_t estimated = RawBytesVariableSizedBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
         EXPECT_EQ(estimated, sizes.size());
     }
 
@@ -210,7 +217,7 @@ TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
                 bytes.push_back(static_cast<uint8_t>((i + j) & 0xFF));
             }
         }
-        const size_t estimate = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        const size_t estimate = RawBytesVariableSizedBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
         EXPECT_EQ(estimate, 33u);  //33 = 30 elements + 10% headroom.
     }
 
@@ -219,18 +226,18 @@ TEST(ByteBufferTest, EstimateOffsetsReserveCountFromSample_MultipleCases) {
         // First 10 elements are very small, tail elements are very large:
         const std::vector<size_t> sizes = {1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 1u, 100u, 100u};
         const std::vector<uint8_t> bytes = make_variable_size_bytes(sizes);
-        const size_t estimate = ByteBufferTestProxy::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
+        const size_t estimate = RawBytesVariableSizedBuffer::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t>(bytes));
         EXPECT_GT(estimate, sizes.size());
     }
 }
 
-TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
+TEST(TypedBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
     // [len=5]["ABCDE"][len=7]["1234567"]
     std::vector<uint8_t> bytes = {
         0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
 
     const auto first = buffer.GetElement(0);
     const auto second = buffer.GetElement(1);
@@ -243,13 +250,13 @@ TEST(ByteBufferTest, GetElement_VariableSize_ReturnsExpectedPayload) {
     EXPECT_EQ(second[6], 0x37);
 }
 
-TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_WithPrefixSize_SkipsPrefix) {
+TEST(TypedBufferTest, Iterate_ReadOnlyVariableSize_WithPrefixSize_SkipsPrefix) {
     std::vector<uint8_t> bytes = {
         0xEE, 0xDD, // prefix
         0x02, 0x00, 0x00, 0x00, 0x41, 0x42,
         0x03, 0x00, 0x00, 0x00, 0x78, 0x79, 0x7A
     };
-    ByteBuffer buffer(tcb::span<const uint8_t>(bytes), 2u);
+    ByteBuffer<RawBytesVariableSizedCodec> buffer(tcb::span<const uint8_t>(bytes), 2u);
 
     std::vector<std::vector<uint8_t>> collected;
     for (const auto element : buffer) {
@@ -261,12 +268,12 @@ TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_WithPrefixSize_SkipsPrefix) {
     EXPECT_EQ(collected[1], (std::vector<uint8_t>{0x78, 0x79, 0x7A}));
 }
 
-TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_WithPrefixSize_SkipsPrefix) {
+TEST(TypedBufferTest, Iterate_ReadOnlyFixedSize_WithPrefixSize_SkipsPrefix) {
     std::vector<uint8_t> bytes = {
         0xFE, 0xFD, 0xFC, // prefix
         0x10, 0x11, 0x20, 0x21, 0x30, 0x31
     };
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2u, 3u);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 3u, RawBytesFixedSizedCodec{2u});
 
     std::vector<std::vector<uint8_t>> collected;
     for (const auto element : buffer) {
@@ -279,9 +286,9 @@ TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_WithPrefixSize_SkipsPrefix) {
     EXPECT_EQ(collected[2], (std::vector<uint8_t>{0x30, 0x31}));
 }
 
-TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
+TEST(TypedBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
     std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21, 0x30, 0x31};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
 
     std::vector<std::vector<uint8_t>> collected;
     for (const auto element : buffer) {
@@ -314,13 +321,13 @@ TEST(ByteBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
 
 }
 
-TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
+TEST(TypedBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
     // [len=5]["ABCDE"][len=7]["1234567"]
     std::vector<uint8_t> bytes = {
         0x05, 0x00, 0x00, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45,
         0x07, 0x00, 0x00, 0x00, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37
     };
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
 
     std::vector<std::vector<uint8_t>> collected;
     for (const auto element : buffer) {
@@ -353,7 +360,7 @@ TEST(ByteBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
 
 }
 
-TEST(ByteBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
+TEST(TypedBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
     constexpr size_t kElementSize = 2u;
     std::vector<uint8_t> source_bytes = {
         0x10, 0x11,
@@ -362,10 +369,10 @@ TEST(ByteBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
     };
 
     // Create a source buffer to read the elements from.
-    ByteBufferTestProxy source_buffer(tcb::span<const uint8_t>(source_bytes), kElementSize);
+    RawBytesFixedSizedBuffer source_buffer(tcb::span<const uint8_t>(source_bytes), 0, RawBytesFixedSizedCodec{kElementSize});
 
-    // Create a new buffer to write the transformed elements.
-    ByteBufferTestProxy transformed_buffer(3u, kElementSize);
+    // Create a new buffer to write the transformed elements into.
+    RawBytesFixedSizedBuffer transformed_buffer(3u, 0, RawBytesFixedSizedCodec{kElementSize});
     size_t position = 0;
     for (const auto element : source_buffer) {
         std::vector<uint8_t> source_element(element.begin(), element.end());
@@ -393,7 +400,7 @@ TEST(ByteBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
 
     // Now finalize the transformed buffer and populate a third buffer to read the elements from.
     std::vector<uint8_t> finalized_bytes = transformed_buffer.FinalizeAndTakeBuffer();
-    ByteBufferTestProxy finalized_read_buffer(tcb::span<const uint8_t>(finalized_bytes), kElementSize);
+    RawBytesFixedSizedBuffer finalized_read_buffer(tcb::span<const uint8_t>(finalized_bytes), 0, RawBytesFixedSizedCodec{kElementSize});
 
     // Compare source and finalized read buffer using the same transformation rule.
     for (size_t i = 0; i < position; ++i) {
@@ -409,7 +416,7 @@ TEST(ByteBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
     }
 }
 
-TEST(ByteBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
+TEST(TypedBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
     std::vector<uint8_t> source_bytes;
     append_u32_le(source_bytes, 5u);
     source_bytes.insert(source_bytes.end(), {0x41, 0x42, 0x43, 0x44, 0x45});  // "ABCDE"
@@ -418,8 +425,8 @@ TEST(ByteBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
     append_u32_le(source_bytes, 3u);
     source_bytes.insert(source_bytes.end(), {0x61, 0x62, 0x63});  // "abc"
 
-    ByteBufferTestProxy source_buffer{tcb::span<const uint8_t>(source_bytes)};
-    ByteBufferTestProxy transformed_buffer(3u, source_bytes.size(), true);
+    RawBytesVariableSizedBuffer source_buffer{tcb::span<const uint8_t>(source_bytes)};
+    RawBytesVariableSizedBuffer transformed_buffer(3u, source_bytes.size(), true);
     size_t position = 0;
 
     for (const auto element : source_buffer) {
@@ -446,7 +453,7 @@ TEST(ByteBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
     }
 
     std::vector<uint8_t> finalized_bytes = transformed_buffer.FinalizeAndTakeBuffer();
-    ByteBufferTestProxy finalized_read_buffer{tcb::span<const uint8_t>(finalized_bytes)};
+    RawBytesVariableSizedBuffer finalized_read_buffer{tcb::span<const uint8_t>(finalized_bytes)};
 
     // Compare source and finalized read buffer using the same transformation rule.
     for (size_t i = 0; i < position; ++i) {
@@ -462,11 +469,11 @@ TEST(ByteBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) {
     }
 }
 
-TEST(ByteBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
+TEST(TypedBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
     std::vector<uint8_t> empty_bytes;
 
     // Fixed-size empty span.
-    ByteBufferTestProxy fixed_buffer(tcb::span<const uint8_t>(empty_bytes), 2);
+    RawBytesFixedSizedBuffer fixed_buffer(tcb::span<const uint8_t>(empty_bytes), 0, RawBytesFixedSizedCodec{2});
     size_t fixed_count = 0;
     for (const auto element : fixed_buffer) {
         (void)element;
@@ -475,7 +482,7 @@ TEST(ByteBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
     EXPECT_EQ(fixed_count, 0u);
 
     // Variable-size empty span.
-    ByteBufferTestProxy variable_buffer{tcb::span<const uint8_t>(empty_bytes)};
+    RawBytesVariableSizedBuffer variable_buffer{tcb::span<const uint8_t>(empty_bytes)};
     size_t variable_count = 0;
     for (const auto element : variable_buffer) {
         (void)element;
@@ -484,16 +491,15 @@ TEST(ByteBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
     EXPECT_EQ(variable_count, 0u);
 }
 
-TEST(ByteBufferTest, GetElement_OutOfRange_Throws) {
+TEST(TypedBufferTest, GetElement_OutOfRange_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
     EXPECT_THROW((void)buffer.GetElement(2), InvalidInputException);
 }
 
-TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_AllocatesAndSets) {
-    ByteBufferTestProxy buffer(3u, 2u);
+TEST(TypedBufferTest, ConstructWithNumElements_FixedSize_AllocatesAndSets) {
+    RawBytesFixedSizedBuffer buffer(3u, 0, RawBytesFixedSizedCodec{2u});
     EXPECT_EQ(buffer.GetNumElements(), 3u);
-    EXPECT_TRUE(buffer.GetHasFixedSizedElements());
     EXPECT_EQ(buffer.GetElementSize(), 2u);
     EXPECT_TRUE(buffer.GetOffsets().empty());
 
@@ -512,8 +518,8 @@ TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_AllocatesAndSets) {
     EXPECT_EQ(read_third[1], 0xDD);
 }
 
-TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_WithPrefixSize_PreservesLeadingBytes) {
-    ByteBufferTestProxy buffer(2u, 3u, (size_t) 7u);
+TEST(TypedBufferTest, ConstructWithNumElements_FixedSize_WithPrefixSize_PreservesLeadingBytes) {
+    RawBytesFixedSizedBuffer buffer(2u, 7u, RawBytesFixedSizedCodec{3u});
 
     std::vector<uint8_t> first = {0xAA, 0xBB, 0xBC};
     std::vector<uint8_t> second = {0xCC, 0xDD, 0xDE};
@@ -541,10 +547,9 @@ TEST(ByteBufferTest, ConstructWithNumElements_FixedSize_WithPrefixSize_Preserves
     EXPECT_EQ(final_buffer[12], 0xDE);
 }
 
-TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
-    ByteBufferTestProxy buffer(2u, 8u, true);
+TEST(TypedBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
+    RawBytesVariableSizedBuffer buffer(2u, 8u, true);
     EXPECT_EQ(buffer.GetNumElements(), 2u);
-    EXPECT_FALSE(buffer.GetHasFixedSizedElements());
     EXPECT_EQ(buffer.GetElementSize(), 0u);
     ASSERT_EQ(buffer.GetOffsets().size(), 2u);
     EXPECT_EQ(buffer.GetOffsets()[0], kUnsetVariableElementOffset);
@@ -565,9 +570,9 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_AllocatesAndSets) {
     EXPECT_EQ(read_second[6], 0x26);
 }
 
-TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_WithPrefixSize_PreservesLeadingBytes) {
+TEST(TypedBufferTest, ConstructWithNumElements_VariableSize_WithPrefixSize_PreservesLeadingBytes) {
     size_t prefix_size = 3u;
-    ByteBufferTestProxy buffer(2u, 8u, true, prefix_size);
+    RawBytesVariableSizedBuffer buffer(2u, 8u, true, prefix_size);
 
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22, 0x23, 0x24};
@@ -601,16 +606,16 @@ TEST(ByteBufferTest, ConstructWithNumElements_VariableSize_WithPrefixSize_Preser
     EXPECT_EQ(final_buffer[17], 0x24);
 }
 
-TEST(ByteBufferTest, GetElement_VariableSize_UnsetPosition_Throws) {
-    ByteBufferTestProxy buffer(2u, 8u, true);
+TEST(TypedBufferTest, GetElement_VariableSize_UnsetPosition_Throws) {
+    RawBytesVariableSizedBuffer buffer(2u, 8u, true);
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     buffer.SetElement(1, tcb::span<const uint8_t>(second));
 
     EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
-TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
-    ByteBufferTestProxy buffer(3u, 32u, true);
+TEST(TypedBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
+    RawBytesVariableSizedBuffer buffer(3u, 32u, true);
 
     std::vector<uint8_t> v2_first = {0xA0, 0xA1};
     std::vector<uint8_t> v0_first = {0xB0, 0xB1, 0xB2};
@@ -677,7 +682,7 @@ TEST(ByteBufferTest, SetElement_VariableSize_OutOfOrderAndOverwrite_ReturnsLates
     }
 }
 
-TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize) {
+TEST(TypedBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize) {
     const std::vector<size_t> payload_sizes = {37u, 11u, 47u, 23u, 43u, 17u, 31u};
     const size_t num_elements = payload_sizes.size();
 
@@ -687,7 +692,7 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
     }
     const size_t exact_hint_bytes = (num_elements * 4u) + total_payload_bytes;
 
-    ByteBufferTestProxy buffer(num_elements, exact_hint_bytes, true);
+    RawBytesVariableSizedBuffer buffer(num_elements, exact_hint_bytes, true);
     const size_t initial_capacity = buffer.GetWriteBuffer().capacity();
     const uint8_t* const initial_data_ptr = buffer.GetWriteBuffer().data();
 
@@ -716,9 +721,9 @@ TEST(ByteBufferTest, VariableSizeWrite_ExactHint_NoReallocationAndExactUsedSize)
     EXPECT_EQ(final_buffer.data(), data_ptr_before_finalize);  // Same allocation: finalize returned write_buffer_ as-is.
 }
 
-TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
+TEST(TypedBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
     const size_t num_elements = 7u;
-    ByteBufferTestProxy buffer(num_elements, 32u, true);
+    RawBytesVariableSizedBuffer buffer(num_elements, 32u, true);
 
     const size_t initial_capacity = buffer.GetWriteBuffer().capacity();
     const uint8_t* const initial_data_ptr = buffer.GetWriteBuffer().data();
@@ -743,8 +748,8 @@ TEST(ByteBufferTest, VariableSizeWrite_ExceedsHint_ReallocatesBuffer) {
     }
 }
 
-TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAllowsRetry) {
-    ByteBufferTestProxy buffer(2u, 8u, true);
+TEST(TypedBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAllowsRetry) {
+    RawBytesVariableSizedBuffer buffer(2u, 8u, true);
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     buffer.SetElement(1, tcb::span<const uint8_t>(second));
@@ -756,7 +761,7 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAl
     std::vector<uint8_t> final_buffer = buffer.FinalizeAndTakeBuffer();
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented after retry).
 
-    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    RawBytesVariableSizedBuffer read_back{tcb::span<const uint8_t>(final_buffer)};
     const auto r0 = read_back.GetElement(0);
     const auto r1 = read_back.GetElement(1);
     ASSERT_EQ(r0.size(), first.size());
@@ -767,8 +772,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_PartialWrite_ThrowsAndAl
     EXPECT_EQ(r1[2], 0x22);
 }
 
-TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) {
-    ByteBufferTestProxy buffer(3u, 64u, true);
+TEST(TypedBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) {
+    RawBytesVariableSizedBuffer buffer(3u, 64u, true);
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> third = {0x30};
@@ -785,8 +790,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Sequential_ReturnsAsIs) 
     EXPECT_EQ(final_buffer.data(), data_ptr_before);  // Same allocation (moved, not copied).
 }
 
-TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_SequentialWithTrailingBytes_Throws) {
-    ByteBufferTestProxy buffer(3u, 64u, true);
+TEST(TypedBufferTest, FinalizeAndTakeBuffer_VariableSize_SequentialWithTrailingBytes_Throws) {
+    RawBytesVariableSizedBuffer buffer(3u, 64u, true);
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> third = {0x30};
@@ -805,8 +810,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_SequentialWithTrailingBy
     EXPECT_THROW((void)buffer.FinalizeAndTakeBuffer(), InvalidInputException);
 }
 
-TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) {
-    ByteBufferTestProxy buffer(3u, 64u, true);
+TEST(TypedBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) {
+    RawBytesVariableSizedBuffer buffer(3u, 64u, true);
     std::vector<uint8_t> first = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> third = {0x30};
@@ -822,7 +827,7 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) 
     EXPECT_NE(final_buffer, raw_before_finalize);     // Different byte content.
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
 
-    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    RawBytesVariableSizedBuffer read_back{tcb::span<const uint8_t>(final_buffer)};
     const auto r0 = read_back.GetElement(0);
     const auto r1 = read_back.GetElement(1);
     const auto r2 = read_back.GetElement(2);
@@ -840,8 +845,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_OutOfOrder_Defragments) 
     }
 }
 
-TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) {
-    ByteBufferTestProxy buffer(2u, 64u, true);
+TEST(TypedBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) {
+    RawBytesVariableSizedBuffer buffer(2u, 64u, true);
     std::vector<uint8_t> first_initial = {0x10, 0x11};
     std::vector<uint8_t> second = {0x20, 0x21, 0x22};
     std::vector<uint8_t> first_overwrite = {0x30, 0x31, 0x32, 0x33};
@@ -859,7 +864,7 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) 
     EXPECT_NE(final_buffer, raw_before_finalize);
     EXPECT_NE(final_buffer.data(), data_ptr_before);  // Different allocation (defragmented copy).
 
-    ByteBufferTestProxy read_back{tcb::span<const uint8_t>(final_buffer)};
+    RawBytesVariableSizedBuffer read_back{tcb::span<const uint8_t>(final_buffer)};
     const auto r0 = read_back.GetElement(0);
     const auto r1 = read_back.GetElement(1);
     ASSERT_EQ(r0.size(), first_overwrite.size());
@@ -872,8 +877,8 @@ TEST(ByteBufferTest, FinalizeAndTakeBuffer_VariableSize_Fragmented_Defragments) 
     }
 }
 
-TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
-    ByteBufferTestProxy buffer(3u, 2u);
+TEST(TypedBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestValues) {
+    RawBytesFixedSizedBuffer buffer(3u, 0, RawBytesFixedSizedCodec{2u});
 
     std::vector<uint8_t> v2_first = {0xA0, 0xA1};
     std::vector<uint8_t> v0_first = {0xB0, 0xB1};
@@ -929,43 +934,43 @@ TEST(ByteBufferTest, SetElement_FixedSize_OutOfOrderAndOverwrite_ReturnsLatestVa
     EXPECT_EQ(final_buffer[5], v2_second[1]);
 }
 
-TEST(ByteBufferTest, SetElement_FixedSize_WrongPayloadSize_Throws) {
-    ByteBufferTestProxy buffer(1u, 4u);
+TEST(TypedBufferTest, SetElement_FixedSize_WrongPayloadSize_Throws) {
+    RawBytesFixedSizedBuffer buffer(1u, 0, RawBytesFixedSizedCodec{4u});
     std::vector<uint8_t> wrong = {0x01, 0x02};
     EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(wrong)), InvalidInputException);
 }
 
-TEST(ByteBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
+TEST(TypedBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
     std::vector<uint8_t> bytes = {0x10, 0x11, 0x20, 0x21};
-    ByteBufferTestProxy buffer(tcb::span<const uint8_t>(bytes), 2);
+    RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 0, RawBytesFixedSizedCodec{2});
     std::vector<uint8_t> replacement = {0xAA, 0xBB};
     EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(replacement)), InvalidInputException);
 }
 
-TEST(ByteBufferTest, Iterate_OnWriteBuffer_Throws) {
-    ByteBufferTestProxy buffer(3u, 2u);
+TEST(TypedBufferTest, Iterate_OnWriteBuffer_Throws) {
+    RawBytesFixedSizedBuffer buffer(3u, 0, RawBytesFixedSizedCodec{2u});
     EXPECT_THROW((void)buffer.begin(), InvalidInputException);
     EXPECT_THROW((void)buffer.end(), InvalidInputException);
 }
 
-TEST(ByteBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {
+TEST(TypedBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {
     std::vector<uint8_t> bytes;
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
-    ExpectCommonState(buffer, 0u, false, 0u);
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
+    ExpectCommonState(buffer, 0u, 0u);
     EXPECT_TRUE(buffer.GetOffsets().empty());
 }
 
-TEST(ByteBufferTest, ConstructVariableSize_TruncatedLengthPrefix_Throws) {
+TEST(TypedBufferTest, ConstructVariableSize_TruncatedLengthPrefix_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x00, 0x00}; // only 3 bytes
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
     EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
 
-TEST(ByteBufferTest, ConstructVariableSize_TruncatedPayload_Throws) {
+TEST(TypedBufferTest, ConstructVariableSize_TruncatedPayload_Throws) {
     // Declares payload length 5, but provides only 2 bytes.
     std::vector<uint8_t> bytes = {
         0x05, 0x00, 0x00, 0x00, 0xAA, 0xBB
     };
-    ByteBufferTestProxy buffer{tcb::span<const uint8_t>(bytes)};
+    RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes)};
     EXPECT_THROW((void)buffer.GetElement(0), InvalidInputException);
 }
