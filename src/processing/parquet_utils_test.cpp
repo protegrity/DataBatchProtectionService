@@ -30,6 +30,7 @@
 
 using namespace dbps::external;
 using namespace dbps::compression;
+using namespace dbps::processing;
 
 TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V2) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
@@ -634,4 +635,327 @@ TEST(ParquetUtils, CompressAndJoin_UnsupportedEncoding) {
     EXPECT_THROW(
         CompressAndJoin(level_bytes, value_bytes, CompressionCodec::UNCOMPRESSED, attribs),
         InvalidInputException);
+}
+
+// =============================================================================
+// ReinterpretValueBytesAsTypedValuesBuffer tests
+// =============================================================================
+
+TEST(ParquetUtils, Reinterpret_INT32) {
+    std::vector<int32_t> values = {-1, 0, 2147483647};
+    std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
+                               reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
+
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferI32>(&result);
+    ASSERT_NE(nullptr, buf);
+
+    size_t i = 0;
+    for (auto val : *buf) {
+        EXPECT_EQ(values[i], val);
+        ++i;
+    }
+    EXPECT_EQ(values.size(), i);
+}
+
+TEST(ParquetUtils, Reinterpret_DOUBLE) {
+    std::vector<double> values = {0.0, 1.5, -3.75, 1.7976931348623157e+308};
+    std::vector<uint8_t> bytes(reinterpret_cast<const uint8_t*>(values.data()),
+                               reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(double));
+
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::DOUBLE, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferDouble>(&result);
+    ASSERT_NE(nullptr, buf);
+
+    size_t i = 0;
+    for (auto val : *buf) {
+        EXPECT_DOUBLE_EQ(values[i], val);
+        ++i;
+    }
+    EXPECT_EQ(values.size(), i);
+}
+
+TEST(ParquetUtils, Reinterpret_INT96) {
+    std::vector<Int96> expected = {
+        {0, 0, 0},
+        {-1, 2147483647, -2147483648},
+        {305419896, 0, 1},
+        {1, 1, 1},
+        {123456789, -987654321, 42}
+    };
+    std::vector<uint8_t> bytes;
+    for (const auto& v : expected) {
+        bytes.insert(bytes.end(), reinterpret_cast<const uint8_t*>(&v),
+                     reinterpret_cast<const uint8_t*>(&v) + sizeof(Int96));
+    }
+
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::INT96, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferInt96>(&result);
+    ASSERT_NE(nullptr, buf);
+    size_t i = 0;
+    for (auto val : *buf) {
+        EXPECT_EQ(expected[i].lo, val.lo);
+        EXPECT_EQ(expected[i].mid, val.mid);
+        EXPECT_EQ(expected[i].hi, val.hi);
+        ++i;
+    }
+    EXPECT_EQ(expected.size(), i);
+}
+
+TEST(ParquetUtils, Reinterpret_BYTE_ARRAY) {
+    std::vector<std::vector<uint8_t>> expected = {
+        {},
+        {0x42},
+        {0x00, 0xFF, 0x80},
+        {'h', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd'},
+        {}
+    };
+
+    std::vector<uint8_t> bytes;
+    for (const auto& elem : expected) {
+        uint32_t len = static_cast<uint32_t>(elem.size());
+        bytes.insert(bytes.end(), reinterpret_cast<const uint8_t*>(&len),
+                     reinterpret_cast<const uint8_t*>(&len) + sizeof(len));
+        bytes.insert(bytes.end(), elem.begin(), elem.end());
+    }
+
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
+    ASSERT_NE(nullptr, buf);
+
+    size_t i = 0;
+    for (auto val : *buf) {
+        EXPECT_EQ(expected[i], std::vector<uint8_t>(val.begin(), val.end()));
+        ++i;
+    }
+    EXPECT_EQ(expected.size(), i);
+}
+
+TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY) {
+    std::vector<std::vector<uint8_t>> expected = {
+        {0x00, 0x00, 0x00, 0x00, 0x00},
+        {0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+        {0x01, 0x02, 0x03, 0x04, 0x05},
+        {0xDE, 0xAD, 0xBE, 0xEF, 0x42}
+    };
+    const int element_len = 5;
+
+    std::vector<uint8_t> bytes;
+    for (const auto& elem : expected) {
+        bytes.insert(bytes.end(), elem.begin(), elem.end());
+    }
+
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferRawBytesFixedSized>(&result);
+    ASSERT_NE(nullptr, buf);
+
+    size_t i = 0;
+    for (auto val : *buf) {
+        EXPECT_EQ(expected[i], std::vector<uint8_t>(val.begin(), val.end()));
+        ++i;
+    }
+    EXPECT_EQ(expected.size(), i);
+}
+
+TEST(ParquetUtils, Reinterpret_UnsupportedEncoding) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::INT32, std::nullopt, Encoding::RLE),
+        DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, Reinterpret_RLE_DICTIONARY_Throws) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::INT32, std::nullopt, Encoding::RLE_DICTIONARY),
+        DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, Reinterpret_BOOLEAN_Throws) {
+    std::vector<uint8_t> bytes = {0xB4};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
+        DBPSUnsupportedException);
+}
+
+TEST(ParquetUtils, Reinterpret_InvalidDataSize) {
+    std::vector<uint8_t> bytes = {0xAA, 0xBB, 0xCC};
+    auto result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferI32>(&result);
+    ASSERT_NE(nullptr, buf);
+    EXPECT_THROW(
+        { for (auto val : *buf) { (void)val; } },
+        InvalidInputException);
+}
+
+TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_MissingLength_Throws) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, std::nullopt, Encoding::PLAIN),
+        InvalidInputException);
+}
+
+TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_ZeroLength_Throws) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, 0, Encoding::PLAIN),
+        InvalidInputException);
+}
+
+TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_NegativeLength_Throws) {
+    std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
+    EXPECT_THROW(
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, -1, Encoding::PLAIN),
+        InvalidInputException);
+}
+
+TEST(ParquetUtils, Reinterpret_EmptyBytes_FixedSize) {
+    std::vector<uint8_t> bytes;
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::DOUBLE, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferDouble>(&result);
+    ASSERT_NE(nullptr, buf);
+    size_t count = 0;
+    for (auto val : *buf) { (void)val; ++count; }
+    EXPECT_EQ(0u, count);
+}
+
+TEST(ParquetUtils, Reinterpret_EmptyBytes_VariableSize) {
+    std::vector<uint8_t> bytes;
+    TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
+        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
+    ASSERT_NE(nullptr, buf);
+    size_t count = 0;
+    for (auto val : *buf) { (void)val; ++count; }
+    EXPECT_EQ(0u, count);
+}
+
+// =============================================================================
+// Round-trip tests: Reinterpret -> iterate -> write -> GetAsValueBytes -> compare
+// =============================================================================
+
+TEST(ParquetUtils, RoundTrip_INT32) {
+    std::vector<int32_t> values = {-2147483648, 0, 42, 2147483647};
+    std::vector<uint8_t> input_bytes(
+        reinterpret_cast<const uint8_t*>(values.data()),
+        reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
+
+    auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
+        input_bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+
+    auto* src = std::get_if<TypedBufferI32>(&read_buf);
+    ASSERT_NE(nullptr, src);
+
+    TypedBufferI32 write_buf{values.size()};
+    size_t pos = 0;
+    for (auto val : *src) {
+        write_buf.SetElement(pos++, val);
+    }
+
+    TypedValuesBuffer variant_buf = std::move(write_buf);
+    std::vector<uint8_t> output_bytes = GetTypedValuesBufferAsValueBytes(std::move(variant_buf));
+    EXPECT_EQ(input_bytes, output_bytes);
+}
+
+TEST(ParquetUtils, RoundTrip_BYTE_ARRAY) {
+    std::vector<std::vector<uint8_t>> payloads = {
+        {0xCA, 0xFE},
+        {},
+        {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+        {0xFF}
+    };
+
+    std::vector<uint8_t> input_bytes;
+    for (const auto& p : payloads) {
+        uint32_t len = static_cast<uint32_t>(p.size());
+        input_bytes.insert(input_bytes.end(),
+            reinterpret_cast<const uint8_t*>(&len),
+            reinterpret_cast<const uint8_t*>(&len) + sizeof(len));
+        input_bytes.insert(input_bytes.end(), p.begin(), p.end());
+    }
+
+    auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
+        input_bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    auto* src = std::get_if<TypedBufferRawBytesVariableSized>(&read_buf);
+    ASSERT_NE(nullptr, src);
+
+    TypedBufferRawBytesVariableSized write_buf{payloads.size(), input_bytes.size(), true};
+    size_t pos = 0;
+    for (auto val : *src) {
+        write_buf.SetElement(pos++, val);
+    }
+    EXPECT_EQ(payloads.size(), pos);
+
+    TypedValuesBuffer variant_buf = std::move(write_buf);
+    std::vector<uint8_t> output_bytes = GetTypedValuesBufferAsValueBytes(std::move(variant_buf));
+    EXPECT_EQ(input_bytes, output_bytes);
+}
+
+TEST(ParquetUtils, RoundTrip_FIXED_LEN_BYTE_ARRAY) {
+    const int element_len = 7;
+    std::vector<std::vector<uint8_t>> payloads = {
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+        {0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9},
+        {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70}
+    };
+
+    std::vector<uint8_t> input_bytes;
+    for (const auto& p : payloads) {
+        input_bytes.insert(input_bytes.end(), p.begin(), p.end());
+    }
+
+    auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
+        input_bytes, Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
+
+    auto* src = std::get_if<TypedBufferRawBytesFixedSized>(&read_buf);
+    ASSERT_NE(nullptr, src);
+
+    TypedBufferRawBytesFixedSized write_buf{
+        payloads.size(), 0, RawBytesFixedSizedCodec{static_cast<size_t>(element_len)}};
+    size_t pos = 0;
+    for (auto val : *src) {
+        write_buf.SetElement(pos++, val);
+    }
+    EXPECT_EQ(payloads.size(), pos);
+
+    TypedValuesBuffer variant_buf = std::move(write_buf);
+    std::vector<uint8_t> output_bytes = GetTypedValuesBufferAsValueBytes(std::move(variant_buf));
+    EXPECT_EQ(input_bytes, output_bytes);
+}
+
+// =============================================================================
+// GetTypedValuesBufferAsValueBytes standalone tests
+// =============================================================================
+
+TEST(ParquetUtils, GetAsValueBytes_WrittenBuffer) {
+    std::vector<double> values = {-0.0, 1.0e-300, 3.141592653589793, -1.7976931348623157e+308, 1.0};
+
+    TypedBufferDouble write_buf{values.size()};
+    for (size_t i = 0; i < values.size(); ++i) {
+        write_buf.SetElement(i, values[i]);
+    }
+
+    std::vector<uint8_t> expected(
+        reinterpret_cast<const uint8_t*>(values.data()),
+        reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(double));
+
+    TypedValuesBuffer variant_buf = std::move(write_buf);
+    std::vector<uint8_t> output_bytes = GetTypedValuesBufferAsValueBytes(std::move(variant_buf));
+    EXPECT_EQ(expected, output_bytes);
 }

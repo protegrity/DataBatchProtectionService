@@ -18,12 +18,14 @@
 #include "parquet_utils.h"
 #include "enum_utils.h"
 #include "compression_utils.h"
+#include "typed_buffer_values.h"
 #include <cstring>
 #include <iostream>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
 using namespace dbps::compression;
+using namespace dbps::processing;
 
 // -----------------------------------------------------------------------------
 // Process Parquet formatted Dictionary and Data pages
@@ -374,6 +376,66 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     Encoding::type encoding) {
     std::vector<RawValueBytes> raw_values = BuildRawBytesFromTypedListValues(list);
     return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, encoding);
+}
+
+// -----------------------------------------------------------------------------
+// Build Parquet formatted value bytes into TypedValuesBuffer
+// -----------------------------------------------------------------------------
+
+TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8_t> value_bytes,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Encoding::type encoding) {
+
+    if (encoding == Encoding::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException(
+            "Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations "
+            "since values are not present in the data, only references to them.");
+    }
+
+    if (encoding != Encoding::PLAIN) {
+        throw DBPSUnsupportedException(
+            "On ReinterpretValueBytesAsTypedValuesBuffer, unsupported encoding: "
+            + std::string(to_string(encoding)));
+    }
+
+    if (datatype == Type::BOOLEAN) {
+        throw DBPSUnsupportedException("On ReinterpretValueBytesAsTypedValuesBuffer, BOOLEAN datatype "
+            "values are bit-encoded and not expanded as bytes, so BOOLEAN is not supported.");
+    }
+
+    switch (datatype) {
+        case Type::INT32:
+            return TypedBufferI32{value_bytes};
+        case Type::INT64:
+            return TypedBufferI64{value_bytes};
+        case Type::FLOAT:
+            return TypedBufferFloat{value_bytes};
+        case Type::DOUBLE:
+            return TypedBufferDouble{value_bytes};
+        case Type::INT96:
+            return TypedBufferInt96{value_bytes};
+        case Type::FIXED_LEN_BYTE_ARRAY: {
+            if (!datatype_length.has_value() || datatype_length.value() <= 0) {
+                throw InvalidInputException("FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
+            }
+            return TypedBufferRawBytesFixedSized{
+                value_bytes, 0, RawBytesFixedSizedCodec{static_cast<size_t>(datatype_length.value())}};
+        }
+        case Type::BYTE_ARRAY:
+            return TypedBufferRawBytesVariableSized{value_bytes};
+        default:
+            throw InvalidInputException(
+                "Invalid datatype: " + std::string(to_string(datatype)));
+    }
+}
+
+std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(TypedValuesBuffer buffer) {
+    // std::visit is needed to unwrap the variant. TypedValuesBuffer could be of different ByteBuffer types,
+    // so the indirection is needed to call FinalizeAndTakeBuffer() on the correct type. In practice, this is the same for all.
+    return std::visit([](auto& buf) -> std::vector<uint8_t> {
+        return buf.FinalizeAndTakeBuffer();
+    }, buffer);
 }
 
 // -----------------------------------------------------------------------------
