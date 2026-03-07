@@ -28,6 +28,7 @@
 #include "../common/exceptions.h"
 #include "enum_utils.h"
 #include "typed_list_values.h"
+#include "typed_buffer_values.h"
 #include "../common/bytes_utils.h"
 
 struct LevelAndValueBytes {
@@ -131,3 +132,31 @@ std::vector<uint8_t> GetTypedListAsValueBytes(
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding);
+
+/**
+ * Zero-copy reinterpretation of raw value bytes into a typed buffer.
+ * Returns a TypedValuesBuffer variant holding the appropriate ByteBuffer<Codec>
+ * for the given Parquet datatype.
+ *
+ * The returned buffer holds a non-owning view into value_bytes.
+ * The caller must keep the backing data alive for as long as the buffer is used.
+ *
+ * @param value_bytes Raw value bytes (span must outlive the returned buffer)
+ * @param datatype Parquet physical type
+ * @param datatype_length Required for FIXED_LEN_BYTE_ARRAY (must be > 0)
+ * @param encoding Only PLAIN is currently supported
+ * @throws DBPSUnsupportedException for RLE_DICTIONARY, BOOLEAN, or non-PLAIN encodings
+ * @throws InvalidInputException for invalid datatype_length on FIXED_LEN_BYTE_ARRAY
+ */
+dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
+    tcb::span<const uint8_t> value_bytes,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Encoding::type encoding);
+
+/**
+ * Finalize a typed buffer and return the raw value bytes.
+ * Consumes the buffer; caller must std::move() it in to pass ownership.
+ */
+std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
+    dbps::processing::TypedValuesBuffer buffer);
