@@ -141,6 +141,18 @@ target_include_directories(dbps_byte_buffer_lib INTERFACE
 )
 target_link_libraries(dbps_byte_buffer_lib INTERFACE tcb_span)
 
+# TODO: Update this when deprecating BasicEncryptor
+# Standalone XOR encryptor library (kept parallel to legacy basic_encryptor path)
+add_library(dbps_xor_encryptor_lib STATIC
+  src/processing/encryptors/basic_xor_encryptor.cpp
+)
+target_link_libraries(dbps_xor_encryptor_lib PUBLIC dbps_common_lib tcb_span)
+target_include_directories(dbps_xor_encryptor_lib PUBLIC
+  src/processing
+  src/processing/encryptors
+  src/common
+)
+
 # Server components library
 add_library(dbps_server_lib STATIC 
   src/processing/encryption_sequencer.cpp
@@ -358,6 +370,15 @@ if(BUILD_TESTS)
   )
   target_include_directories(basic_encryptor_test PRIVATE src/processing src/processing/encryptors)
 
+  # Basic XOR encryptor tests (parallel path; does not replace BasicEncryptor callers)
+  add_executable(basic_xor_encryptor_test src/processing/encryptors/basic_xor_encryptor_test.cpp)
+  target_link_libraries(basic_xor_encryptor_test
+    dbps_xor_encryptor_lib
+    dbps_common_lib
+    gtest_main
+  )
+  target_include_directories(basic_xor_encryptor_test PRIVATE src/processing src/processing/encryptors)
+
   # Auth utils tests
   add_executable(auth_utils_test src/server/auth_utils_test.cpp)
   target_link_libraries(auth_utils_test
@@ -513,6 +534,7 @@ add_custom_target(libraries
     dbps_local_lib
   COMMENT "Building all libraries"
 )
+add_dependencies(libraries dbps_xor_encryptor_lib)
 
 add_custom_target(shared_libraries
   DEPENDS 
@@ -556,6 +578,7 @@ if(BUILD_TESTS)
       http_client_base_test
     COMMENT "Building all tests"
   )
+  add_dependencies(tests basic_xor_encryptor_test)
 
   # Register tests with CTest via GoogleTest discovery
   gtest_discover_tests(json_request_test)
@@ -569,6 +592,7 @@ if(BUILD_TESTS)
   gtest_discover_tests(typed_buffer_test)
   gtest_discover_tests(typed_buffer_values_test)
   gtest_discover_tests(basic_encryptor_test)
+  gtest_discover_tests(basic_xor_encryptor_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)
   gtest_discover_tests(dbpa_utils_test)

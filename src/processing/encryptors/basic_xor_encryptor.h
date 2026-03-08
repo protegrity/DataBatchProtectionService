@@ -17,7 +17,13 @@
 
 #pragma once
 
-#include "dbps_encryptor.h"
+// TODO: Remove these includes when deprecating BasicEncryptor.
+#include <cstdint>
+#include <string>
+#include <tcb/span.hpp>
+#include <vector>
+#include "../typed_buffer_values.h"
+#include "../../common/enums.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
@@ -26,7 +32,41 @@
 using namespace dbps::processing;
 
 /**
- * Basic implementation of the DBPSEncryptor interface.
+ * TODO: Remove this when deprecating BasicEncryptor.
+ * Temporary interface for the XOR encryptor during migration.
+ * Keeps XOR implementation independent from DBPSEncryptor while both paths coexist.
+ */
+class DBPS_EXPORT XorEncryptorInterface {
+public:
+    XorEncryptorInterface(
+        const std::string& key_id,
+        const std::string& column_name,
+        const std::string& user_id,
+        const std::string& application_context,
+        dbps::external::Type::type datatype)
+        : key_id_(key_id),
+          column_name_(column_name),
+          user_id_(user_id),
+          application_context_(application_context),
+          datatype_(datatype) {}
+
+    virtual ~XorEncryptorInterface() = default;
+
+    virtual std::vector<uint8_t> EncryptBlock(tcb::span<const uint8_t> data) = 0;
+    virtual std::vector<uint8_t> DecryptBlock(tcb::span<const uint8_t> data) = 0;
+    virtual std::vector<uint8_t> EncryptValueList(const TypedValuesBuffer& typed_buffer) = 0;
+    virtual TypedValuesBuffer DecryptValueList(tcb::span<const uint8_t> encrypted_bytes) = 0;
+
+protected:
+    std::string key_id_;
+    std::string column_name_;
+    std::string user_id_;
+    std::string application_context_;
+    dbps::external::Type::type datatype_;
+};
+
+/**
+ * Basic implementation of the temporary XOR encryptor interface.
  * 
  * This implementation provides:
  * - Block encryption/decryption using XOR with key_id hash (same as current encryption_sequencer)
@@ -34,7 +74,7 @@ using namespace dbps::processing;
  * This is a simple, default encryption implementation that can be replaced with more
  * sophisticated encryption providers (e.g., Protegrity) in the future.
  */
-class DBPS_EXPORT BasicEncryptor : public DBPSEncryptor {
+class DBPS_EXPORT BasicXorEncryptor : public XorEncryptorInterface {
 public:
     /**
      * Constructor that initializes the encryptor with context parameters.
@@ -46,15 +86,15 @@ public:
      * @param datatype The data type of the column being encrypted/decrypted. 
      *    It is needed for correct type specific parsing during the DecryptValueList call.
      */
-    BasicEncryptor(
+    BasicXorEncryptor(
         const std::string& key_id,
         const std::string& column_name,
         const std::string& user_id,
         const std::string& application_context,
         dbps::external::Type::type datatype)
-        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype) {}
+        : XorEncryptorInterface(key_id, column_name, user_id, application_context, datatype) {}
 
-    ~BasicEncryptor() override = default;
+    ~BasicXorEncryptor() override = default;
 
     // Block encryption methods
     std::vector<uint8_t> EncryptBlock(tcb::span<const uint8_t> data) override;

@@ -15,11 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "basic_encryptor.h"
+#include "basic_xor_encryptor.h"
 #include "encryptor_utils.h"
 #include "../../common/exceptions.h"
 #include "../../common/enum_utils.h"
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <type_traits>
 
@@ -55,11 +56,11 @@ static std::vector<uint8_t> DecryptByteArray(tcb::span<const uint8_t> data, cons
 // Block encryption
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> BasicEncryptor::EncryptBlock(tcb::span<const uint8_t> data) {
+std::vector<uint8_t> BasicXorEncryptor::EncryptBlock(tcb::span<const uint8_t> data) {
     return EncryptByteArray(data, key_id_);
 }
 
-std::vector<uint8_t> BasicEncryptor::DecryptBlock(tcb::span<const uint8_t> data) {
+std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> data) {
     return DecryptByteArray(data, key_id_);
 }
 
@@ -72,7 +73,7 @@ std::vector<uint8_t> BasicEncryptor::DecryptBlock(tcb::span<const uint8_t> data)
 //
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> BasicEncryptor::EncryptValueList(
+std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
     const TypedValuesBuffer& typed_buffer) {
 
     std::cout << "EncryptValueList context: column=" << column_name_
@@ -131,7 +132,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
 // automatically.  Output is the correctly-typed buffer matching datatype_.
 // ---------------------------------------------------------------------------
 
-TypedValuesBuffer BasicEncryptor::DecryptValueList(
+TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     tcb::span<const uint8_t> encrypted_bytes) {
 
     auto header = ReadHeader(encrypted_bytes);
@@ -179,7 +180,8 @@ TypedValuesBuffer BasicEncryptor::DecryptValueList(
             }
             default:
                 throw InvalidInputException(
-                    "DecryptValueList: unsupported fixed-size datatype: " + dbps::enum_utils::to_string(datatype_));
+                    std::string("DecryptValueList: unsupported fixed-size datatype: ")
+                    + std::string(dbps::enum_utils::to_string(datatype_)));
         }
     } else {
         TypedBufferRawBytesVariableSized encrypted_buffer{
@@ -199,7 +201,8 @@ TypedValuesBuffer BasicEncryptor::DecryptValueList(
             }
             default:
                 throw InvalidInputException(
-                    "DecryptValueList: unsupported variable-size datatype: " + dbps::enum_utils::to_string(datatype_));
+                    std::string("DecryptValueList: unsupported variable-size datatype: ")
+                    + std::string(dbps::enum_utils::to_string(datatype_)));
         }
     }
 }
