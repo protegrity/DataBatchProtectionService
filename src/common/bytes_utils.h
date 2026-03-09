@@ -74,6 +74,13 @@ inline void append_f64_le(std::vector<uint8_t>& out, double v) {
     append_u64_le(out, bits);
 }
 
+inline void write_u32_le_at(std::vector<uint8_t>& buf, size_t offset, uint32_t v) {
+    buf[offset + 0] = static_cast<uint8_t>(v & 0xFF);
+    buf[offset + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+    buf[offset + 2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+    buf[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+}
+
 inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
     return static_cast<uint32_t>(in[offset]) |
         (static_cast<uint32_t>(in[offset + 1]) << 8) |
