@@ -115,8 +115,25 @@ TEST(BasicXorEncryptor, EncryptDecryptValueList_RoundTrip_DOUBLE) {
 
 TEST(BasicXorEncryptor, EncryptDecryptValueList_RoundTrip_BYTE_ARRAY) {
     BasicXorEncryptor encryptor("test_key", "byte_array_column", "test_user", "test_context", Type::BYTE_ARRAY);
-    
-    std::vector<std::string> values = {"", "a", "hello", std::string("\x01\x02\x00\xFF", 4)};
+
+    auto make_pattern = [](size_t length, uint8_t seed) -> std::string {
+        std::string out(length, '\0');
+        for (size_t i = 0; i < length; ++i) {
+            out[i] = static_cast<char>((seed + static_cast<uint8_t>(i * 17u)) & 0xFF);
+        }
+        return out;
+    };
+
+    std::vector<std::string> values = {
+        "",
+        "a",
+        "hello",
+        std::string("\x01\x02\x00\xFF", 4),     // short binary payload
+        std::string("x\0y\0z", 5),               // embedded null bytes
+        make_pattern(64u, 0x11),                 // medium deterministic payload
+        make_pattern(257u, 0x5A),                // non-power-of-two length
+        std::string(1024u, 'Q')                  // larger payload
+    };
     size_t reserved_bytes_hint = 0;
     for (const auto& value : values) {
         reserved_bytes_hint += value.size();

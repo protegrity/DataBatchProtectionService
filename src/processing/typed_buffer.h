@@ -103,6 +103,7 @@ public:
             const ByteBuffer* buffer_ = nullptr;
             size_t cursor_offset_ = 0;
             size_t elements_span_size_ = 0;
+            mutable size_t current_element_size_ = 0;
         };
     // Methods used by the STL iterator machinery to iterate over the buffer.
     ConstIterator begin() const;
@@ -385,10 +386,22 @@ template <class Codec>
 ByteBuffer<Codec>::ConstIterator::ConstIterator(const ByteBuffer<Codec>* buffer, size_t cursor_offset)
     : buffer_(buffer),
       cursor_offset_(cursor_offset),
-      elements_span_size_(buffer != nullptr ? buffer->elements_span_.size() : 0u) {}
+      elements_span_size_(buffer != nullptr ? buffer->elements_span_.size() : 0u),
+      current_element_size_(kUnsetSize) {}
 
 template <class Codec>
 inline size_t ByteBuffer<Codec>::ConstIterator::ReadAndValidateVariableElementSizeAtCursor() const {
+    // Fixed-sized buffers should not call this method.
+    if constexpr (is_fixed_sized) {
+        throw InvalidInputException("ReadAndValidateVariableElementSizeAtCursor is not valid for fixed-size codecs");
+    }
+
+    // If the current element size has already been read, return it.
+    if (current_element_size_ != kUnsetSize) {
+        return current_element_size_;
+    }
+
+    // Read the current element size and save it to current_element_size_ cached variable.
     if ((elements_span_size_ - cursor_offset_) < kSizePrefixBytes) {
         throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
     }
@@ -397,7 +410,8 @@ inline size_t ByteBuffer<Codec>::ConstIterator::ReadAndValidateVariableElementSi
     if ((elements_span_size_ - payload_offset) < current_element_size) {
         throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
     }
-    return current_element_size;
+    current_element_size_ = current_element_size;
+    return current_element_size_;
 }
 
 template <class Codec>
@@ -431,6 +445,7 @@ typename ByteBuffer<Codec>::ConstIterator& ByteBuffer<Codec>::ConstIterator::ope
     }
     const size_t current_element_size = ReadAndValidateVariableElementSizeAtCursor();
     cursor_offset_ += (kSizePrefixBytes + current_element_size);
+    current_element_size_ = kUnsetSize;
     return *this;
 }
 
