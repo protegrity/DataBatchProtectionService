@@ -138,8 +138,8 @@ protected:
     // Helper to validate the preconditions for reading the buffer with an iterator.
     void ValidateIteratorReadPreconditions() const;
 
-    // Helper to get the write span for an element during SetElement calls.
-    tcb::span<uint8_t> GetWriteSpanForElement(size_t position, size_t payload_size);
+    // Helper to get a writable span for an element during SetElement calls.
+    tcb::span<uint8_t> GetWritableSpanForElement(size_t position, size_t payload_size);
 
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
@@ -204,7 +204,7 @@ ByteBuffer<Codec>::ByteBuffer(
 }
 
 // Initializes `num_elements_` and `offsets_` from the span.
-// Called in a lazy manner when the buffer is accessed with GetElement, avoiding unnecessary initialization.
+// Called in a lazy manner when the buffer is accessed with GetElement or GetNumElements, avoiding unnecessary initialization.
 template <class Codec>
 void ByteBuffer<Codec>::InitializeFromSpan() const {
     if (elements_span_.size() < prefix_size_) {
@@ -283,44 +283,8 @@ size_t ByteBuffer<Codec>::GetNumElements() const {
         return num_elements_;
     }
 
-    if (elements_span_.size() < prefix_size_) {
-        throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
-    }
-    const size_t readable_size = elements_span_.size() - prefix_size_;
-    if (readable_size == 0) {
-        num_elements_ = 0;
-        return num_elements_;
-    }
-
-    // For fixed-sized elements, it's a direct calculation.
-    if constexpr (is_fixed_sized) {
-        if (element_size_ <= 0) {
-            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
-        }
-        if ((readable_size % element_size_) != 0) {
-            throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
-        }
-        num_elements_ = readable_size / element_size_;
-        return num_elements_;
-    }
-
-    // For variable-size elements, we need to iterate over the elements and count them.
-    size_t count = 0;
-    size_t cursor = prefix_size_;
-    const size_t span_size = elements_span_.size();
-    while (cursor < span_size) {
-        if (span_size - cursor < kSizePrefixBytes) {
-            throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
-        }
-        const size_t element_size = ReadSizeAt(elements_span_, cursor);
-        cursor += kSizePrefixBytes;
-        if (span_size - cursor < element_size) {
-            throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
-        }
-        cursor += element_size;
-        ++count;
-    }
-    num_elements_ = count;
+    // If the buffer is not initialized, initialize it from the span.
+    EnsureInitializedFromSpan();
     return num_elements_;
 }
 
@@ -673,17 +637,17 @@ tcb::span<uint8_t> ByteBuffer<Codec>::GetWriteSpanForElement(size_t position, si
 template <class Codec>
 void ByteBuffer<Codec>::SetElement(size_t position, const value_type& element) {
     if constexpr (is_fixed_sized) {
-        auto write_span = GetWriteSpanForElement(position, element_size_);
+        auto write_span = GetWritableSpanForElement(position, element_size_);
         codec_.Encode(element, write_span);
     } else {
-        auto write_span = GetWriteSpanForElement(position, static_cast<size_t>(element.size()));
+        auto write_span = GetWritableSpanForElement(position, static_cast<size_t>(element.size()));
         codec_.Encode(element, write_span);
     }
 }
 
 template <class Codec>
 void ByteBuffer<Codec>::SetRawElement(size_t position, tcb::span<const uint8_t> raw) {
-    auto write_span = GetWriteSpanForElement(position, raw.size());
+    auto write_span = GetWritableSpanForElement(position, raw.size());
     std::memcpy(write_span.data(), raw.data(), raw.size());
 }
 

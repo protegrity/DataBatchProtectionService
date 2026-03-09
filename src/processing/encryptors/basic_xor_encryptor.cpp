@@ -80,6 +80,9 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
               << " user=" << user_id_ << " key=" << key_id_
               << " datatype=" << dbps::enum_utils::to_string(datatype_) << std::endl;
 
+    // TODO: Make EncryptValueList/DecryptValueList more readable:
+    // - Implement a simpler way of accessing Variant TypedBuffer if possible.
+    // - Replace unnecesary use of lambdas and removing other unnecessary complexity.
     return std::visit([&](const auto& input_buffer) -> std::vector<uint8_t> {
         using BufferType = std::decay_t<decltype(input_buffer)>;
         constexpr bool is_fixed = BufferType::is_fixed_sized;
@@ -150,6 +153,8 @@ static OutputBuffer DecryptFixedIntoBuffer(
 TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     tcb::span<const uint8_t> encrypted_bytes) {
 
+    // During decryption, the number of elements can be obtained from the header,
+    // no need to calculate it from the encrypted_buffer.
     auto header = ReadHeader(encrypted_bytes);
     auto num_elements = static_cast<size_t>(header.num_elements);
 
