@@ -111,7 +111,7 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
                 num_elements, prefix_length, RawBytesFixedSizedCodec{element_size}};
             final_buffer = encrypt_into(output_buffer);
         } else {
-            auto reserved_bytes_hint = input_buffer.GetSpanSize();
+            auto reserved_bytes_hint = input_buffer.GetRawBufferSize();
             TypedBufferRawBytesVariableSized output_buffer{
                 num_elements, reserved_bytes_hint, true, prefix_length};
             final_buffer = encrypt_into(output_buffer);
@@ -132,6 +132,21 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
 // automatically.  Output is the correctly-typed buffer matching datatype_.
 // ---------------------------------------------------------------------------
 
+// Helper function to decrypt fixed-size buffer into a specific output TypedBuffer type.
+template <typename OutputBuffer>
+static OutputBuffer DecryptFixedIntoBuffer(
+    const TypedBufferRawBytesFixedSized& encrypted_buffer,
+    const std::string& key_id,
+    OutputBuffer output_buffer) {
+    size_t output_index = 0;
+    for (const auto raw_bytes : encrypted_buffer.raw_elements()) {
+        auto decrypted_bytes = DecryptByteArray(raw_bytes, key_id);
+        output_buffer.SetRawElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
+        output_index++;
+    }
+    return output_buffer;
+}
+
 TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     tcb::span<const uint8_t> encrypted_bytes) {
 
@@ -143,30 +158,20 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
             encrypted_bytes, kFixedHeaderLength,
             RawBytesFixedSizedCodec{header.element_size}};
 
-        auto decrypt_fixed_into = [&](auto output) {
-            size_t output_index = 0;
-            for (const auto raw_bytes : encrypted_buffer.raw_elements()) {
-                auto decrypted_bytes = DecryptByteArray(raw_bytes, key_id_);
-                output.SetRawElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
-                output_index++;
-            }
-            return output;
-        };
-
         // TODO: This is leaking Parquet-specific types into the encryptor, which should be agnostic of Parquet.
         // This is needed because on the returned bytes we are not saving a type information.
         // We could annotate the generating bytes by simply updating the 1st byte of the header to indicate the type.
         switch (datatype_) {
             case Type::INT32:
-                return decrypt_fixed_into(TypedBufferI32{num_elements});
+                return DecryptFixedIntoBuffer(encrypted_buffer, key_id_, TypedBufferI32{num_elements});
             case Type::INT64:
-                return decrypt_fixed_into(TypedBufferI64{num_elements});
+                return DecryptFixedIntoBuffer(encrypted_buffer, key_id_, TypedBufferI64{num_elements});
             case Type::INT96:
-                return decrypt_fixed_into(TypedBufferInt96{num_elements});
+                return DecryptFixedIntoBuffer(encrypted_buffer, key_id_, TypedBufferInt96{num_elements});
             case Type::FLOAT:
-                return decrypt_fixed_into(TypedBufferFloat{num_elements});
+                return DecryptFixedIntoBuffer(encrypted_buffer, key_id_, TypedBufferFloat{num_elements});
             case Type::DOUBLE:
-                return decrypt_fixed_into(TypedBufferDouble{num_elements});
+                return DecryptFixedIntoBuffer(encrypted_buffer, key_id_, TypedBufferDouble{num_elements});
             case Type::FIXED_LEN_BYTE_ARRAY: {
                 TypedBufferRawBytesFixedSized output_buffer{
                     num_elements, 0, RawBytesFixedSizedCodec{header.element_size}};
@@ -189,7 +194,7 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
 
         switch (datatype_) {
             case Type::BYTE_ARRAY: {
-                auto reserved_bytes_hint = encrypted_buffer.GetSpanSize();
+                auto reserved_bytes_hint = encrypted_buffer.GetRawBufferSize();
                 TypedBufferRawBytesVariableSized output_buffer{num_elements, reserved_bytes_hint, true};
                 size_t output_index = 0;
                 for (const auto element : encrypted_buffer) {

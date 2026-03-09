@@ -24,7 +24,7 @@ using namespace dbps::processing;
 // --- WriteHeader + ReadHeader round-trip ---
 
 TEST(EncryptorUtils, FixedHeader_RoundTrip) {
-    std::vector<uint8_t> buf(kFixedHeaderSize, 0);
+    std::vector<uint8_t> buf(kFixedHeaderLength, 0);
     EncryptedValueHeader written{true, 42, 8};
     WriteHeader(buf, written);
 
@@ -35,7 +35,7 @@ TEST(EncryptorUtils, FixedHeader_RoundTrip) {
 }
 
 TEST(EncryptorUtils, VariableHeader_RoundTrip) {
-    std::vector<uint8_t> buf(kVariableHeaderSize, 0);
+    std::vector<uint8_t> buf(kVariableHeaderLength, 0);
     EncryptedValueHeader written{false, 100, 0};
     WriteHeader(buf, written);
 
@@ -46,7 +46,7 @@ TEST(EncryptorUtils, VariableHeader_RoundTrip) {
 }
 
 TEST(EncryptorUtils, FixedHeader_ZeroElements) {
-    std::vector<uint8_t> buf(kFixedHeaderSize, 0);
+    std::vector<uint8_t> buf(kFixedHeaderLength, 0);
     WriteHeader(buf, {true, 0, 0});
 
     auto read = ReadHeader(tcb::span<const uint8_t>(buf));
@@ -55,15 +55,40 @@ TEST(EncryptorUtils, FixedHeader_ZeroElements) {
     EXPECT_EQ(read.element_size, 0u);
 }
 
+TEST(EncryptorUtils, WriteHeader_Fixed_WritesExpectedWireFormat) {
+    std::vector<uint8_t> buf(kFixedHeaderLength, 0xEE);
+    WriteHeader(buf, {true, 42u, 8u});
+
+    // [tag=0x01][count=42 little-endian][elem_size=8 little-endian]
+    const std::vector<uint8_t> expected = {
+        0x01,
+        0x2A, 0x00, 0x00, 0x00,
+        0x08, 0x00, 0x00, 0x00
+    };
+    EXPECT_EQ(buf, expected);
+}
+
+TEST(EncryptorUtils, WriteHeader_Variable_WritesExpectedWireFormat) {
+    std::vector<uint8_t> buf(kVariableHeaderLength, 0xEE);
+    WriteHeader(buf, {false, 100u, 0u});
+
+    // [tag=0x00][count=100 little-endian]
+    const std::vector<uint8_t> expected = {
+        0x00,
+        0x64, 0x00, 0x00, 0x00
+    };
+    EXPECT_EQ(buf, expected);
+}
+
 // --- Error cases ---
 
 TEST(EncryptorUtils, WriteHeader_BufferTooSmall_Fixed) {
-    std::vector<uint8_t> buf(kFixedHeaderSize - 1, 0);
+    std::vector<uint8_t> buf(kFixedHeaderLength - 1, 0);
     EXPECT_THROW(WriteHeader(buf, {true, 1, 4}), InvalidInputException);
 }
 
 TEST(EncryptorUtils, WriteHeader_BufferTooSmall_Variable) {
-    std::vector<uint8_t> buf(kVariableHeaderSize - 1, 0);
+    std::vector<uint8_t> buf(kVariableHeaderLength - 1, 0);
     EXPECT_THROW(WriteHeader(buf, {false, 1, 0}), InvalidInputException);
 }
 

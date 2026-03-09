@@ -156,7 +156,9 @@ dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
 
 /**
  * Finalize a typed buffer and return the raw value bytes.
- * Consumes the buffer; caller must std::move() it in to pass ownership.
+ * Consumes the buffer via rvalue-reference; caller must pass std::move(buffer).
+ * Example:
+ *   std::vector<uint8_t> value_bytes = GetTypedValuesBufferAsValueBytes(std::move(buf));
  */
 std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
-    dbps::processing::TypedValuesBuffer buffer);
+    dbps::processing::TypedValuesBuffer&& buffer);

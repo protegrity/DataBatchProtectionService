@@ -70,7 +70,7 @@ public:
     void SetRawElement(size_t position, tcb::span<const uint8_t> raw);
 
     // Getters for immediately available properties.
-    size_t GetSpanSize() const { return elements_span_.size(); }
+    size_t GetRawBufferSize() const { return elements_span_.size(); }
     size_t GetElementSize() const { return codec_.element_size(); }
 
     // Get the number of elements in the buffer.

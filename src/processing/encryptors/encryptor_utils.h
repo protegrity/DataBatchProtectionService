@@ -29,13 +29,14 @@ namespace dbps::processing {
 // Wire-format prefix tags.
 inline constexpr uint8_t kFixedSizeTag = 0x01;
 inline constexpr uint8_t kVariableSizeTag = 0x00;
+inline constexpr size_t kTagLength = 1;
 inline constexpr size_t kSizeTLength = 4;
 
 // Header sizes in bytes.
 //   Fixed:    [1-byte tag] [uint32 element_count] [uint32 element_size]
 //   Variable: [1-byte tag] [uint32 element_count]
-inline constexpr size_t kFixedHeaderLength = 1 + kSizeTLength + kSizeTLength;
-inline constexpr size_t kVariableHeaderLength = 1 + kSizeTLength;
+inline constexpr size_t kFixedHeaderLength = kTagLength + kSizeTLength + kSizeTLength;
+inline constexpr size_t kVariableHeaderLength = kTagLength + kSizeTLength;
 
 struct EncryptedValueHeader {
     bool is_fixed;
@@ -51,11 +52,11 @@ inline void WriteHeader(std::vector<uint8_t>& buf, const EncryptedValueHeader& h
     }
     if (header.is_fixed) {
         buf[0] = kFixedSizeTag;
-        write_u32_le_at(buf, 1, header.num_elements);
-        write_u32_le_at(buf, 1 + kSizeTLength, header.element_size);
+        write_u32_le_at(buf, kTagLength, header.num_elements);
+        write_u32_le_at(buf, kTagLength + kSizeTLength, header.element_size);
     } else {
         buf[0] = kVariableSizeTag;
-        write_u32_le_at(buf, 1, header.num_elements);
+        write_u32_le_at(buf, kTagLength, header.num_elements);
     }
 }
 
@@ -72,13 +73,13 @@ inline EncryptedValueHeader ReadHeader(tcb::span<const uint8_t> bytes) {
         if (bytes.size() < kFixedHeaderLength) {
             throw InvalidInputException("ReadHeader: truncated fixed-size header");
         }
-        header.num_elements = read_u32_le(bytes, 1);
-        header.element_size = read_u32_le(bytes, 1 + kSizeTLength);
+        header.num_elements = read_u32_le(bytes, kTagLength);
+        header.element_size = read_u32_le(bytes, kTagLength + kSizeTLength);
     } else {
         if (bytes.size() < kVariableHeaderLength) {
             throw InvalidInputException("ReadHeader: truncated variable-size header");
         }
-        header.num_elements = read_u32_le(bytes, 1);
+        header.num_elements = read_u32_le(bytes, kTagLength);
         header.element_size = 0;
     }
     return header;

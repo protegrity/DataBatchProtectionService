@@ -959,18 +959,18 @@ TEST(TypedBufferTest, Iterate_OnWriteBuffer_Throws) {
 TEST(TypedBufferTest, GetSpanSize_ReturnsUnderlyingSpanByteCount) {
     std::vector<uint8_t> fixed_bytes = {0x10, 0x11, 0x20, 0x21, 0x30, 0x31};
     RawBytesFixedSizedBuffer fixed_buffer(tcb::span<const uint8_t>(fixed_bytes), 0, RawBytesFixedSizedCodec{2});
-    EXPECT_EQ(fixed_buffer.GetSpanSize(), 6u);
+    EXPECT_EQ(fixed_buffer.GetRawBufferSize(), 6u);
 
     std::vector<uint8_t> var_bytes = {
         0x02, 0x00, 0x00, 0x00, 0x41, 0x42,
         0x03, 0x00, 0x00, 0x00, 0x78, 0x79, 0x7A
     };
     RawBytesVariableSizedBuffer var_buffer{tcb::span<const uint8_t>(var_bytes)};
-    EXPECT_EQ(var_buffer.GetSpanSize(), 13u);
+    EXPECT_EQ(var_buffer.GetRawBufferSize(), 13u);
 
     std::vector<uint8_t> empty_bytes;
     RawBytesFixedSizedBuffer empty_buffer(tcb::span<const uint8_t>(empty_bytes), 0, RawBytesFixedSizedCodec{2});
-    EXPECT_EQ(empty_buffer.GetSpanSize(), 0u);
+    EXPECT_EQ(empty_buffer.GetRawBufferSize(), 0u);
 }
 
 // -----------------------------------------------------------------------------

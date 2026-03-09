@@ -430,7 +430,7 @@ TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8
     }
 }
 
-std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(TypedValuesBuffer buffer) {
+std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(TypedValuesBuffer&& buffer) {
     // std::visit is needed to unwrap the variant. TypedValuesBuffer could be of different ByteBuffer types,
     // so the indirection is needed to call FinalizeAndTakeBuffer() on the correct type. In practice, this is the same for all.
     return std::visit([](auto& buf) -> std::vector<uint8_t> {
