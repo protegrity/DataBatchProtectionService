@@ -576,7 +576,7 @@ void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_reserved_b
 
 
 template <class Codec>
-tcb::span<uint8_t> ByteBuffer<Codec>::GetWriteSpanForElement(size_t position, size_t payload_size) {
+tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t position, size_t payload_size) {
     if (!is_write_buffer_initialized_) {
         throw InvalidInputException("Cannot GetWriteSpanForElement: write buffer is not initialized.");
     }
