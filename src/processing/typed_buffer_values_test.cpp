@@ -27,16 +27,7 @@
 #include "bytes_utils.h"
 #include "exceptions.h"
 
-using dbps::processing::ByteBuffer;
-using dbps::processing::Int96;
-using dbps::processing::PlainValueCodec;
-using dbps::processing::StringFixedSizedCodec;
-using dbps::processing::StringVariableSizedCodec;
-using dbps::processing::TypedBufferFloat;
-using dbps::processing::TypedBufferI32;
-using dbps::processing::TypedBufferInt96;
-using dbps::processing::TypedBufferStringFixedSized;
-using dbps::processing::TypedBufferStringVariableSized;
+using namespace dbps::processing; 
 
 // =============================================================================
 // INT32
@@ -543,4 +534,54 @@ TEST(TypedBufferValuesTest, StringVariableSized_UTF8_WriteRoundTrip) {
     EXPECT_EQ(reader.GetElement(1), "中文测试");
     EXPECT_EQ(reader.GetElement(2), "Emoji: 🚀🌟💻");
     EXPECT_EQ(reader.GetElement(3), "Ελληνικά");
+}
+
+// =============================================================================
+// TypedValuesBufferToString
+// =============================================================================
+
+TEST(TypedBufferValuesTest, TypedValuesBufferToString_BasicUsage) {
+    // --- INT32: construct from raw bytes (creates a read buffer) ---
+    std::vector<uint8_t> i32_bytes;
+    append_i32_le(i32_bytes, 42);
+    append_i32_le(i32_bytes, -1);
+    append_i32_le(i32_bytes, 100);
+
+    TypedValuesBuffer i32_variant = TypedBufferI32{tcb::span<const uint8_t>(i32_bytes)};
+    std::string i32_str = PrintableTypedValuesBuffer(i32_variant);
+
+    EXPECT_NE(i32_str.find("INT32"), std::string::npos);
+    EXPECT_NE(i32_str.find("3 elements"), std::string::npos);
+    EXPECT_NE(i32_str.find("42"), std::string::npos);
+    EXPECT_NE(i32_str.find("-1"), std::string::npos);
+    EXPECT_NE(i32_str.find("100"), std::string::npos);
+
+    // --- FLOAT: construct from raw bytes ---
+    std::vector<uint8_t> float_bytes;
+    append_f32_le(float_bytes, 3.14f);
+    append_f32_le(float_bytes, -0.5f);
+
+    TypedValuesBuffer float_variant = TypedBufferFloat{tcb::span<const uint8_t>(float_bytes)};
+    std::string float_str = PrintableTypedValuesBuffer(float_variant);
+
+    EXPECT_NE(float_str.find("FLOAT"), std::string::npos);
+    EXPECT_NE(float_str.find("2 elements"), std::string::npos);
+
+    // --- Variable BYTE_ARRAY: write, finalize, then read ---
+    const uint8_t blob1[] = {0xDE, 0xAD};
+    const uint8_t blob2[] = {0xBE, 0xEF, 0xCA, 0xFE};
+
+    TypedBufferRawBytesVariableSized writer(2u, 64u, true);
+    writer.SetElement(0, tcb::span<const uint8_t>(blob1));
+    writer.SetElement(1, tcb::span<const uint8_t>(blob2));
+
+    std::vector<uint8_t> raw_finalized = writer.FinalizeAndTakeBuffer();
+    TypedValuesBuffer raw_variant =
+        TypedBufferRawBytesVariableSized{tcb::span<const uint8_t>(raw_finalized)};
+    std::string raw_str = PrintableTypedValuesBuffer(raw_variant);
+
+    EXPECT_NE(raw_str.find("raw bytes (variable-length)"), std::string::npos);
+    EXPECT_NE(raw_str.find("2 elements"), std::string::npos);
+    EXPECT_NE(raw_str.find("2 bytes"), std::string::npos);
+    EXPECT_NE(raw_str.find("4 bytes"), std::string::npos);
 }

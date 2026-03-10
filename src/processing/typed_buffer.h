@@ -41,6 +41,7 @@ class ByteBuffer {
 public:
     using value_type = typename Codec::value_type;
     static constexpr bool is_fixed_sized = Codec::is_fixed_sized;
+    static constexpr std::string_view type_name() noexcept { return Codec::type_name(); }
 
     // Constructor for read-only buffer for both fixed-sized and variable-sized elements.
     // Elements are stored contiguously in the span.
