@@ -141,27 +141,13 @@ target_include_directories(dbps_byte_buffer_lib INTERFACE
 )
 target_link_libraries(dbps_byte_buffer_lib INTERFACE tcb_span)
 
-# TODO: Update this when deprecating BasicEncryptor
-# Standalone XOR encryptor library (kept parallel to legacy basic_encryptor path)
-add_library(dbps_xor_encryptor_lib STATIC
-  src/processing/encryptors/basic_xor_encryptor.cpp
-)
-target_link_libraries(dbps_xor_encryptor_lib PUBLIC dbps_common_lib tcb_span)
-target_include_directories(dbps_xor_encryptor_lib PUBLIC
-  src/processing
-  src/processing/encryptors
-  src/common
-)
-
 # Server components library
 add_library(dbps_server_lib STATIC 
   src/processing/encryption_sequencer.cpp
   src/server/auth_utils.cpp
   src/processing/parquet_utils.cpp
   src/processing/compression_utils.cpp
-  src/processing/value_encryption_utils.cpp
-  src/processing/typed_list_values.cpp
-  src/processing/encryptors/basic_encryptor.cpp
+  src/processing/encryptors/basic_xor_encryptor.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
 target_include_directories(dbps_server_lib PUBLIC
@@ -294,22 +280,6 @@ if(BUILD_TESTS)
     gtest_main
   )
 
-  # Value encryption utils tests
-  add_executable(value_encryption_utils_test src/processing/value_encryption_utils_test.cpp)
-  target_link_libraries(value_encryption_utils_test
-    dbps_server_lib
-    dbps_common_lib
-    gtest_main
-  )
-
-  # Typed list values tests
-  add_executable(typed_list_values_test src/processing/typed_list_values_test.cpp)
-  target_link_libraries(typed_list_values_test
-    dbps_server_lib
-    dbps_common_lib
-    gtest_main
-  )
-
   # Encryption sequencer tests
   add_executable(encryption_sequencer_test src/processing/encryption_sequencer_test.cpp)
   target_link_libraries(encryption_sequencer_test 
@@ -362,18 +332,9 @@ if(BUILD_TESTS)
   target_include_directories(typed_buffer_values_test PRIVATE src/processing src/common)
 
   # Basic encryptor tests
-  add_executable(basic_encryptor_test src/processing/encryptors/basic_encryptor_test.cpp)
-  target_link_libraries(basic_encryptor_test
-    dbps_server_lib
-    dbps_common_lib
-    gtest_main
-  )
-  target_include_directories(basic_encryptor_test PRIVATE src/processing src/processing/encryptors)
-
-  # Basic XOR encryptor tests (parallel path; does not replace BasicEncryptor callers)
   add_executable(basic_xor_encryptor_test src/processing/encryptors/basic_xor_encryptor_test.cpp)
   target_link_libraries(basic_xor_encryptor_test
-    dbps_xor_encryptor_lib
+    dbps_server_lib
     dbps_common_lib
     gtest_main
   )
@@ -534,7 +495,6 @@ add_custom_target(libraries
     dbps_local_lib
   COMMENT "Building all libraries"
 )
-add_dependencies(libraries dbps_xor_encryptor_lib)
 
 add_custom_target(shared_libraries
   DEPENDS 
@@ -558,15 +518,13 @@ if(BUILD_TESTS)
     DEPENDS 
       json_request_test
       enum_utils_test
-      value_encryption_utils_test
-      typed_list_values_test
       encryption_sequencer_test
       parquet_utils_test
       bytes_utils_test
       compression_utils_test
       typed_buffer_test
       typed_buffer_values_test
-      basic_encryptor_test
+      basic_xor_encryptor_test
       auth_utils_test
       dbpa_interface_test
       dbpa_utils_test
@@ -578,20 +536,16 @@ if(BUILD_TESTS)
       http_client_base_test
     COMMENT "Building all tests"
   )
-  add_dependencies(tests basic_xor_encryptor_test)
 
   # Register tests with CTest via GoogleTest discovery
   gtest_discover_tests(json_request_test)
   gtest_discover_tests(enum_utils_test)
-  gtest_discover_tests(value_encryption_utils_test)
-  gtest_discover_tests(typed_list_values_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(parquet_utils_test)
   gtest_discover_tests(bytes_utils_test)
   gtest_discover_tests(compression_utils_test)
   gtest_discover_tests(typed_buffer_test)
   gtest_discover_tests(typed_buffer_values_test)
-  gtest_discover_tests(basic_encryptor_test)
   gtest_discover_tests(basic_xor_encryptor_test)
   gtest_discover_tests(auth_utils_test)
   gtest_discover_tests(dbpa_interface_test)

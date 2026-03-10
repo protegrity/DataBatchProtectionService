@@ -36,6 +36,7 @@
 #include "../common/bytes_utils.h"
 #include "../processing/compression_utils.h"
 #include "../processing/parquet_utils.h"
+#include "../processing/parquet_testing_utils.h"
 #include "tcb/span.hpp"
 
 using namespace dbps::external;
@@ -52,7 +53,7 @@ namespace {
         for (const auto& s : items) {
             elements.emplace_back(s.begin(), s.end());
         }
-        return CombineRawBytesIntoValueBytes(
+        return CombineRawBytesIntoValueBytesForTesting(
             elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     }
 
