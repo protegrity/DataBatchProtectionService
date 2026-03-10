@@ -50,7 +50,7 @@ namespace {
         for (const auto& s : items) {
             elements.emplace_back(s.begin(), s.end());
         }
-        return CombineRawBytesIntoValueBytes(
+        return CombineRawBytesIntoValueBytesForTesting(
             elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     }
 
@@ -313,7 +313,7 @@ public:
             auto decrypted_plain = Decompress(
                 std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
                 CompressionCodec::SNAPPY);
-            auto decrypted_list = ParseByteArrayListValueBytes(decrypted_plain);
+            auto decrypted_list = ParseByteArrayListValueBytesForTesting(decrypted_plain);
                             
             // Verify data integrity
             if (decrypted_list == sample_data) {
@@ -356,7 +356,7 @@ public:
             }
             
             try {
-                auto plaintext = BuildByteArrayValueBytes(test_data);
+                auto plaintext = BuildByteArrayValueBytesForTesting(test_data);
                 auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
                 
                 // Encrypt
@@ -393,7 +393,7 @@ public:
                 auto decrypted_plain = Decompress(
                     std::vector<uint8_t>(decrypted_compressed.begin(), decrypted_compressed.end()),
                     CompressionCodec::SNAPPY);
-                std::vector<std::string> decrypted_values = ParseByteArrayListValueBytes(decrypted_plain);
+                std::vector<std::string> decrypted_values = ParseByteArrayListValueBytesForTesting(decrypted_plain);
                 if (decrypted_values.size() != 1u) {
                     throw std::runtime_error("Expected exactly one BYTE_ARRAY value");
                 }
@@ -757,7 +757,7 @@ public:
         // Test with empty data
         std::cout << "\nTesting empty data handling:" << std::endl;
         try {
-            auto empty_data = BuildByteArrayValueBytes("");
+            auto empty_data = BuildByteArrayValueBytesForTesting("");
             auto compressed_empty = Compress(empty_data, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_empty), encoding_attributes);
@@ -777,7 +777,7 @@ public:
         std::cout << "\nTesting large data handling:" << std::endl;
         try {
             std::string large_data(1000, 'X');  // 1KB of data
-            auto plaintext = BuildByteArrayValueBytes(large_data);
+            auto plaintext = BuildByteArrayValueBytesForTesting(large_data);
             auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);

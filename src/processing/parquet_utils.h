@@ -120,3 +120,5 @@ std::vector<uint8_t> CombineRawBytesIntoValueBytesForTesting(
     Encoding::type encoding);
 
 std::vector<uint8_t> BuildByteArrayValueBytesForTesting(const std::string& payload);
+
+std::vector<std::string> ParseByteArrayListValueBytesForTesting(const std::vector<uint8_t>& bytes);

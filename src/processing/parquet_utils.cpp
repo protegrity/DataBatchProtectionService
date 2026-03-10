@@ -345,4 +345,23 @@ std::vector<uint8_t> BuildByteArrayValueBytesForTesting(const std::string& paylo
         elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
 }
 
+std::vector<std::string> ParseByteArrayListValueBytesForTesting(const std::vector<uint8_t>& bytes) {
+    std::vector<std::string> out;
+    const uint8_t* p = bytes.data();
+    const uint8_t* last = bytes.data() + bytes.size();
+    while (p + 4 <= last) {
+        const uint32_t len = static_cast<uint32_t>(read_u32_le(tcb::span<const uint8_t>(bytes), p - bytes.data()));
+        p += 4;
+        if (p + len > last) {
+            throw InvalidInputException("Invalid BYTE_ARRAY encoding: length exceeds data bounds");
+        }
+        out.emplace_back(reinterpret_cast<const char*>(p), reinterpret_cast<const char*>(p + len));
+        p += len;
+    }
+    if (p != last) {
+        throw InvalidInputException("Invalid BYTE_ARRAY encoding: trailing bytes remain");
+    }
+    return out;
+}
+
 // -----------------------------------------------------------------------------

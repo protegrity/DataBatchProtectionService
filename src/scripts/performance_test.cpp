@@ -52,7 +52,7 @@ namespace {
         for (const auto& s : items) {
             elements.emplace_back(s.begin(), s.end());
         }
-        return CombineRawBytesIntoValueBytes(
+        return CombineRawBytesIntoValueBytesForTesting(
             elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
     }
 
