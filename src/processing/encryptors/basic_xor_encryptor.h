@@ -17,53 +17,9 @@
 
 #pragma once
 
-// TODO: Remove these includes when deprecating BasicEncryptor.
-#include <cstdint>
-#include <string>
-#include <tcb/span.hpp>
-#include <vector>
-#include "../typed_buffer_values.h"
-#include "../../common/enums.h"
-
-#ifndef DBPS_EXPORT
-#define DBPS_EXPORT
-#endif
+#include "dbps_encryptor.h"
 
 using namespace dbps::processing;
-
-/**
- * TODO: Remove this when deprecating BasicEncryptor.
- * Temporary interface for the XOR encryptor during migration.
- * Keeps XOR implementation independent from DBPSEncryptor while both paths coexist.
- */
-class DBPS_EXPORT XorEncryptorInterface {
-public:
-    XorEncryptorInterface(
-        const std::string& key_id,
-        const std::string& column_name,
-        const std::string& user_id,
-        const std::string& application_context,
-        dbps::external::Type::type datatype)
-        : key_id_(key_id),
-          column_name_(column_name),
-          user_id_(user_id),
-          application_context_(application_context),
-          datatype_(datatype) {}
-
-    virtual ~XorEncryptorInterface() = default;
-
-    virtual std::vector<uint8_t> EncryptBlock(tcb::span<const uint8_t> data) = 0;
-    virtual std::vector<uint8_t> DecryptBlock(tcb::span<const uint8_t> data) = 0;
-    virtual std::vector<uint8_t> EncryptValueList(const TypedValuesBuffer& typed_buffer) = 0;
-    virtual TypedValuesBuffer DecryptValueList(tcb::span<const uint8_t> encrypted_bytes) = 0;
-
-protected:
-    std::string key_id_;
-    std::string column_name_;
-    std::string user_id_;
-    std::string application_context_;
-    dbps::external::Type::type datatype_;
-};
 
 /**
  * Basic implementation of the temporary XOR encryptor interface.
@@ -74,7 +30,7 @@ protected:
  * This is a simple, default encryption implementation that can be replaced with more
  * sophisticated encryption providers (e.g., Protegrity) in the future.
  */
-class DBPS_EXPORT BasicXorEncryptor : public XorEncryptorInterface {
+class DBPS_EXPORT BasicXorEncryptor : public DBPSEncryptor {
 public:
     /**
      * Constructor that initializes the encryptor with context parameters.
@@ -92,7 +48,7 @@ public:
         const std::string& user_id,
         const std::string& application_context,
         dbps::external::Type::type datatype)
-        : XorEncryptorInterface(key_id, column_name, user_id, application_context, datatype) {}
+        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype) {}
 
     ~BasicXorEncryptor() override = default;
 

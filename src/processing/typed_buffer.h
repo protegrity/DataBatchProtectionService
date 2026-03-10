@@ -49,7 +49,7 @@ public:
         size_t prefix_size = 0,
         Codec codec = Codec{});
 
-    // Constructor for a new write buffer with both fixed-sized and variable-sized elements.
+    // Constructor for a new write buffer with fixed-sized elements.    
     ByteBuffer(
         size_t num_elements,
         size_t prefix_size = 0,

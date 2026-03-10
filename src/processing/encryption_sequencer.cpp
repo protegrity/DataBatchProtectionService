@@ -21,7 +21,7 @@
 #include "../common/bytes_utils.h"
 #include "compression_utils.h"
 #include "../common/exceptions.h"
-#include "encryptors/basic_encryptor.h"
+#include "encryptors/basic_xor_encryptor.h"
 #include <functional>
 #include <iomanip>
 #include <iostream>
@@ -52,8 +52,8 @@ static std::unique_ptr<DBPSEncryptor> CreateEncryptor(
     const std::string& application_context,
     Type::type datatype) {
 
-    // Return a BasicEncryptor instance.
-    return std::make_unique<BasicEncryptor>(key_id, column_name, user_id, application_context, datatype);
+    // Return a BasicXorEncryptor instance.
+    return std::make_unique<BasicXorEncryptor>(key_id, column_name, user_id, application_context, datatype);
 }
 
 // Constructor implementation
@@ -141,11 +141,11 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
         auto [level_bytes, value_bytes] = DecompressAndSplit(
             plaintext, compression_, encoding_attributes_converted_);
         
-        // Parse value bytes into typed list
-        auto typed_list = ParseValueBytesIntoTypedList(value_bytes, datatype_, datatype_length_, encoding_);
+        // Parse value bytes into typed values buffer
+        auto typed_buffer = ReinterpretValueBytesAsTypedValuesBuffer(value_bytes, datatype_, datatype_length_, encoding_);
         
-        // Encrypt the typed list and level bytes, then join them into a single encrypted byte vector.
-        auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_list);
+        // Encrypt the typed values buffer and level bytes, then join them into a single encrypted byte vector.
+        auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_buffer);
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
         auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
         
@@ -237,10 +237,10 @@ bool DataBatchEncryptionSequencer::DecryptAndEncode(tcb::span<const uint8_t> cip
         auto [encrypted_level_bytes, encrypted_value_bytes] =
             SplitWithLengthPrefix(tcb::span<const uint8_t>(decompressed_encrypted_bytes));
         auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
-        auto typed_list = encryptor_->DecryptValueList(encrypted_value_bytes);
+        auto typed_buffer = encryptor_->DecryptValueList(encrypted_value_bytes);
         
-        // Convert the decrypted typed list back to value bytes
-        auto value_bytes = GetTypedListAsValueBytes(typed_list, datatype_, datatype_length_, encoding_);
+        // Convert the decrypted typed values buffer back to value bytes
+        auto value_bytes = GetTypedValuesBufferAsValueBytes(std::move(typed_buffer));
         
         // Join the decrypted level and value bytes, then compress to get plaintext
         decrypted_result_ = CompressAndJoin(

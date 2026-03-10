@@ -20,15 +20,15 @@
 #include <cstdint>
 #include <string>
 #include <tcb/span.hpp>
-#include <utility>
 #include <vector>
-#include "../../common/exceptions.h"
-#include "../typed_list_values.h"
+#include "../typed_buffer_values.h"
 #include "../../common/enums.h"
 
 #ifndef DBPS_EXPORT
 #define DBPS_EXPORT
 #endif
+
+using namespace dbps::processing;
 
 /**
  * Interface for encryption/decryption operations in the Data Batch Protection Service.
@@ -89,26 +89,24 @@ public:
      * The context-rich encryptor can use the additional parameters stored in the constructor:
      *    column_name, user_id, key_id, application_context.
      * 
-     * This method encrypts individual values from a typed list (e.g., integers, floats, strings).
+     * This method encrypts individual values from a typed values buffer (e.g., integers, floats, strings).
      * 
-     * @param typed_list The typed list of values to encrypt (variant type supporting multiple data types)
-     * @return The encrypted data as a vector of bytes containing the encrypted typed list values
+     * @param typed_buffer The typed values buffer to encrypt
+     * @return The encrypted data as a vector of bytes containing the encrypted typed values buffer
      * @throws InvalidInputException if the input data is invalid or empty
      */
-    virtual std::vector<uint8_t> EncryptValueList(
-        const TypedListValues& typed_list) = 0;
+    virtual std::vector<uint8_t> EncryptValueList(const TypedValuesBuffer& typed_buffer) = 0;
 
     /**
      * Integration point: Decryption function based on encrypted bytes that will be implemented by Protegrity.
      * 
-     * This method decrypts the encrypted byte vector containing only the typed list values.
+     * This method decrypts the encrypted byte vector containing only the typed values buffer.
      * 
-     * @param encrypted_bytes The encrypted data as a vector of bytes containing only the encrypted typed list
-     * @return The decrypted TypedListValues
+     * @param encrypted_bytes The encrypted data as a vector of bytes containing only the encrypted typed values
+     * @return The decrypted TypedValuesBuffer
      * @throws InvalidInputException if the input data is invalid, empty, or corrupted
      */
-    virtual TypedListValues DecryptValueList(
-        tcb::span<const uint8_t> encrypted_bytes) = 0;
+    virtual TypedValuesBuffer DecryptValueList(tcb::span<const uint8_t> encrypted_bytes) = 0;
 
 protected:
     // Context parameters stored from constructor
