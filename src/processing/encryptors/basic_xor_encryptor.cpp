@@ -80,10 +80,10 @@ std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> da
 // to call type-specific encryption functions, if the underlying library supports them.
 //
 // For example, a type-specific encryption per element could look like:
-//   for (size_t i = 0; i < input_buffer.GetNumElements(); ++i) {
-//       int32_t int_value = input_buffer.GetElement(i);   // e.g. int32_t for TypedBufferI32
-//       auto encrypted = library.EncryptInt32(typed_value, key_id);
-//       output_buffer.SetElement(i, encrypted);
+//   size_t i = 0;
+//   for (const int32_t element : input_buffer) {    // e.g. int32_t for TypedBufferI32
+//       auto encrypted = library.EncryptInt32(element, key_id);
+//       output_buffer.SetElement(i++, encrypted);
 //   }
 //
 // ---------------------------------------------------------------------------
