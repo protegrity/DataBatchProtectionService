@@ -18,6 +18,7 @@
 #include "encryption_sequencer.h"
 #include "compression_utils.h"
 #include "parquet_utils.h"
+#include "parquet_testing_utils.h"
 #include "../common/enums.h"
 #include "../common/bytes_utils.h"
 #include <iostream>

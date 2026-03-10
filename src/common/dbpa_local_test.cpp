@@ -17,6 +17,7 @@
 
 #include "dbpa_local.h"
 #include "../processing/parquet_utils.h"
+#include "../processing/parquet_testing_utils.h"
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>

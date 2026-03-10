@@ -31,6 +31,7 @@
 #include "../common/enums.h"
 #include "../processing/compression_utils.h"
 #include "../processing/parquet_utils.h"
+#include "../processing/parquet_testing_utils.h"
 #include "../common/bytes_utils.h"
 #include "tcb/span.hpp"
 

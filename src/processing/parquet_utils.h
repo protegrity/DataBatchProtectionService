@@ -106,19 +106,3 @@ dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
  */
 std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
     dbps::processing::TypedValuesBuffer&& buffer);
-
-// -----------------------------------------------------------------------------
-// Helper functions for testing only, to generate sample Parquet payloads for testing.
-// -----------------------------------------------------------------------------
-
-using RawValueBytes = std::vector<uint8_t>;
-
-std::vector<uint8_t> CombineRawBytesIntoValueBytesForTesting(
-    const std::vector<RawValueBytes>& elements,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding);
-
-std::vector<uint8_t> BuildByteArrayValueBytesForTesting(const std::string& payload);
-
-std::vector<std::string> ParseByteArrayListValueBytesForTesting(const std::vector<uint8_t>& bytes);
