@@ -73,13 +73,18 @@ std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> da
 //
 // NOTE ON TYPE-SPECIFIC ENCRYPTION:
 //
-// The current implementation encrypts each element by interpreting the elements a plain bytes,
+// While this version of EncryptValueList is aware of types, the implementation ignores the type
+// of the TypeValuesBuffer. It encrypts each element by interpreting the elements a plain bytes,
 // not utilizing the specific type of the buffer elements (INT32, INT64, etc.).
 // 
 // A more sophisticated implementation could take advantage of the specific element type
 // to call type-specific encryption functions, if the underlying library supports them.
 //
+// Further, a context-aware encryptor can additionally take advantage of the app_context, 
+// user_id, and column_name to further customize the encryption process, refined access control, etc.
+//
 // For example, a type-specific encryption per element could look like:
+//   assert(input_buffer.IsTypedBufferI32());
 //   size_t i = 0;
 //   for (const int32_t element : input_buffer) {    // e.g. int32_t for TypedBufferI32
 //       auto encrypted = library.EncryptInt32(element, key_id);
