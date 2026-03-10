@@ -32,10 +32,10 @@ using namespace dbps::compression;
 using namespace dbps::external;
 
 // Test data constants - pure binary data
-const std::vector<uint8_t> HELLO_WORLD_DATA = BuildByteArrayValueBytes("Hello, World!");
-const std::vector<uint8_t> BINARY_DATA = BuildByteArrayValueBytes(
+const std::vector<uint8_t> HELLO_WORLD_DATA = BuildByteArrayValueBytesForTesting("Hello, World!");
+const std::vector<uint8_t> BINARY_DATA = BuildByteArrayValueBytesForTesting(
     std::string("\x00\x01\x02\x03\x04\x05", 6));
-const std::vector<uint8_t> SINGLE_CHAR_DATA = BuildByteArrayValueBytes("A");
+const std::vector<uint8_t> SINGLE_CHAR_DATA = BuildByteArrayValueBytesForTesting("A");
 const std::vector<uint8_t> EMPTY_DATA = {};
 const std::vector<uint8_t> FIXED_LEN_BYTE_ARRAY_DATA = {
     'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',

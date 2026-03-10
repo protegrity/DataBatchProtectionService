@@ -196,189 +196,6 @@ std::vector<uint8_t> CompressAndJoin(
 }
 
 // -----------------------------------------------------------------------------
-// Parse and build Parquet formatted value bytes into vectors -- version materialized-vectors
-// -----------------------------------------------------------------------------
-
-inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
-    switch (datatype) {
-        case Type::INT32:
-        case Type::FLOAT:
-            return 4;
-        case Type::INT64:
-        case Type::DOUBLE:
-            return 8;
-        case Type::INT96:
-            // INT96 is three little-endian uint32 words laid out consecutively (lo, mid, hi).
-            return 12;
-        case Type::FIXED_LEN_BYTE_ARRAY: {
-            if (!datatype_length.has_value() || datatype_length.value() <= 0) {
-                throw InvalidInputException(
-                    "FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
-            }
-            return static_cast<size_t>(datatype_length.value());
-        }
-        case Type::BOOLEAN:
-            throw InvalidInputException("BOOLEAN is bit-sized; not fixed byte-sized");
-        case Type::BYTE_ARRAY:
-            throw InvalidInputException("BYTE_ARRAY is variable-length; not fixed-size");
-        default:
-            throw InvalidInputException(
-                "Invalid datatype. Only fixed-size types are supported: " + std::string(to_string(datatype)));
-    }
-}
-
-std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
-    const std::vector<uint8_t>& bytes,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding) {
-
-    // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
-    // only references to them.
-    if (encoding == Encoding::RLE_DICTIONARY) {
-        throw DBPSUnsupportedException("Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations "
-            "since values are not present in the data, only references to them.");
-    }
-
-    if (encoding != Encoding::PLAIN) {
-        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, unsupported encoding: " + std::string(to_string(encoding)));
-    }
-
-    // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
-    if (datatype == Type::BOOLEAN) {
-        throw DBPSUnsupportedException("On SliceValueBytesIntoRawBytes, BOOLEAN datatype is not supported for converting to bytes.");
-    }
-
-    // Variable-length BYTE_ARRAY: parse [4-byte len][bytes...] elements in order.
-    // This is the Parquet specific encoding for BYTE_ARRAY.
-    if (datatype == Type::BYTE_ARRAY) {
-        std::vector<RawValueBytes> out;
-        const uint8_t* p = bytes.data();
-        const uint8_t* last = bytes.data() + bytes.size();
-        while (p + 4 <= last) {
-            uint32_t len = 0;
-            std::memcpy(&len, p, sizeof(len)); // little-endian length
-            p += 4;
-            if (p + len > last) {
-                throw InvalidInputException(
-                    "Invalid BYTE_ARRAY encoding: length exceeds data bounds");
-            }
-            out.emplace_back(p, p + len);
-            p += len;
-        }
-        if (p != last) {
-            throw InvalidInputException("Invalid BYTE_ARRAY encoding: trailing bytes remain");
-        }
-        return out;
-    }
-
-    // Fixed-size types: slice into raw value bytes in order.
-    const size_t elem_size = GetFixedElemSizeOrThrow(datatype, datatype_length);
-
-    // Validate that the input size is divisible by the element size
-    if ((bytes.size() % elem_size) != 0) {
-        throw InvalidInputException("Input size not divisible by element width");
-    }
-
-    // Slice the input bytes into raw value bytes
-    const size_t count = bytes.size() / elem_size;
-    std::vector<RawValueBytes> out;
-    out.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        const auto begin = bytes.begin() + static_cast<std::ptrdiff_t>(i * elem_size);
-        out.emplace_back(begin, begin + static_cast<std::ptrdiff_t>(elem_size));
-    }
-    return out;
-}
-
-std::vector<uint8_t> CombineRawBytesIntoValueBytes(
-    const std::vector<RawValueBytes>& elements,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding) {
-
-    // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
-    // only references to them.
-    if (encoding == Encoding::RLE_DICTIONARY) {
-        throw DBPSUnsupportedException("Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations");
-    }
-
-    if (encoding != Encoding::PLAIN) {
-        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported encoding: " + std::string(to_string(encoding)));
-    }
-
-    // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
-    if (datatype == Type::BOOLEAN) {
-        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, BOOLEAN datatype is not supported for converting to bytes.");
-    }
-
-    if (datatype == Type::BYTE_ARRAY) {
-        std::vector<uint8_t> out;
-        size_t total = 0;
-        for (const auto& v : elements) {
-            total += 4 + v.size();
-        }
-        out.reserve(total);
-        for (const auto& v : elements) {
-            append_u32_le(out, static_cast<uint32_t>(v.size()));
-            out.insert(out.end(), v.begin(), v.end());
-        }
-        return out;
-    }
-
-    const size_t elem_size = GetFixedElemSizeOrThrow(datatype, datatype_length);
-
-    for (size_t i = 0; i < elements.size(); ++i) {
-        if (elements[i].size() != elem_size) {
-            throw InvalidInputException("Element size mismatch for fixed-size datatype");
-        }
-    }
-
-    std::vector<uint8_t> out;
-    out.reserve(elem_size * elements.size());
-    for (const auto& v : elements) {
-        out.insert(out.end(), v.begin(), v.end());
-    }
-    return out;
-}
-
-std::vector<uint8_t> BuildByteArrayValueBytes(const std::string& payload) {
-    std::vector<RawValueBytes> elements;
-    elements.emplace_back(payload.begin(), payload.end());
-    return CombineRawBytesIntoValueBytes(
-        elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
-}
-
-std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>& bytes) {
-    TypedListValues list = ParseValueBytesIntoTypedList(
-        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
-    auto* values = std::get_if<std::vector<std::string>>(&list);
-    if (!values) {
-        throw InvalidInputException("Expected BYTE_ARRAY values");
-    }
-    return std::move(*values);
-}
-
-TypedListValues ParseValueBytesIntoTypedList(
-    const std::vector<uint8_t>& bytes,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding) {
-    std::vector<RawValueBytes> raw_values =
-        SliceValueBytesIntoRawBytes(bytes, datatype, datatype_length, encoding);
-    return BuildTypedListFromRawBytes(datatype, raw_values);
-}
-
-std::vector<uint8_t> GetTypedListAsValueBytes(
-    const TypedListValues& list,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding) {
-    std::vector<RawValueBytes> raw_values = BuildRawBytesFromTypedListValues(list);
-    return CombineRawBytesIntoValueBytes(raw_values, datatype, datatype_length, encoding);
-}
-
-// -----------------------------------------------------------------------------
 // Build Parquet formatted value bytes into TypedValuesBuffer
 // -----------------------------------------------------------------------------
 
@@ -436,6 +253,96 @@ std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(TypedValuesBuffer&& buffer
     return std::visit([](auto& buf) -> std::vector<uint8_t> {
         return buf.FinalizeAndTakeBuffer();
     }, buffer);
+}
+
+// -----------------------------------------------------------------------------
+// Helper functions for testing only, to generate sample Parquet payloads for testing.
+// -----------------------------------------------------------------------------
+
+inline static size_t GetFixedElemSizeOrThrowForTesting(Type::type datatype, const std::optional<int>& datatype_length) {
+    switch (datatype) {
+        case Type::INT32:
+        case Type::FLOAT:
+            return 4;
+        case Type::INT64:
+        case Type::DOUBLE:
+            return 8;
+        case Type::INT96:
+            // INT96 is three little-endian uint32 words laid out consecutively (lo, mid, hi).
+            return 12;
+        case Type::FIXED_LEN_BYTE_ARRAY: {
+            if (!datatype_length.has_value() || datatype_length.value() <= 0) {
+                throw InvalidInputException(
+                    "FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
+            }
+            return static_cast<size_t>(datatype_length.value());
+        }
+        case Type::BOOLEAN:
+            throw InvalidInputException("BOOLEAN is bit-sized; not fixed byte-sized");
+        case Type::BYTE_ARRAY:
+            throw InvalidInputException("BYTE_ARRAY is variable-length; not fixed-size");
+        default:
+            throw InvalidInputException(
+                "Invalid datatype. Only fixed-size types are supported: " + std::string(to_string(datatype)));
+    }
+}
+
+std::vector<uint8_t> CombineRawBytesIntoValueBytesForTesting(
+    const std::vector<RawValueBytes>& elements,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Encoding::type encoding) {
+
+    // RLE_DICTIONARY is not supported for per-value operations since the values themselves are not present in the data,
+    // only references to them.
+    if (encoding == Encoding::RLE_DICTIONARY) {
+        throw DBPSUnsupportedException("Unsupported encoding: RLE_DICTIONARY is not supported for per-value operations");
+    }
+
+    if (encoding != Encoding::PLAIN) {
+        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, unsupported encoding: " + std::string(to_string(encoding)));
+    }
+
+    // BOOLEAN: boolean values are bit-encoded and not expanded as bytes
+    if (datatype == Type::BOOLEAN) {
+        throw DBPSUnsupportedException("On CombineRawBytesIntoValueBytes, BOOLEAN datatype is not supported.");
+    }
+
+    if (datatype == Type::BYTE_ARRAY) {
+        std::vector<uint8_t> out;
+        size_t total = 0;
+        for (const auto& v : elements) {
+            total += 4 + v.size();
+        }
+        out.reserve(total);
+        for (const auto& v : elements) {
+            append_u32_le(out, static_cast<uint32_t>(v.size()));
+            out.insert(out.end(), v.begin(), v.end());
+        }
+        return out;
+    }
+
+    const size_t elem_size = GetFixedElemSizeOrThrowForTesting(datatype, datatype_length);
+
+    for (size_t i = 0; i < elements.size(); ++i) {
+        if (elements[i].size() != elem_size) {
+            throw InvalidInputException("Element size mismatch for fixed-size datatype");
+        }
+    }
+
+    std::vector<uint8_t> out;
+    out.reserve(elem_size * elements.size());
+    for (const auto& v : elements) {
+        out.insert(out.end(), v.begin(), v.end());
+    }
+    return out;
+}
+
+std::vector<uint8_t> BuildByteArrayValueBytesForTesting(const std::string& payload) {
+    std::vector<RawValueBytes> elements;
+    elements.emplace_back(payload.begin(), payload.end());
+    return CombineRawBytesIntoValueBytesForTesting(
+        elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
 }
 
 // -----------------------------------------------------------------------------

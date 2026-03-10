@@ -27,7 +27,6 @@
 #include "enums.h"
 #include "../common/exceptions.h"
 #include "enum_utils.h"
-#include "typed_list_values.h"
 #include "typed_buffer_values.h"
 #include "../common/bytes_utils.h"
 
@@ -37,6 +36,10 @@ struct LevelAndValueBytes {
 };
 
 using namespace dbps::external;
+
+// -----------------------------------------------------------------------------
+// Helper functions for processing Parquet formatted data pages and dictionary pages.
+// -----------------------------------------------------------------------------
 
 /**
  * Calculates the total length of level bytes based on encoding attributes.
@@ -69,69 +72,10 @@ std::vector<uint8_t> CompressAndJoin(
     CompressionCodec::type compression,
     const AttributesMap& encoding_attributes);
 
-/**
- * Slice a flat byte buffer into RawValueBytes elements according to datatype/encoding.
- * This follows the Parquet specific encoding.
- */
-std::vector<RawValueBytes> SliceValueBytesIntoRawBytes(
-    const std::vector<uint8_t>& bytes,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding);
 
-/**
- * Combine RawValueBytes elements back into a flat value-bytes buffer.
- */
-std::vector<uint8_t> CombineRawBytesIntoValueBytes(
-    const std::vector<RawValueBytes>& elements,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding);
-
-/**
- * Build BYTE_ARRAY value bytes for a single string payload.
- */
-std::vector<uint8_t> BuildByteArrayValueBytes(const std::string& payload);
-
-/**
- * Parse BYTE_ARRAY value bytes into a list of string payloads.
- */
-std::vector<std::string> ParseByteArrayListValueBytes(const std::vector<uint8_t>& bytes);
-
-/**
- * Parse the value bytes into a typed list based on the data type and encoding.
- * 
- * @param bytes The value bytes to parse
- * @param datatype The data type of the values
- * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
- * @param encoding The encoding of the data (currently only PLAIN is supported)
- * @return TypedListValues containing the parsed values
- * @throws DBPSUnsupportedException if encoding or datatype is unsupported
- * @throws InvalidInputException if the data is invalid or malformed
- */
-TypedListValues ParseValueBytesIntoTypedList(
-    const std::vector<uint8_t>& bytes,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding);
-
-/**
- * Convert a typed list back into value bytes based on the data type and encoding.
- * This is the reverse operation of ParseValueBytesIntoTypedList.
- * 
- * @param list The typed list to convert
- * @param datatype The data type of the values
- * @param datatype_length Optional length for fixed-length types (required for FIXED_LEN_BYTE_ARRAY)
- * @param encoding The encoding of the data (currently only PLAIN is supported)
- * @return std::vector<uint8_t> containing the serialized value bytes
- * @throws DBPSUnsupportedException if encoding or datatype is unsupported
- * @throws InvalidInputException if the data is invalid or malformed
- */
-std::vector<uint8_t> GetTypedListAsValueBytes(
-    const TypedListValues& list,
-    Type::type datatype,
-    const std::optional<int>& datatype_length,
-    Encoding::type encoding);
+// -----------------------------------------------------------------------------
+// Helper functions for zero-copy reinterpretation of raw value bytes into a typed buffer.
+// -----------------------------------------------------------------------------
 
 /**
  * Zero-copy reinterpretation of raw value bytes into a typed buffer.
@@ -162,3 +106,17 @@ dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
  */
 std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
     dbps::processing::TypedValuesBuffer&& buffer);
+
+// -----------------------------------------------------------------------------
+// Helper functions for testing only, to generate sample Parquet payloads for testing.
+// -----------------------------------------------------------------------------
+
+using RawValueBytes = std::vector<uint8_t>;
+
+std::vector<uint8_t> CombineRawBytesIntoValueBytesForTesting(
+    const std::vector<RawValueBytes>& elements,
+    Type::type datatype,
+    const std::optional<int>& datatype_length,
+    Encoding::type encoding);
+
+std::vector<uint8_t> BuildByteArrayValueBytesForTesting(const std::string& payload);

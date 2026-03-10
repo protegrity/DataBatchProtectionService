@@ -48,7 +48,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
     EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
-    std::vector<uint8_t> test_data = BuildByteArrayValueBytes("test_ABC");
+    std::vector<uint8_t> test_data = BuildByteArrayValueBytesForTesting("test_ABC");
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
@@ -91,7 +91,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
     EXPECT_NO_THROW(agent.init("test_column", configuration_map, app_context, "test_key", 
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, DBPS_ENCRYPTION_METADATA));
     
-    std::vector<uint8_t> test_data = BuildByteArrayValueBytes("test_EFG");
+    std::vector<uint8_t> test_data = BuildByteArrayValueBytesForTesting("test_EFG");
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
     auto result = agent.Decrypt(test_data, encoding_attributes);
     
@@ -111,7 +111,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
                                        Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     // Original data to encrypt
-    std::vector<uint8_t> original_data = BuildByteArrayValueBytes("roundtrip_XYZ");
+    std::vector<uint8_t> original_data = BuildByteArrayValueBytesForTesting("roundtrip_XYZ");
     std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
     
     // Encrypt the data

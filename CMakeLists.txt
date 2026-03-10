@@ -147,8 +147,6 @@ add_library(dbps_server_lib STATIC
   src/server/auth_utils.cpp
   src/processing/parquet_utils.cpp
   src/processing/compression_utils.cpp
-  src/processing/value_encryption_utils.cpp
-  src/processing/typed_list_values.cpp
   src/processing/encryptors/basic_xor_encryptor.cpp
 )
 target_link_libraries(dbps_server_lib PUBLIC dbps_common_lib snappy)
@@ -278,22 +276,6 @@ if(BUILD_TESTS)
   # Enum utils tests
   add_executable(enum_utils_test src/common/enum_utils_test.cpp)
   target_link_libraries(enum_utils_test
-    dbps_common_lib
-    gtest_main
-  )
-
-  # Value encryption utils tests
-  add_executable(value_encryption_utils_test src/processing/value_encryption_utils_test.cpp)
-  target_link_libraries(value_encryption_utils_test
-    dbps_server_lib
-    dbps_common_lib
-    gtest_main
-  )
-
-  # Typed list values tests
-  add_executable(typed_list_values_test src/processing/typed_list_values_test.cpp)
-  target_link_libraries(typed_list_values_test
-    dbps_server_lib
     dbps_common_lib
     gtest_main
   )
@@ -536,8 +518,6 @@ if(BUILD_TESTS)
     DEPENDS 
       json_request_test
       enum_utils_test
-      value_encryption_utils_test
-      typed_list_values_test
       encryption_sequencer_test
       parquet_utils_test
       bytes_utils_test
@@ -560,8 +540,6 @@ if(BUILD_TESTS)
   # Register tests with CTest via GoogleTest discovery
   gtest_discover_tests(json_request_test)
   gtest_discover_tests(enum_utils_test)
-  gtest_discover_tests(value_encryption_utils_test)
-  gtest_discover_tests(typed_list_values_test)
   gtest_discover_tests(encryption_sequencer_test)
   gtest_discover_tests(parquet_utils_test)
   gtest_discover_tests(bytes_utils_test)
