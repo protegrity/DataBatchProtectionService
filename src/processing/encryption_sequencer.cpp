@@ -44,21 +44,31 @@ namespace {
     constexpr const char* ENCRYPTION_MODE_PER_BLOCK = "per_block";
     constexpr const char* ENCRYPTION_MODE_PER_VALUE = "per_value";
 
-    void PrintDecodeAndEncryptTimings(
-        int64_t decompress_and_split_us,
-        int64_t parse_value_bytes_into_typed_list_us,
-        int64_t encrypt_value_list_us,
-        int64_t encrypt_block_level_bytes_us,
-        int64_t join_with_length_prefix_us,
-        int64_t compress_us) {
+    int64_t ToMicroseconds(int64_t nanoseconds) {
+        return nanoseconds / 1000;
+    }
 
-        std::cout << "+++++ DecodeAndEncrypt timings (microseconds) +++++" << std::endl;
-        std::cout << "  DecompressAndSplit: " << decompress_and_split_us << std::endl;
-        std::cout << "  ParseValueBytesIntoTypedList: " << parse_value_bytes_into_typed_list_us << std::endl;
-        std::cout << "  EncryptValueList: " << encrypt_value_list_us << std::endl;
-        std::cout << "  EncryptBlock(level_bytes): " << encrypt_block_level_bytes_us << std::endl;
-        std::cout << "  JoinWithLengthPrefix: " << join_with_length_prefix_us << std::endl;
-        std::cout << "  Compress: " << compress_us << std::endl;
+    void PrintDurationLine(const char* label, int64_t nanoseconds) {
+        std::cout << "  " << label << ": "
+                  << ToMicroseconds(nanoseconds) << " us"
+                  << " (" << nanoseconds << " ns)" << std::endl;
+    }
+
+    void PrintDecodeAndEncryptTimings(
+        int64_t decompress_and_split_ns,
+        int64_t parse_value_bytes_into_typed_list_ns,
+        int64_t encrypt_value_list_ns,
+        int64_t encrypt_block_level_bytes_ns,
+        int64_t join_with_length_prefix_ns,
+        int64_t compress_ns) {
+
+        std::cout << "+++++ DecodeAndEncrypt timings (microseconds + nanoseconds) +++++" << std::endl;
+        PrintDurationLine("DecompressAndSplit", decompress_and_split_ns);
+        PrintDurationLine("ParseValueBytesIntoTypedList", parse_value_bytes_into_typed_list_ns);
+        PrintDurationLine("EncryptValueList", encrypt_value_list_ns);
+        PrintDurationLine("EncryptBlock(level_bytes)", encrypt_block_level_bytes_ns);
+        PrintDurationLine("JoinWithLengthPrefix", join_with_length_prefix_ns);
+        PrintDurationLine("Compress", compress_ns);
     }
 }
 
@@ -155,53 +165,53 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
      * - Once per-value encryption for all cases is complete, the try-catch block and the call to EncryptBlock must be removed.
      */
     try {
-        int64_t decompress_and_split_us = 0;
-        int64_t parse_value_bytes_into_typed_list_us = 0;
-        int64_t encrypt_value_list_us = 0;
-        int64_t encrypt_block_level_bytes_us = 0;
-        int64_t join_with_length_prefix_us = 0;
-        int64_t compress_us = 0;
+        int64_t decompress_and_split_ns = 0;
+        int64_t parse_value_bytes_into_typed_list_ns = 0;
+        int64_t encrypt_value_list_ns = 0;
+        int64_t encrypt_block_level_bytes_ns = 0;
+        int64_t join_with_length_prefix_ns = 0;
+        int64_t compress_ns = 0;
 
         // Decompress and split plaintext into level and value bytes
         auto stage_start = std::chrono::steady_clock::now();
         auto [level_bytes, value_bytes] = DecompressAndSplit(
             plaintext, compression_, encoding_attributes_converted_);
-        decompress_and_split_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        decompress_and_split_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         
         // Parse value bytes into typed values buffer
         stage_start = std::chrono::steady_clock::now();
         auto typed_buffer = ReinterpretValueBytesAsTypedValuesBuffer(value_bytes, datatype_, datatype_length_, encoding_);
-        parse_value_bytes_into_typed_list_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        parse_value_bytes_into_typed_list_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         
         // Encrypt the typed values buffer and level bytes, then join them into a single encrypted byte vector.
         stage_start = std::chrono::steady_clock::now();
         auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_buffer);
-        encrypt_value_list_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        encrypt_value_list_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         stage_start = std::chrono::steady_clock::now();
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
-        encrypt_block_level_bytes_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        encrypt_block_level_bytes_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         stage_start = std::chrono::steady_clock::now();
         auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
-        join_with_length_prefix_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        join_with_length_prefix_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         
         // Compress the joined encrypted bytes
         stage_start = std::chrono::steady_clock::now();
         encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
-        compress_us = std::chrono::duration_cast<std::chrono::microseconds>(
+        compress_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
 
         PrintDecodeAndEncryptTimings(
-            decompress_and_split_us,
-            parse_value_bytes_into_typed_list_us,
-            encrypt_value_list_us,
-            encrypt_block_level_bytes_us,
-            join_with_length_prefix_us,
-            compress_us);
+            decompress_and_split_ns,
+            parse_value_bytes_into_typed_list_ns,
+            encrypt_value_list_ns,
+            encrypt_block_level_bytes_ns,
+            join_with_length_prefix_ns,
+            compress_ns);
 
         // Set the encryption type to per-value
         encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_VALUE;
