@@ -114,6 +114,14 @@ TypedListValues ParseValueBytesIntoTypedList(
     Encoding::type encoding);
 
 /**
+ * Get fixed element size for fixed-width types.
+ * Throws for variable-width or unsupported datatypes.
+ */
+size_t GetFixedElemSizeOrThrow(
+    Type::type datatype,
+    const std::optional<int>& datatype_length);
+
+/**
  * Convert a typed list back into value bytes based on the data type and encoding.
  * This is the reverse operation of ParseValueBytesIntoTypedList.
  * 

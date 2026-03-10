@@ -43,14 +43,16 @@ public:
      * @param application_context Additional application context information
      * @param datatype The data type of the column being encrypted/decrypted. 
      *    It is needed for correct type specific parsing during the DecryptValueList call.
+     * @param datatype_length Optional length for FIXED_LEN_BYTE_ARRAY.
      */
     BasicEncryptor(
         const std::string& key_id,
         const std::string& column_name,
         const std::string& user_id,
         const std::string& application_context,
-        dbps::external::Type::type datatype)
-        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype) {}
+        dbps::external::Type::type datatype,
+        const std::optional<int>& datatype_length)
+        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype, datatype_length) {}
 
     ~BasicEncryptor() override = default;
 
@@ -60,14 +62,23 @@ public:
     std::vector<uint8_t> DecryptBlock(const std::vector<uint8_t>& data) override;
 
     // Value encryption methods
-    std::vector<uint8_t> EncryptValueList(
-        const TypedListValues& typed_list) override;
+    std::vector<uint8_t> EncryptValueList_NEW(
+        const TypedListValues& typed_list);
 
     // Legacy implementation kept for reference/perf comparison
     std::vector<uint8_t> EncryptValueList_OLD(
         const TypedListValues& typed_list);
 
+    // Forwarding selector: flip this to switch implementation quickly.
+    static constexpr bool kUseNewEncryptValueList = true;
+
+    std::vector<uint8_t> EncryptValueList(
+        const TypedListValues& typed_list) override {
+        return kUseNewEncryptValueList
+            ? EncryptValueList_NEW(typed_list)
+            : EncryptValueList_OLD(typed_list);
+    }
+
     TypedListValues DecryptValueList(
         const std::vector<uint8_t>& encrypted_bytes) override;
 };
-

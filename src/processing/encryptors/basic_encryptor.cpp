@@ -18,12 +18,14 @@
 #include "basic_encryptor.h"
 #include "../../common/exceptions.h"
 #include "../../common/enum_utils.h"
+#include "../parquet_utils.h"
 #include <functional>
 #include <iostream>
 #include <cstdlib>
 #include <chrono>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include "../value_encryption_utils.h"
 
 using namespace dbps::value_encryption_utils;
@@ -155,20 +157,27 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList_OLD(
     // (the blob encodes #of elements and the size of each element)
     std::vector<uint8_t> concatenated_encrypted_bytes;
     time_step("ConcatenateEncryptedValues", [&]() {
-        concatenated_encrypted_bytes = ConcatenateEncryptedValues(encrypted_values);
+        std::optional<size_t> fixed_element_size;
+        if (datatype_ == Type::BYTE_ARRAY || datatype_ == Type::BOOLEAN) {
+            fixed_element_size = std::nullopt;
+        } else {
+            fixed_element_size = GetFixedElemSizeOrThrow(datatype_, datatype_length_);
+        }
+        concatenated_encrypted_bytes =
+            ConcatenateEncryptedValues(encrypted_values, fixed_element_size);
     });
 
     if (log_timings) {
-        std::cout << "EncryptValueList timings (microseconds):\n";
+        std::cout << "EncryptValueList_OLD timings (microseconds):\n";
         for (const auto& entry : timings) {
             std::cout << "  " << entry.first << ": " << entry.second << "\n";
         }
     }
     
     return concatenated_encrypted_bytes;
-} // EncryptValueList
+} // EncryptValueList_OLD
 
-std::vector<uint8_t> BasicEncryptor::EncryptValueList(
+std::vector<uint8_t> BasicEncryptor::EncryptValueList_NEW(
     const TypedListValues& typed_list) {
 
     const bool log_timings = ShouldLogValueEncryptionTiming();
@@ -211,6 +220,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
 
     size_t total_capacity = 0;
     uint32_t count = 0;
+    std::optional<size_t> fixed_element_size;
 
     time_step("ComputeEncryptedSize", [&]() {
         std::visit([&](const auto& vec) {
@@ -220,7 +230,14 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                 throw InvalidInputException("Too many elements to serialize into uint32 count");
             }
             count = static_cast<uint32_t>(vec.size());
-            total_capacity = 4;
+            const bool is_variable =
+                (datatype_ == Type::BYTE_ARRAY || datatype_ == Type::BOOLEAN);
+            if (!is_variable) {
+                fixed_element_size = GetFixedElemSizeOrThrow(datatype_, datatype_length_);
+            } else {
+                fixed_element_size = std::nullopt;
+            }
+            total_capacity = 1 + 4;
             for (size_t i = 0; i < vec.size(); ++i) {
                 size_t elem_size = 0;
                 if constexpr (std::is_same_v<ElemT, int32_t> || std::is_same_v<ElemT, float>) {
@@ -238,7 +255,14 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                 if (elem_size > static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
                     throw InvalidInputException("Element size exceeds uint32 capacity");
                 }
-                total_capacity += 4 + elem_size;
+                if (fixed_element_size.has_value()) {
+                    total_capacity += elem_size;
+                } else {
+                    total_capacity += 4 + elem_size;
+                }
+            }
+            if (fixed_element_size.has_value()) {
+                total_capacity += 4;
             }
         }, typed_list);
     });
@@ -246,6 +270,7 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
     time_step("EncryptIntoBuffer", [&]() {
         concatenated_encrypted_bytes.resize(total_capacity);
         size_t offset = 0;
+        const bool is_variable = !fixed_element_size.has_value();
         auto write_u32_le = [&](uint32_t v) {
             concatenated_encrypted_bytes[offset + 0] = static_cast<uint8_t>(v & 0xFF);
             concatenated_encrypted_bytes[offset + 1] = static_cast<uint8_t>((v >> 8) & 0xFF);
@@ -254,7 +279,11 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
             offset += 4;
         };
 
+        concatenated_encrypted_bytes[offset++] = is_variable ? 1 : 0;
         write_u32_le(count);
+        if (!is_variable) {
+            write_u32_le(static_cast<uint32_t>(fixed_element_size.value()));
+        }
 
         std::visit([&](const auto& vec) {
             using VecT = std::decay_t<decltype(vec)>;
@@ -264,7 +293,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                 size_t elem_size = 0;
                 if constexpr (std::is_same_v<ElemT, int32_t>) {
                     elem_size = 4;
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     uint8_t raw[4];
                     const uint32_t v = static_cast<uint32_t>(vec[i]);
                     raw[0] = static_cast<uint8_t>(v & 0xFF);
@@ -275,7 +306,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                     offset += elem_size;
                 } else if constexpr (std::is_same_v<ElemT, int64_t>) {
                     elem_size = 8;
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     uint8_t raw[8];
                     const uint64_t v = static_cast<uint64_t>(vec[i]);
                     raw[0] = static_cast<uint8_t>(v & 0xFF);
@@ -290,7 +323,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                     offset += elem_size;
                 } else if constexpr (std::is_same_v<ElemT, float>) {
                     elem_size = 4;
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     uint32_t bits = 0;
                     std::memcpy(&bits, &vec[i], sizeof(bits));
                     uint8_t raw[4];
@@ -302,7 +337,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                     offset += elem_size;
                 } else if constexpr (std::is_same_v<ElemT, double>) {
                     elem_size = 8;
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     uint64_t bits = 0;
                     std::memcpy(&bits, &vec[i], sizeof(bits));
                     uint8_t raw[8];
@@ -318,7 +355,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                     offset += elem_size;
                 } else if constexpr (std::is_same_v<ElemT, std::array<uint32_t, 3>>) {
                     elem_size = 12;
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     uint8_t raw[12];
                     for (int j = 0; j < 3; ++j) {
                         const uint32_t w = vec[i][j];
@@ -331,7 +370,9 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
                     offset += elem_size;
                 } else if constexpr (std::is_same_v<ElemT, std::string>) {
                     elem_size = vec[i].size();
-                    write_u32_le(static_cast<uint32_t>(elem_size));
+                    if (is_variable) {
+                        write_u32_le(static_cast<uint32_t>(elem_size));
+                    }
                     if (elem_size > 0) {
                         EncryptBytesInto(reinterpret_cast<const uint8_t*>(vec[i].data()),
                                          elem_size,
@@ -347,14 +388,14 @@ std::vector<uint8_t> BasicEncryptor::EncryptValueList(
     });
 
     if (log_timings) {
-        std::cout << "EncryptValueList timings (microseconds):\n";
+        std::cout << "EncryptValueList_NEW timings (microseconds):\n";
         for (const auto& entry : timings) {
             std::cout << "  " << entry.first << ": " << entry.second << "\n";
         }
     }
 
     return concatenated_encrypted_bytes;
-} // EncryptValueList
+} // EncryptValueList_NEW
 
 TypedListValues BasicEncryptor::DecryptValueList(
     const std::vector<uint8_t>& encrypted_bytes) {

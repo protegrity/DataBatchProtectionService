@@ -110,7 +110,7 @@ int CalculateLevelBytesLength(const std::vector<uint8_t>& raw,
     return total_level_bytes;
 }
 
-inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
+size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::optional<int>& datatype_length) {
     switch (datatype) {
         case Type::INT32:
         case Type::FLOAT:
@@ -134,7 +134,8 @@ inline static size_t GetFixedElemSizeOrThrow(Type::type datatype, const std::opt
             throw InvalidInputException("BYTE_ARRAY is variable-length; not fixed-size");
         default:
             throw InvalidInputException(
-                "Invalid datatype. Only fixed-size types are supported: " + std::string(to_string(datatype)));
+                "Invalid datatype. Only fixed-size types are supported: " +
+                std::string(dbps::enum_utils::to_string(datatype)));
     }
 }
 

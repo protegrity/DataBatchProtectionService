@@ -57,10 +57,17 @@ static std::unique_ptr<DBPSEncryptor> CreateEncryptor(
     const std::string& column_name,
     const std::string& user_id,
     const std::string& application_context,
-    Type::type datatype) {
+    Type::type datatype,
+    const std::optional<int>& datatype_length) {
 
     // Return a BasicEncryptor instance.
-    return std::make_unique<BasicEncryptor>(key_id, column_name, user_id, application_context, datatype);
+    return std::make_unique<BasicEncryptor>(
+        key_id,
+        column_name,
+        user_id,
+        application_context,
+        datatype,
+        datatype_length);
 }
 
 // Constructor implementation
@@ -87,7 +94,7 @@ DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(
     user_id_(user_id),
     application_context_(application_context),
     encryption_metadata_(encryption_metadata),
-    encryptor_(CreateEncryptor(key_id, column_name, user_id, application_context, datatype)) {}
+    encryptor_(CreateEncryptor(key_id, column_name, user_id, application_context, datatype, datatype_length)) {}
 
 // Constructor with pre-built encryptor
 DataBatchEncryptionSequencer::DataBatchEncryptionSequencer(

@@ -21,6 +21,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 #include "../../common/exceptions.h"
 #include "../typed_list_values.h"
 #include "../../common/enums.h"
@@ -49,18 +50,21 @@ public:
      * @param application_context Additional application context information
      * @param datatype The data type of the column being encrypted/decrypted.
      *    It is needed for correct type specific parsing during the DecryptValueList call.
+     * @param datatype_length Optional length for FIXED_LEN_BYTE_ARRAY.
      */
     DBPSEncryptor(
         const std::string& key_id,
         const std::string& column_name,
         const std::string& user_id,
         const std::string& application_context,
-        dbps::external::Type::type datatype)
+        dbps::external::Type::type datatype,
+        const std::optional<int>& datatype_length)
         : key_id_(key_id),
           column_name_(column_name),
           user_id_(user_id),
           application_context_(application_context),
-          datatype_(datatype) {}
+          datatype_(datatype),
+          datatype_length_(datatype_length) {}
 
     virtual ~DBPSEncryptor() = default;
 
@@ -116,4 +120,5 @@ protected:
     std::string user_id_;
     std::string application_context_;
     dbps::external::Type::type datatype_;
+    std::optional<int> datatype_length_;
 };

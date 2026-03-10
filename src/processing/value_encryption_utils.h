@@ -22,6 +22,7 @@
 #include <vector>
 #include <utility>
 #include <functional>
+#include <optional>
 
 #include "typed_list_values.h"
 #include "enums.h"
@@ -37,24 +38,37 @@ using EncryptedValue = std::vector<uint8_t>;
 
 /**
  * Concatenate a list of EncryptedValue into a single binary blob:
- * - int32 (LE) number of elements
- * - for each element:
- *   - int32 (LE) size
- *   - payload bytes
+ * - 1 byte: flag (1 = variable-length, 0 = fixed-length)
+ * - uint32 (LE): number of elements
+ * - if fixed-length:
+ *   - uint32 (LE): element size
+ *   - payload bytes back-to-back (no per-element length)
+ * - if variable-length:
+ *   - for each element:
+ *     - uint32 (LE) size
+ *     - payload bytes
  *
+ * @param fixed_element_size If set, all elements are expected to have this size.
  * @throws std::overflow_error if count or any size doesn't fit in uint32_t
  */
-std::vector<uint8_t> ConcatenateEncryptedValues(const std::vector<EncryptedValue>& values);
+std::vector<uint8_t> ConcatenateEncryptedValues(
+    const std::vector<EncryptedValue>& values,
+    const std::optional<size_t>& fixed_element_size = std::nullopt);
 
 /**
  * Parse a concatenated blob produced by ConcatenateEncryptedValues into a list
  * of EncryptedValue entries.
  *
  * Format:
- * - int32 (LE) number of elements
- * - for each element:
- *   - int32 (LE) size
- *   - payload bytes
+ * - 1 byte: flag (1 = variable-length, 0 = fixed-length)
+ * - uint32 (LE): number of elements
+ * - if fixed-length:
+ *   - uint32 (LE): element size
+ *   - payload bytes back-to-back
+ * - if variable-length:
+ *   - for each element:
+ *     - uint32 (LE) size
+ *     - payload bytes
  *
  * @throws std::runtime_error on malformed input (truncated or inconsistent sizes)
  */
