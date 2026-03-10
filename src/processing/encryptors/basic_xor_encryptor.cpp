@@ -19,6 +19,7 @@
 #include "encryptor_utils.h"
 #include "../../common/exceptions.h"
 #include "../../common/enum_utils.h"
+#include <chrono>
 #include <cstring>
 #include <functional>
 #include <iostream>
@@ -26,6 +27,66 @@
 
 using namespace dbps::processing;
 using namespace dbps::external;
+
+namespace {
+    int64_t ElapsedMicrosecondsSince(const std::chrono::steady_clock::time_point& start) {
+        return std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - start).count();
+    }
+
+    void PrintBasicXorBlockTimings(const char* operation, int64_t total_us) {
+        std::cout << "+++++ BasicXorEncryptor timings (microseconds) +++++" << std::endl;
+        std::cout << "  " << operation << ": " << total_us << std::endl;
+    }
+
+    void PrintBasicXorEncryptTypedElementsTimings(
+        bool is_fixed,
+        size_t num_elements,
+        size_t element_size,
+        int64_t encrypt_elements_loop_us,
+        int64_t get_raw_element_us,
+        int64_t xor_encrypt_us,
+        int64_t set_element_us,
+        int64_t finalize_buffer_us,
+        int64_t write_header_us,
+        int64_t total_us) {
+        std::cout << "+++++ BasicXorEncryptor EncryptTypedElements timings (microseconds) +++++" << std::endl;
+        std::cout << "  mode: " << (is_fixed ? "fixed" : "variable") << std::endl;
+        std::cout << "  num_elements: " << num_elements << std::endl;
+        std::cout << "  element_size: " << element_size << std::endl;
+        std::cout << "  EncryptElementsLoop: " << encrypt_elements_loop_us << std::endl;
+        std::cout << "  GetRawElement(aggregated): " << get_raw_element_us << std::endl;
+        std::cout << "  XorEncrypt(aggregated): " << xor_encrypt_us << std::endl;
+        std::cout << "  SetElement(aggregated): " << set_element_us << std::endl;
+        std::cout << "  LoopResidual(iterator+other): "
+                  << (encrypt_elements_loop_us - get_raw_element_us - xor_encrypt_us - set_element_us) << std::endl;
+        std::cout << "  FinalizeBuffer: " << finalize_buffer_us << std::endl;
+        std::cout << "  WriteHeader: " << write_header_us << std::endl;
+        std::cout << "  EncryptTypedElements(total): " << total_us << std::endl;
+    }
+
+    void PrintBasicXorEncryptValueListTimings(int64_t visit_dispatch_us, int64_t total_us) {
+        std::cout << "+++++ BasicXorEncryptor EncryptValueList timings (microseconds) +++++" << std::endl;
+        std::cout << "  VariantVisitAndEncrypt: " << visit_dispatch_us << std::endl;
+        std::cout << "  EncryptValueList(total): " << total_us << std::endl;
+    }
+
+    void PrintBasicXorDecryptValueListTimings(
+        bool is_fixed,
+        size_t num_elements,
+        int64_t read_header_us,
+        int64_t setup_buffer_us,
+        int64_t decrypt_elements_us,
+        int64_t total_us) {
+        std::cout << "+++++ BasicXorEncryptor DecryptValueList timings (microseconds) +++++" << std::endl;
+        std::cout << "  mode: " << (is_fixed ? "fixed" : "variable") << std::endl;
+        std::cout << "  num_elements: " << num_elements << std::endl;
+        std::cout << "  ReadHeader: " << read_header_us << std::endl;
+        std::cout << "  SetupEncryptedBuffer: " << setup_buffer_us << std::endl;
+        std::cout << "  DecryptElements: " << decrypt_elements_us << std::endl;
+        std::cout << "  DecryptValueList(total): " << total_us << std::endl;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Functions for encrypting and decrypting byte arrays.
@@ -57,11 +118,17 @@ std::vector<uint8_t> BasicXorEncryptor::XorDecrypt(tcb::span<const uint8_t> data
 // ---------------------------------------------------------------------------
 
 std::vector<uint8_t> BasicXorEncryptor::EncryptBlock(tcb::span<const uint8_t> data) {
-    return XorEncrypt(data, key_id_);
+    auto start = std::chrono::steady_clock::now();
+    auto out = XorEncrypt(data, key_id_);
+    PrintBasicXorBlockTimings("EncryptBlock", ElapsedMicrosecondsSince(start));
+    return out;
 }
 
 std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> data) {
-    return XorDecrypt(data, key_id_);
+    auto start = std::chrono::steady_clock::now();
+    auto out = XorDecrypt(data, key_id_);
+    PrintBasicXorBlockTimings("DecryptBlock", ElapsedMicrosecondsSince(start));
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +163,7 @@ std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> da
 template <typename TypedBuffer>
 std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     const TypedBuffer& input_buffer, const std::string& key_id) {
+    auto total_start = std::chrono::steady_clock::now();
     constexpr bool is_fixed = TypedBuffer::is_fixed_sized;
     constexpr size_t prefix_length = is_fixed ? kFixedHeaderLength : kVariableHeaderLength;
     const size_t num_elements = input_buffer.GetNumElements();
@@ -114,19 +182,33 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
 
     std::vector<uint8_t> final_buffer;
     size_t element_size = 0;
+    int64_t encrypt_elements_loop_us = 0;
+    int64_t get_raw_element_us = 0;
+    int64_t xor_encrypt_us = 0;
+    int64_t set_element_us = 0;
+    int64_t finalize_buffer_us = 0;
 
     // Encrypt fixed-size elements
     if constexpr (is_fixed) {
         element_size = input_buffer.GetElementSize();
         TypedBufferRawBytesFixedSized output_buffer{
             num_elements, prefix_length, RawBytesFixedSizedCodec{element_size}};
-        size_t output_index = 0;
-        for (const auto raw_bytes : input_buffer.raw_elements()) {
+        auto stage_start = std::chrono::steady_clock::now();
+        for (size_t i = 0; i < num_elements; ++i) {
+            auto op_start = std::chrono::steady_clock::now();
+            auto raw_bytes = input_buffer.GetRawElement(i);
+            get_raw_element_us += ElapsedMicrosecondsSince(op_start);
+            op_start = std::chrono::steady_clock::now();
             auto encrypted = XorEncrypt(raw_bytes, key_id);
-            output_buffer.SetElement(output_index, tcb::span<const uint8_t>(encrypted));
-            output_index++;
+            xor_encrypt_us += ElapsedMicrosecondsSince(op_start);
+            op_start = std::chrono::steady_clock::now();
+            output_buffer.SetElement(i, tcb::span<const uint8_t>(encrypted));
+            set_element_us += ElapsedMicrosecondsSince(op_start);
         }
+        encrypt_elements_loop_us = ElapsedMicrosecondsSince(stage_start);
+        stage_start = std::chrono::steady_clock::now();
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
+        finalize_buffer_us = ElapsedMicrosecondsSince(stage_start);
     }
     
     // Encrypt variable-size elements
@@ -134,24 +216,52 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
         auto reserved_bytes_hint = input_buffer.GetRawBufferSize();
         TypedBufferRawBytesVariableSized output_buffer{
             num_elements, reserved_bytes_hint, true, prefix_length};
-        size_t output_index = 0;
-        for (const auto raw_bytes : input_buffer.raw_elements()) {
+
+        auto stage_start = std::chrono::steady_clock::now();
+        for (size_t i = 0; i < num_elements; ++i) {
+
+            auto op_start = std::chrono::steady_clock::now();
+            auto raw_bytes = input_buffer.GetRawElement(i);
+            get_raw_element_us += ElapsedMicrosecondsSince(op_start);
+
+            op_start = std::chrono::steady_clock::now();
             auto encrypted = XorEncrypt(raw_bytes, key_id);
-            output_buffer.SetElement(output_index, tcb::span<const uint8_t>(encrypted));
-            output_index++;
+            xor_encrypt_us += ElapsedMicrosecondsSince(op_start);
+            
+            op_start = std::chrono::steady_clock::now();
+            output_buffer.SetElement(i, tcb::span<const uint8_t>(encrypted));
+            set_element_us += ElapsedMicrosecondsSince(op_start);
         }
+        encrypt_elements_loop_us = ElapsedMicrosecondsSince(stage_start);
+        stage_start = std::chrono::steady_clock::now();
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
+        finalize_buffer_us = ElapsedMicrosecondsSince(stage_start);
     }
 
     // Write the header to the final buffer and return it.
+    auto header_start = std::chrono::steady_clock::now();
     WriteHeader(final_buffer, {is_fixed,
         static_cast<uint32_t>(num_elements),
         static_cast<uint32_t>(element_size)});
+    auto write_header_us = ElapsedMicrosecondsSince(header_start);
+
+    PrintBasicXorEncryptTypedElementsTimings(
+        is_fixed,
+        num_elements,
+        element_size,
+        encrypt_elements_loop_us,
+        get_raw_element_us,
+        xor_encrypt_us,
+        set_element_us,
+        finalize_buffer_us,
+        write_header_us,
+        ElapsedMicrosecondsSince(total_start));
     return final_buffer;
 }
 
 std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
     const TypedValuesBuffer& typed_buffer) {
+    auto total_start = std::chrono::steady_clock::now();
 
     // Printable context string for logging
     // std::string context_str = std::string("Context parameters:")
@@ -166,9 +276,13 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
         
     // std::visit extracts the concrete buffer type from the TypedValuesBuffer variant
     // and forwards it to EncryptTypedElements, which handles all buffer types generically.
-    return std::visit([&](const auto& input_buffer) {
+    auto visit_start = std::chrono::steady_clock::now();
+    auto encrypted = std::visit([&](const auto& input_buffer) {
         return EncryptTypedElements(input_buffer, key_id_);
     }, typed_buffer);
+    auto visit_dispatch_us = ElapsedMicrosecondsSince(visit_start);
+    PrintBasicXorEncryptValueListTimings(visit_dispatch_us, ElapsedMicrosecondsSince(total_start));
+    return encrypted;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,38 +307,80 @@ TypedBuffer BasicXorEncryptor::DecryptFixedSizedElementsIntoTypedBuffer(
 
 TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     tcb::span<const uint8_t> encrypted_bytes) {
+    auto total_start = std::chrono::steady_clock::now();
 
+    auto stage_start = std::chrono::steady_clock::now();
     auto header = ReadHeader(encrypted_bytes);
+    auto read_header_us = ElapsedMicrosecondsSince(stage_start);
     auto num_elements = static_cast<size_t>(header.num_elements);
 
     // Decrypt fixed-size elements
     if (header.is_fixed) {
+        stage_start = std::chrono::steady_clock::now();
 
         // Create a fixed-sized byte buffer for reading the encrypted elements.
         TypedBufferRawBytesFixedSized encrypted_buffer{
             encrypted_bytes, kFixedHeaderLength, RawBytesFixedSizedCodec{header.element_size}};
+        auto setup_buffer_us = ElapsedMicrosecondsSince(stage_start);
 
         // Populate a typed buffer with the decrypted elements in the corresponding type.
+        stage_start = std::chrono::steady_clock::now();
         switch (datatype_) {
             case Type::INT32:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_, TypedBufferI32{num_elements});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             case Type::INT64:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_, TypedBufferI64{num_elements});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             case Type::INT96:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_, TypedBufferInt96{num_elements});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             case Type::FLOAT:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_, TypedBufferFloat{num_elements});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             case Type::DOUBLE:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_, TypedBufferDouble{num_elements});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             case Type::FIXED_LEN_BYTE_ARRAY:
-                return DecryptFixedSizedElementsIntoTypedBuffer(
+            {
+                auto out = DecryptFixedSizedElementsIntoTypedBuffer(
                     encrypted_buffer, key_id_,
                     TypedBufferRawBytesFixedSized{num_elements, 0, RawBytesFixedSizedCodec{header.element_size}});
+                PrintBasicXorDecryptValueListTimings(
+                    true, num_elements, read_header_us, setup_buffer_us,
+                    ElapsedMicrosecondsSince(stage_start), ElapsedMicrosecondsSince(total_start));
+                return out;
+            }
             default:
                 throw InvalidInputException(
                     std::string("DecryptValueList: unsupported fixed-size datatype: ")
@@ -234,8 +390,10 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     
     // Decrypt variable-size elements
     else {
+        stage_start = std::chrono::steady_clock::now();
         // Create a variable-sized byte buffer for reading the encrypted elements.
         TypedBufferRawBytesVariableSized encrypted_buffer{ encrypted_bytes, kVariableHeaderLength};
+        auto setup_buffer_us = ElapsedMicrosecondsSince(stage_start);
 
         switch (datatype_) {
             // Create a BYTE-ARRAY typed buffer for storing the decrypted elements.
@@ -243,11 +401,16 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
                 auto reserved_bytes_hint = encrypted_buffer.GetRawBufferSize();
                 TypedBufferRawBytesVariableSized output_buffer{num_elements, reserved_bytes_hint, true};
                 size_t output_index = 0;
+                stage_start = std::chrono::steady_clock::now();
                 for (const auto element : encrypted_buffer) {
                     auto decrypted_bytes = XorDecrypt(element, key_id_);
                     output_buffer.SetElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
                     output_index++;
                 }
+                auto decrypt_elements_us = ElapsedMicrosecondsSince(stage_start);
+                PrintBasicXorDecryptValueListTimings(
+                    false, num_elements, read_header_us, setup_buffer_us,
+                    decrypt_elements_us, ElapsedMicrosecondsSince(total_start));
                 return output_buffer;
             }
             default:
