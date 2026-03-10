@@ -289,3 +289,4 @@ inline std::string AddStringAttribute(
     out[key] = value;
     return value;
 }
+
