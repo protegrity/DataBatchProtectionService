@@ -61,5 +61,18 @@ public:
     std::vector<uint8_t> EncryptValueList(const TypedValuesBuffer& typed_buffer) override;
 
     TypedValuesBuffer DecryptValueList(tcb::span<const uint8_t> encrypted_bytes) override;
+
+private:
+    static std::vector<uint8_t> XorEncrypt(tcb::span<const uint8_t> data, const std::string& key_id);
+    static std::vector<uint8_t> XorDecrypt(tcb::span<const uint8_t> data, const std::string& key_id);
+
+    template <typename InputBuffer>
+    static std::vector<uint8_t> EncryptTypedElements(
+        const InputBuffer& input_buffer, const std::string& key_id);
+
+    template <typename TypedBuffer>
+    static TypedBuffer DecryptFixedSizedElementsIntoTypedBuffer(
+        const TypedBufferRawBytesFixedSized& encrypted_buffer,
+        const std::string& key_id, TypedBuffer output_buffer);
 };
 

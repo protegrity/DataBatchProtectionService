@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <sstream>
+#include <string>
 #include <variant>
 #include "typed_buffer_codecs.h"
 #include "typed_buffer.h"
@@ -56,4 +58,36 @@ using TypedValuesBuffer = std::variant<
     TypedBufferRawBytesFixedSized,
     TypedBufferRawBytesVariableSized
 >;
+
+// Printable string representation of the typed buffer
+inline std::string PrintableTypedValuesBuffer(const TypedValuesBuffer& buffer) {
+    return std::visit([](const auto& typed_buffer) -> std::string {
+        using BufferType = std::decay_t<decltype(typed_buffer)>;
+        using ValueType = typename BufferType::value_type;
+
+        std::ostringstream out;
+        const size_t num_elements = typed_buffer.GetNumElements();
+
+        out << BufferType::type_name() << " (" << num_elements << " elements):\n";
+
+        size_t i = 0;
+        for (const auto element : typed_buffer) {
+            if constexpr (std::is_same_v<ValueType, Int96>) {
+                out << "  [" << i << "] [" << element.lo << ", "
+                    << element.mid << ", " << element.hi << "]\n";
+            } else if constexpr (std::is_same_v<ValueType, std::string_view>) {
+                out << "  [" << i << "] \"" << element
+                    << "\" (length: " << element.size() << ")\n";
+            } else if constexpr (std::is_same_v<ValueType, tcb::span<const uint8_t>>) {
+                out << "  [" << i << "] <" << element.size() << " bytes>\n";
+            } else {
+                out << "  [" << i << "] " << element << "\n";
+            }
+            ++i;
+        }
+
+        return out.str();
+    }, buffer);
+}
+
 } // namespace dbps::processing
