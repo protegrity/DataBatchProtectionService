@@ -156,7 +156,7 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
     //    + "\n  datatype: " + std::string(dbps::enum_utils::to_string(datatype_));
 
     // Printable typed buffer string for logging -- Commented out by default to avoid performance impact.
-    // std::string typed_buffer_str = TypedValuesBufferToString(typed_buffer);
+    // std::string typed_buffer_str = PrintableTypedValuesBuffer(typed_buffer);
         
     // std::visit extracts the concrete buffer type from the TypedValuesBuffer variant
     // and forwards it to EncryptTypedElements, which handles all buffer types generically.
