@@ -126,8 +126,9 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     
     // Encrypt variable-size elements
     else {
+        auto reserved_bytes_hint = input_buffer.GetRawBufferSize();
         TypedBufferRawBytesVariableSized output_buffer{
-            num_elements, input_buffer.GetRawBufferSize(), true, prefix_length};
+            num_elements, reserved_bytes_hint, true, prefix_length};
         size_t output_index = 0;
         for (const auto raw_bytes : input_buffer.raw_elements()) {
             auto encrypted = XorEncrypt(raw_bytes, key_id);
