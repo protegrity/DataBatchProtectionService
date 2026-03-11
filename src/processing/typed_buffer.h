@@ -67,6 +67,7 @@ public:
     // Get and set elements by position with type access from Codec
     value_type GetElement(size_t position) const;
     tcb::span<const uint8_t> GetRawElement(size_t position) const;
+    tcb::span<uint8_t> GetWritableRawElement(size_t position, size_t payload_size);
     void SetElement(size_t position, const value_type& element);
     void SetRawElement(size_t position, tcb::span<const uint8_t> raw);
 
@@ -614,7 +615,7 @@ inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t po
         if (payload_size != element_size_) {
             throw InvalidInputException("GetWriteSpanForElement: payload does not match element_size");
         }
-        const size_t offset = CalculateOffsetOfElement(position);
+        const size_t offset = prefix_size_ + (position * element_size_);
         auto write_span = tcb::span<uint8_t>(write_buffer_.data() + offset, element_size_);
         return write_span;
     }
@@ -652,6 +653,11 @@ inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t po
         RebindSpanToWriteBuffer();
         return write_span;
     }
+}
+
+template <class Codec>
+inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableRawElement(size_t position, size_t payload_size) {
+    return GetWritableSpanForElement(position, payload_size);
 }
 
 template <class Codec>

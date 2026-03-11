@@ -49,9 +49,9 @@ namespace {
     }
 
     void PrintDurationLine(const char* label, int64_t nanoseconds) {
-        std::cout << "  " << label << ": "
-                  << ToMicroseconds(nanoseconds) << " us"
-                  << " (" << nanoseconds << " ns)" << std::endl;
+        std::cout << "  " << std::left << std::setw(34) << label
+                  << " : " << std::right << std::setw(12) << ToMicroseconds(nanoseconds) << " us"
+                  << " (" << std::setw(12) << nanoseconds << " ns)" << std::endl;
     }
 
     void PrintDecodeAndEncryptTimings(

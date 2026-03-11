@@ -66,8 +66,8 @@ public:
 private:
     const size_t key_id_hash_;
 
-    std::vector<uint8_t> XorEncrypt(tcb::span<const uint8_t> data);
-    std::vector<uint8_t> XorDecrypt(tcb::span<const uint8_t> data);
+    void XorEncryptInto(tcb::span<const uint8_t> data, tcb::span<uint8_t> out);
+    void XorDecryptInto(tcb::span<const uint8_t> data, tcb::span<uint8_t> out);
 
     template <typename InputBuffer>
     std::vector<uint8_t> EncryptTypedElements(const InputBuffer& input_buffer);
