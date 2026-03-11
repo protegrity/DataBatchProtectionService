@@ -208,7 +208,7 @@ ByteBuffer<Codec>::ByteBuffer(
 // Initializes `num_elements_` and `offsets_` from the span.
 // Called in a lazy manner when the buffer is accessed with GetElement or GetNumElements, avoiding unnecessary initialization.
 template <class Codec>
-void ByteBuffer<Codec>::InitializeFromSpan() const {
+inline void ByteBuffer<Codec>::InitializeFromSpan() const {
     if (elements_span_.size() < prefix_size_) {
         throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
     }
@@ -265,7 +265,7 @@ void ByteBuffer<Codec>::InitializeFromSpan() const {
 }
 
 template <class Codec>
-void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
+inline void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
     // If the span is already initialized, skip it.
     if (is_initialized_from_span_) {
         return;
@@ -280,7 +280,7 @@ void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
 // For read-only buffers, gets the number of elements in the buffer and sets num_elements_ if not already set.
 // A lighter version to only get num_elements_ and avoid calling InitializeFromSpan that also builds offsets_.
 template <class Codec>
-size_t ByteBuffer<Codec>::GetNumElements() const {
+inline size_t ByteBuffer<Codec>::GetNumElements() const {
     if (num_elements_ != kUnsetSize) {
         return num_elements_;
     }
@@ -291,7 +291,7 @@ size_t ByteBuffer<Codec>::GetNumElements() const {
 }
 
 template <class Codec>
-size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
+inline size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
     if (bytes.empty())
         return 0;
 
@@ -338,7 +338,7 @@ size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span<const 
 // -----------------------------------------------------------------------------
 
 template <class Codec>
-size_t ByteBuffer<Codec>::CalculateOffsetOfElement(size_t position) const {
+inline size_t ByteBuffer<Codec>::CalculateOffsetOfElement(size_t position) const {
     EnsureInitializedFromSpan();
     if (position >= num_elements_) {
         throw InvalidInputException("Element position out of range during CalculateOffsetOfElement");
@@ -350,19 +350,23 @@ size_t ByteBuffer<Codec>::CalculateOffsetOfElement(size_t position) const {
 }
 
 template <class Codec>
-tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const {
+inline tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const {
     EnsureInitializedFromSpan();
-    if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during GetRawElement");
-    }
-    const size_t offset = CalculateOffsetOfElement(position);
     
     // For fixed-size elements are stored contiguously.
     if constexpr (is_fixed_sized) {
+        if (position >= num_elements_) {
+            throw InvalidInputException("Element position out of range during GetRawElement");
+        }
+        const size_t offset = prefix_size_ + (position * element_size_);
         return elements_span_.subspan(offset, element_size_);
     }
 
     // For variable-size elements, we need to read the size first [u32 size][element].
+    if (position >= num_elements_) {
+        throw InvalidInputException("Element position out of range during GetRawElement");
+    }
+    const size_t offset = offsets_[position];
     if (offset == kUnsetSize) {
         throw InvalidInputException("Element position has not been written yet");
     }
@@ -371,7 +375,7 @@ tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t position) const {
+inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t position) const {
     return codec_.Decode(GetRawElement(position));
 }
 
@@ -384,7 +388,7 @@ typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t posi
 // -----------------------------------------------------------------------------
 
 template <class Codec>
-ByteBuffer<Codec>::ConstIterator::ConstIterator(const ByteBuffer<Codec>* buffer, size_t cursor_offset)
+inline ByteBuffer<Codec>::ConstIterator::ConstIterator(const ByteBuffer<Codec>* buffer, size_t cursor_offset)
     : buffer_(buffer),
       cursor_offset_(cursor_offset),
       elements_span_size_(buffer != nullptr ? buffer->elements_span_.size() : 0u),
@@ -416,7 +420,7 @@ inline size_t ByteBuffer<Codec>::ConstIterator::ReadAndValidateVariableElementSi
 }
 
 template <class Codec>
-tcb::span<const uint8_t> ByteBuffer<Codec>::ConstIterator::RawSpanAtCursor() const {
+inline tcb::span<const uint8_t> ByteBuffer<Codec>::ConstIterator::RawSpanAtCursor() const {
     if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
         throw InvalidInputException("Cannot dereference ByteBuffer iterator at end position");
     }
@@ -429,14 +433,14 @@ tcb::span<const uint8_t> ByteBuffer<Codec>::ConstIterator::RawSpanAtCursor() con
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::ConstIterator::value_type ByteBuffer<Codec>::ConstIterator::operator*() const {
+inline typename ByteBuffer<Codec>::ConstIterator::value_type ByteBuffer<Codec>::ConstIterator::operator*() const {
     // Decode converts raw bytes into the codec's value_type (e.g. int32_t, float, string_view).
     // This keeps the iterator's return type consistent with GetElement across all codecs.
     return buffer_->codec_.Decode(RawSpanAtCursor());
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::ConstIterator& ByteBuffer<Codec>::ConstIterator::operator++() {
+inline typename ByteBuffer<Codec>::ConstIterator& ByteBuffer<Codec>::ConstIterator::operator++() {
     if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
         return *this;
     }
@@ -451,23 +455,23 @@ typename ByteBuffer<Codec>::ConstIterator& ByteBuffer<Codec>::ConstIterator::ope
 }
 
 template <class Codec>
-bool ByteBuffer<Codec>::ConstIterator::operator==(const ConstIterator& other) const {
+inline bool ByteBuffer<Codec>::ConstIterator::operator==(const ConstIterator& other) const {
     return buffer_ == other.buffer_ && cursor_offset_ == other.cursor_offset_;
 }
 
 template <class Codec>
-bool ByteBuffer<Codec>::ConstIterator::operator!=(const ConstIterator& other) const {
+inline bool ByteBuffer<Codec>::ConstIterator::operator!=(const ConstIterator& other) const {
     return !(*this == other);
 }
 
 template <class Codec>
-tcb::span<const uint8_t> ByteBuffer<Codec>::ConstRawIterator::operator*() const {
+inline tcb::span<const uint8_t> ByteBuffer<Codec>::ConstRawIterator::operator*() const {
     // Returns the raw bytes for the current element, consistent with GetRawElement.
     return this->RawSpanAtCursor();
 }
 
 template <class Codec>
-void ByteBuffer<Codec>::ValidateIteratorReadPreconditions() const {
+inline void ByteBuffer<Codec>::ValidateIteratorReadPreconditions() const {
     if (is_write_buffer_initialized_) {
         throw InvalidInputException("Iterator is only available for read buffers");
     }
@@ -486,19 +490,19 @@ void ByteBuffer<Codec>::ValidateIteratorReadPreconditions() const {
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::begin() const {
+inline typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::begin() const {
     ValidateIteratorReadPreconditions();
     return ConstIterator(this, prefix_size_);
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::end() const {
+inline typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::end() const {
     ValidateIteratorReadPreconditions();
     return ConstIterator(this, elements_span_.size());
 }
 
 template <class Codec>
-typename ByteBuffer<Codec>::RawElementsView ByteBuffer<Codec>::raw_elements() const {
+inline typename ByteBuffer<Codec>::RawElementsView ByteBuffer<Codec>::raw_elements() const {
     ValidateIteratorReadPreconditions();
     return RawElementsView{this};
 }
@@ -540,7 +544,7 @@ ByteBuffer<Codec>::ByteBuffer(
 
 // Initializes `write_buffer_`, `offsets_` and `elements_span_`
 template <class Codec>
-void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint) {
+inline void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint) {
     // Fixed-size elements
     if constexpr (is_fixed_sized) {
         if (element_size_ <= 0) {
@@ -592,7 +596,7 @@ void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_reserved_b
 
 
 template <class Codec>
-tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t position, size_t payload_size) {
+inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t position, size_t payload_size) {
     if (!is_write_buffer_initialized_) {
         throw InvalidInputException("Cannot GetWriteSpanForElement: write buffer is not initialized.");
     }
@@ -651,7 +655,7 @@ tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t position,
 }
 
 template <class Codec>
-void ByteBuffer<Codec>::SetElement(size_t position, const value_type& element) {
+inline void ByteBuffer<Codec>::SetElement(size_t position, const value_type& element) {
     if constexpr (is_fixed_sized) {
         auto write_span = GetWritableSpanForElement(position, element_size_);
         codec_.Encode(element, write_span);
@@ -662,13 +666,13 @@ void ByteBuffer<Codec>::SetElement(size_t position, const value_type& element) {
 }
 
 template <class Codec>
-void ByteBuffer<Codec>::SetRawElement(size_t position, tcb::span<const uint8_t> raw) {
+inline void ByteBuffer<Codec>::SetRawElement(size_t position, tcb::span<const uint8_t> raw) {
     auto write_span = GetWritableSpanForElement(position, raw.size());
     std::memcpy(write_span.data(), raw.data(), raw.size());
 }
 
 template <class Codec>
-std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
+inline std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
     if (is_write_buffer_finalized_) {
         throw InvalidInputException("FinalizeAndTakeBuffer: write buffer has already been finalized");
     }
@@ -739,7 +743,7 @@ std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
 }
 
 template <class Codec>
-void ByteBuffer<Codec>::RebindSpanToWriteBuffer() {
+inline void ByteBuffer<Codec>::RebindSpanToWriteBuffer() {
     elements_span_ = tcb::span<const uint8_t>(write_buffer_.data(), write_buffer_.size());
 }
 
