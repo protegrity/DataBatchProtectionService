@@ -48,7 +48,8 @@ public:
         const std::string& user_id,
         const std::string& application_context,
         dbps::external::Type::type datatype)
-        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype) {}
+        : DBPSEncryptor(key_id, column_name, user_id, application_context, datatype),
+          key_id_hash_(std::hash<std::string>{}(key_id)) {}
 
     ~BasicXorEncryptor() override = default;
 
@@ -63,16 +64,17 @@ public:
     TypedValuesBuffer DecryptValueList(tcb::span<const uint8_t> encrypted_bytes) override;
 
 private:
-    static std::vector<uint8_t> XorEncrypt(tcb::span<const uint8_t> data, const std::string& key_id);
-    static std::vector<uint8_t> XorDecrypt(tcb::span<const uint8_t> data, const std::string& key_id);
+    const size_t key_id_hash_;
+
+    std::vector<uint8_t> XorEncrypt(tcb::span<const uint8_t> data);
+    std::vector<uint8_t> XorDecrypt(tcb::span<const uint8_t> data);
 
     template <typename InputBuffer>
-    static std::vector<uint8_t> EncryptTypedElements(
-        const InputBuffer& input_buffer, const std::string& key_id);
+    std::vector<uint8_t> EncryptTypedElements(const InputBuffer& input_buffer);
 
     template <typename TypedBuffer>
-    static TypedBuffer DecryptFixedSizedElementsIntoTypedBuffer(
+    TypedBuffer DecryptFixedSizedElementsIntoTypedBuffer(
         const TypedBufferRawBytesFixedSized& encrypted_buffer,
-        const std::string& key_id, TypedBuffer output_buffer);
+        TypedBuffer output_buffer);
 };
 

@@ -21,7 +21,6 @@
 #include "../../common/enum_utils.h"
 #include <chrono>
 #include <cstring>
-#include <functional>
 #include <iostream>
 #include <type_traits>
 
@@ -103,16 +102,12 @@ namespace {
 // Functions for encrypting and decrypting byte arrays.
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> BasicXorEncryptor::XorEncrypt(tcb::span<const uint8_t> data, const std::string& key_id) {
+std::vector<uint8_t> BasicXorEncryptor::XorEncrypt(tcb::span<const uint8_t> data) {
     if (data.empty()) {
         return {};
     }
-    if (key_id.empty()) {
-        throw std::invalid_argument("XorEncrypt: key must not be empty for non-empty data");
-    }
+    size_t key_hash = key_id_hash_;
     std::vector<uint8_t> out(data.size());
-    std::hash<std::string> hasher;
-    size_t key_hash = hasher(key_id);
     for (size_t i = 0; i < data.size(); ++i) {
         out[i] = data[i] ^ (key_hash & 0xFF);
         key_hash = (key_hash << 1) | (key_hash >> 31);
@@ -120,8 +115,8 @@ std::vector<uint8_t> BasicXorEncryptor::XorEncrypt(tcb::span<const uint8_t> data
     return out;
 }
 
-std::vector<uint8_t> BasicXorEncryptor::XorDecrypt(tcb::span<const uint8_t> data, const std::string& key_id) {
-    return XorEncrypt(data, key_id);
+std::vector<uint8_t> BasicXorEncryptor::XorDecrypt(tcb::span<const uint8_t> data) {
+    return XorEncrypt(data);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +168,7 @@ std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> da
 
 template <typename TypedBuffer>
 std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
-    const TypedBuffer& input_buffer, const std::string& key_id) {
+    const TypedBuffer& input_buffer) {
     auto total_start = std::chrono::steady_clock::now();
     constexpr bool is_fixed = TypedBuffer::is_fixed_sized;
     constexpr size_t prefix_length = is_fixed ? kFixedHeaderLength : kVariableHeaderLength;
@@ -306,10 +301,10 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
 // Helper function to decrypt fixed-size elements into the output TypedBuffer type.
 template <typename TypedBuffer>
 TypedBuffer BasicXorEncryptor::DecryptFixedSizedElementsIntoTypedBuffer(
-    const TypedBufferRawBytesFixedSized& encrypted_buffer, const std::string& key_id, TypedBuffer output_buffer) {
+    const TypedBufferRawBytesFixedSized& encrypted_buffer, TypedBuffer output_buffer) {
     size_t output_index = 0;
     for (const auto raw_bytes : encrypted_buffer.raw_elements()) {
-        auto decrypted_bytes = XorDecrypt(raw_bytes, key_id);
+        auto decrypted_bytes = XorDecrypt(raw_bytes);
         output_buffer.SetRawElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
         output_index++;
     }
@@ -414,7 +409,7 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
                 size_t output_index = 0;
                 stage_start = std::chrono::steady_clock::now();
                 for (const auto element : encrypted_buffer) {
-                    auto decrypted_bytes = XorDecrypt(element, key_id_);
+                    auto decrypted_bytes = XorDecrypt(element);
                     output_buffer.SetElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
                     output_index++;
                 }
