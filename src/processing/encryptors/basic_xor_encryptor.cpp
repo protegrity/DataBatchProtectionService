@@ -268,14 +268,18 @@ TypedBuffer BasicXorEncryptor::DecryptFixedSizedElementsIntoTypedBuffer(
 
 TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     tcb::span<const uint8_t> encrypted_bytes) {
+
     auto header = ReadHeader(encrypted_bytes);
     auto num_elements = static_cast<size_t>(header.num_elements);
 
     // Decrypt fixed-size elements
     if (header.is_fixed) {
+
         // Create a fixed-sized byte buffer for reading the encrypted elements.
         TypedBufferRawBytesFixedSized encrypted_buffer{
             encrypted_bytes, kFixedHeaderLength, RawBytesFixedSizedCodec{header.element_size}};
+
+        // Populate a typed buffer with the decrypted elements in the corresponding type.
         switch (datatype_) {
             case Type::INT32:
                 return DecryptFixedSizedElementsIntoTypedBuffer(
