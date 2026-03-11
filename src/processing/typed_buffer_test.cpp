@@ -953,7 +953,7 @@ TEST(TypedBufferTest, Iterate_OnWriteBuffer_Throws) {
 // NextRawElementIterator tests
 // -----------------------------------------------------------------------------
 
-TEST(TypedBufferTest, NextRawElementIterator_FixedSize_TraversesAllElements) {
+TEST(TypedBufferTest, ElementsIteratorNext_FixedSize_TraversesAllElements) {
     constexpr size_t kElementSize = 8u;
     const std::vector<std::vector<uint8_t>> expected = {
         {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17},
@@ -972,7 +972,7 @@ TEST(TypedBufferTest, NextRawElementIterator_FixedSize_TraversesAllElements) {
 
     std::vector<std::vector<uint8_t>> collected;
     tcb::span<const uint8_t> element;
-    while (buffer.NextRawElementIterator(element)) {
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -984,11 +984,11 @@ TEST(TypedBufferTest, NextRawElementIterator_FixedSize_TraversesAllElements) {
     EXPECT_TRUE(element.empty());
 
     tcb::span<const uint8_t> extra;
-    EXPECT_FALSE(buffer.NextRawElementIterator(extra));
+    EXPECT_FALSE(buffer.ElementsIteratorNext(extra));
     EXPECT_TRUE(extra.empty());
 }
 
-TEST(TypedBufferTest, NextRawElementIterator_VariableSize_TraversesAllElements) {
+TEST(TypedBufferTest, ElementsIteratorNext_VariableSize_TraversesAllElements) {
     const std::vector<std::vector<uint8_t>> expected = {
         MakePayload(11, 0x10),
         MakePayload(3, 0x20),
@@ -1008,7 +1008,7 @@ TEST(TypedBufferTest, NextRawElementIterator_VariableSize_TraversesAllElements) 
 
     std::vector<std::vector<uint8_t>> collected;
     tcb::span<const uint8_t> element;
-    while (buffer.NextRawElementIterator(element)) {
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -1020,7 +1020,7 @@ TEST(TypedBufferTest, NextRawElementIterator_VariableSize_TraversesAllElements) 
     EXPECT_TRUE(element.empty());
 
     tcb::span<const uint8_t> extra;
-    EXPECT_FALSE(buffer.NextRawElementIterator(extra));
+    EXPECT_FALSE(buffer.ElementsIteratorNext(extra));
     EXPECT_TRUE(extra.empty());
 }
 
