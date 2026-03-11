@@ -95,6 +95,12 @@ inline uint32_t read_u32_le(tcb::span<const uint8_t> in, size_t offset) {
         (static_cast<uint32_t>(in[offset + 3]) << 24);
 }
 
+inline uint32_t read_u32_le(const uint8_t* p) {
+    uint32_t v;
+    std::memcpy(&v, p, sizeof(v));
+    return v;
+}
+
 // Utility functions for splitting and joining byte vectors.
 
 struct BytesPair {

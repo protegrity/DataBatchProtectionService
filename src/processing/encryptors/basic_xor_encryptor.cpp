@@ -44,7 +44,7 @@ namespace {
     }
 
     void PrintBasicXorBlockTimings(const char* operation, int64_t total_ns) {
-        std::cout << "+++++ BasicXorEncryptor timings (microseconds + nanoseconds) +++++" << std::endl;
+        std::cout << "----- BasicXorEncryptor timings (microseconds + nanoseconds) -----" << std::endl;
         PrintDurationLine(operation, total_ns);
     }
 
@@ -59,7 +59,7 @@ namespace {
         int64_t finalize_buffer_ns,
         int64_t write_header_ns,
         int64_t total_ns) {
-        std::cout << "+++++ BasicXorEncryptor EncryptTypedElements timings (microseconds + nanoseconds) +++++" << std::endl;
+        std::cout << "----- BasicXorEncryptor EncryptTypedElements timings (microseconds + nanoseconds) -----" << std::endl;
         std::cout << "  mode: " << (is_fixed ? "fixed" : "variable") << std::endl;
         std::cout << "  num_elements: " << num_elements << std::endl;
         std::cout << "  element_size: " << element_size << std::endl;
@@ -76,7 +76,7 @@ namespace {
     }
 
     void PrintBasicXorEncryptValueListTimings(int64_t visit_dispatch_ns, int64_t total_ns) {
-        std::cout << "+++++ BasicXorEncryptor EncryptValueList timings (microseconds + nanoseconds) +++++" << std::endl;
+        std::cout << "----- BasicXorEncryptor EncryptValueList timings (microseconds + nanoseconds) -----" << std::endl;
         PrintDurationLine("VariantVisitAndEncrypt", visit_dispatch_ns);
         PrintDurationLine("EncryptValueList(total)", total_ns);
     }
@@ -88,7 +88,7 @@ namespace {
         int64_t setup_buffer_ns,
         int64_t decrypt_elements_ns,
         int64_t total_ns) {
-        std::cout << "+++++ BasicXorEncryptor DecryptValueList timings (microseconds + nanoseconds) +++++" << std::endl;
+        std::cout << "----- BasicXorEncryptor DecryptValueList timings (microseconds + nanoseconds) -----" << std::endl;
         std::cout << "  mode: " << (is_fixed ? "fixed" : "variable") << std::endl;
         std::cout << "  num_elements: " << num_elements << std::endl;
         PrintDurationLine("ReadHeader", read_header_ns);
@@ -173,7 +173,9 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     const TypedBuffer& input_buffer) {
     constexpr bool is_fixed = TypedBuffer::is_fixed_sized;
     constexpr size_t prefix_length = is_fixed ? kFixedHeaderLength : kVariableHeaderLength;
-    const size_t num_elements = input_buffer.GetNumElements();
+
+    const size_t num_elements = 500000;     // +++++++++ input_buffer.GetNumElements();
+    //const size_t num_elements = input_buffer.GetNumElements();
 
     // If there are no elements, return an empty buffer with the header.
     if (num_elements == 0) {
@@ -195,25 +197,30 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
         element_size = input_buffer.GetElementSize();
         TypedBufferRawBytesFixedSized output_buffer{
             num_elements, prefix_length, RawBytesFixedSizedCodec{element_size}};
-        for (size_t i = 0; i < num_elements; ++i) {
-            auto raw_bytes = input_buffer.GetRawElement(i);
-            auto write_span = output_buffer.GetWritableRawElement(i, raw_bytes.size());
+
+        size_t output_index = 0;
+        tcb::span<const uint8_t> raw_bytes;
+        while (input_buffer.ElementsIteratorNext(raw_bytes)) {
+            auto write_span = output_buffer.GetWritableRawElement(output_index, raw_bytes.size());
             XorEncryptInto(raw_bytes, write_span);
+            output_index++;
         }
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
-    }
+    }   
     
     // Encrypt variable-size elements
     else {
         auto reserved_bytes_hint = input_buffer.GetRawBufferSize();
         TypedBufferRawBytesVariableSized output_buffer{
             num_elements, reserved_bytes_hint, true, prefix_length};
+
         size_t output_index = 0;
-        for (const auto raw_bytes : input_buffer.raw_elements()) {
+        tcb::span<const uint8_t> raw_bytes;
+        while (input_buffer.ElementsIteratorNext(raw_bytes)) {
             auto write_span = output_buffer.GetWritableRawElement(output_index, raw_bytes.size());
             XorEncryptInto(raw_bytes, write_span);
             output_index++;
-        }
+        }   
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
     }
 
@@ -258,7 +265,9 @@ template <typename TypedBuffer>
 TypedBuffer BasicXorEncryptor::DecryptFixedSizedElementsIntoTypedBuffer(
     const TypedBufferRawBytesFixedSized& encrypted_buffer, TypedBuffer output_buffer) {
     size_t output_index = 0;
-    for (const auto raw_bytes : encrypted_buffer.raw_elements()) {
+    tcb::span<const uint8_t> raw_bytes;
+    for (auto raw_bytes : encrypted_buffer.raw_elements()) {
+    // +++++++ while (encrypted_buffer.ElementsIteratorNext(raw_bytes)) {
         auto write_span = output_buffer.GetWritableRawElement(output_index, raw_bytes.size());
         XorDecryptInto(raw_bytes, write_span);
         output_index++;
@@ -317,12 +326,15 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
             case Type::BYTE_ARRAY: {
                 auto reserved_bytes_hint = encrypted_buffer.GetRawBufferSize();
                 TypedBufferRawBytesVariableSized output_buffer{num_elements, reserved_bytes_hint, true};
+
                 size_t output_index = 0;
-                for (const auto element : encrypted_buffer) {
+                tcb::span<const uint8_t> element;
+                for (auto element : encrypted_buffer.raw_elements()) {
+                // +++++++ while (encrypted_buffer.ElementsIteratorNext(element)) {
                     auto write_span = output_buffer.GetWritableRawElement(output_index, element.size());
                     XorDecryptInto(element, write_span);
                     output_index++;
-                }
+                }   
                 return output_buffer;
             }
             default:
