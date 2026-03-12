@@ -82,7 +82,7 @@ public:
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
     // Iterator for read-only elements returning raw bytes.
-    tcb::span<const uint8_t> ElementsIteratorNext() const;
+    bool ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const;
 
     // Iterator for read-only elements returning a `value_type`
     class ConstIterator {
@@ -407,9 +407,10 @@ inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size
 
 // ++++++ Additional validation that this is only used for read-only buffers.
 template <class Codec>
-inline tcb::span<const uint8_t> ByteBuffer<Codec>::ElementsIteratorNext() const {
+inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const {
     if (element_iterator_current_ptr_ == element_iterator_end_ptr_) {
-        return {};
+        raw_bytes = {};
+        return false;
     }
 
     const size_t bytes_remaining =
@@ -419,10 +420,9 @@ inline tcb::span<const uint8_t> ByteBuffer<Codec>::ElementsIteratorNext() const 
         if (bytes_remaining < element_size_) {
             throw InvalidInputException("Malformed fixed-size buffer: truncated element in iterator");
         }
-        const auto out_bytes =
-            tcb::span<const uint8_t>(element_iterator_current_ptr_, element_size_);
+        raw_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, element_size_);
         element_iterator_current_ptr_ += element_size_;
-        return out_bytes;
+        return true;
     }
 
     // Variable-sized elements
@@ -438,10 +438,9 @@ inline tcb::span<const uint8_t> ByteBuffer<Codec>::ElementsIteratorNext() const 
         throw InvalidInputException("Malformed variable-size buffer: truncated element payload in iterator");
     }
 
-    const auto out_bytes =
-        tcb::span<const uint8_t>(element_iterator_current_ptr_, current_element_size);
+    raw_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, current_element_size);
     element_iterator_current_ptr_ += current_element_size;
-    return out_bytes;
+    return true;
 }
 
 
