@@ -82,7 +82,7 @@ public:
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
     // Iterator for read-only elements returning raw bytes.
-    bool ElementsIteratorNext(tcb::span<const uint8_t>& out_bytes) const;
+    tcb::span<const uint8_t> ElementsIteratorNext() const;
 
     // Iterator for read-only elements returning a `value_type`
     class ConstIterator {
@@ -141,6 +141,7 @@ protected:
     // Helper for calculating the offset of an element by position.
     size_t CalculateOffsetOfElement(size_t position) const;
 
+    // ++++ Needed after deprecating std iterators?
     // Helper to validate the preconditions for reading the buffer with an iterator.
     void ValidateIteratorReadPreconditions() const;
 
@@ -179,7 +180,7 @@ private:
     // Initialization methods and flags for write buffer
     void InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint);
     void RebindSpanToWriteBuffer();
-    bool is_write_buffer_initialized_ = false;
+    bool is_write_buffer_enabled_ = false;
     bool is_write_buffer_finalized_ = false;    
 };
 
@@ -211,6 +212,7 @@ ByteBuffer<Codec>::ByteBuffer(
       codec_(std::move(codec)),
       element_size_(0),
       prefix_size_(prefix_size),
+      is_write_buffer_enabled_(false),
       is_initialized_from_span_(false) {
     if constexpr (is_fixed_sized) {
         element_size_ = codec_.element_size();
@@ -283,7 +285,7 @@ inline void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
         return;
     }
     // If the write buffer is initialized, we don't need to initialize from the span.
-    if (is_write_buffer_initialized_) {
+    if (is_write_buffer_enabled_) {
         return;
     }
     InitializeFromSpan();
@@ -403,11 +405,11 @@ inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size
 // Element span iterator  --  The streamlined version of the iterator.
 // -----------------------------------------------------------------------------
 
+// ++++++ Additional validation that this is only used for read-only buffers.
 template <class Codec>
-inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& out_bytes) const {
-    if (element_iterator_current_ptr_ >= element_iterator_end_ptr_) {
-        out_bytes = {};
-        return false;
+inline tcb::span<const uint8_t> ByteBuffer<Codec>::ElementsIteratorNext() const {
+    if (element_iterator_current_ptr_ == element_iterator_end_ptr_) {
+        return {};
     }
 
     const size_t bytes_remaining =
@@ -417,9 +419,10 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ou
         if (bytes_remaining < element_size_) {
             throw InvalidInputException("Malformed fixed-size buffer: truncated element in iterator");
         }
-        out_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, element_size_);
+        const auto out_bytes =
+            tcb::span<const uint8_t>(element_iterator_current_ptr_, element_size_);
         element_iterator_current_ptr_ += element_size_;
-        return true;
+        return out_bytes;
     }
 
     // Variable-sized elements
@@ -434,9 +437,11 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ou
     if (payload_remaining < current_element_size) {
         throw InvalidInputException("Malformed variable-size buffer: truncated element payload in iterator");
     }
-    out_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, current_element_size);
+
+    const auto out_bytes =
+        tcb::span<const uint8_t>(element_iterator_current_ptr_, current_element_size);
     element_iterator_current_ptr_ += current_element_size;
-    return true;    
+    return out_bytes;
 }
 
 
@@ -542,7 +547,7 @@ inline tcb::span<const uint8_t> ByteBuffer<Codec>::ConstRawIterator::operator*()
 
 template <class Codec>
 inline void ByteBuffer<Codec>::ValidateIteratorReadPreconditions() const {
-    if (is_write_buffer_initialized_) {
+    if (is_write_buffer_enabled_) {
         throw InvalidInputException("Iterator is only available for read buffers");
     }
     if (elements_span_size_ < prefix_size_) {
@@ -590,6 +595,7 @@ ByteBuffer<Codec>::ByteBuffer(
     : num_elements_(num_elements),
       codec_(std::move(codec)),
       element_size_(0),
+      is_write_buffer_enabled_(true),
       prefix_size_(prefix_size) {
     static_assert(is_fixed_sized, "ByteBuffer constructor for fixed-size elements only.");
     element_size_ = codec_.element_size();
@@ -607,6 +613,7 @@ ByteBuffer<Codec>::ByteBuffer(
     : num_elements_(num_elements),
       codec_(std::move(codec)),
       element_size_(0),
+      is_write_buffer_enabled_(true),
       prefix_size_(prefix_size) {
     static_assert(!is_fixed_sized, "ByteBuffer constructor for variable-size elements only.");
     InitializeForWriteBuffer(use_reserve_hint ? reserved_bytes_hint : 0);
@@ -626,7 +633,6 @@ inline void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_res
         const size_t fixed_size_total_bytes = prefix_size_ + (num_elements_ * element_size_);
         write_buffer_.clear();
         write_buffer_.resize(fixed_size_total_bytes, static_cast<uint8_t>(0));
-        is_write_buffer_initialized_ = true;
 
         // offsets_ are not used for fixed-size elements.
         offsets_.clear();
@@ -647,7 +653,6 @@ inline void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_res
     write_buffer_.clear();
     write_buffer_.resize(prefix_size_, static_cast<uint8_t>(0));
     write_buffer_.reserve(variable_size_reserved_bytes);
-    is_write_buffer_initialized_ = true;
 
     // offsets_ is initialized so the vector is fully allocated and have random-ish access during writes.
     offsets_.clear();
@@ -667,7 +672,7 @@ inline void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_res
 
 template <class Codec>
 inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t position, size_t payload_size) {
-    if (!is_write_buffer_initialized_) {
+    if (!is_write_buffer_enabled_) {
         throw InvalidInputException("Cannot GetWriteSpanForElement: write buffer is not initialized.");
     }
 
@@ -753,7 +758,7 @@ inline std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
         throw InvalidInputException("FinalizeAndTakeBuffer: write buffer has already been finalized");
     }
 
-    if (!is_write_buffer_initialized_) {
+    if (!is_write_buffer_enabled_) {
         throw InvalidInputException("FinalizeAndTakeBuffer: write buffer is not initialized");
     }
 
@@ -812,7 +817,7 @@ inline std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
     // Defrag path returns a new buffer; release the original fragmented write buffer.
     write_buffer_.clear();
     write_buffer_.shrink_to_fit();
-    is_write_buffer_initialized_ = false;
+    is_write_buffer_enabled_ = false;
     is_write_buffer_finalized_ = true;
     
     return result;
@@ -820,7 +825,9 @@ inline std::vector<uint8_t> ByteBuffer<Codec>::FinalizeAndTakeBuffer() {
 
 template <class Codec>
 inline void ByteBuffer<Codec>::RebindSpanToWriteBuffer() {
-    elements_span_ = tcb::span<const uint8_t>(write_buffer_.data(), write_buffer_.size());
+    auto write_buffer_size = write_buffer_.size();
+    elements_span_ = tcb::span<const uint8_t>(write_buffer_.data(), write_buffer_size);
+    elements_span_size_ = write_buffer_size;
 }
 
 } // namespace dbps::processing

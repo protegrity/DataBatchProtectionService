@@ -196,8 +196,8 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     constexpr bool is_fixed = TypedBuffer::is_fixed_sized;
     constexpr size_t prefix_length = is_fixed ? kFixedHeaderLength : kVariableHeaderLength;
 
-    // const size_t num_elements = 500000;     // +++++++++ input_buffer.GetNumElements();
-    const size_t num_elements = input_buffer.GetNumElements();
+    const size_t num_elements = 500000;     // +++++++++ input_buffer.GetNumElements();
+    // const size_t num_elements = input_buffer.GetNumElements();
 
     // If there are no elements, return an empty buffer with the header.
     if (num_elements == 0) {
@@ -230,10 +230,12 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
 
         auto loop_start = std::chrono::steady_clock::now();
         size_t output_index = 0;
-        tcb::span<const uint8_t> raw_bytes;
+        
+        // ++++++ Restore the while (auto rawbytes = input_buffer.ElementsIteratorNext()) {} form.
         while (true) {
             // auto t0 = std::chrono::steady_clock::now();
-            if (!input_buffer.ElementsIteratorNext(raw_bytes)) break;
+            const auto raw_bytes = input_buffer.ElementsIteratorNext();
+            if (raw_bytes.empty()) break;
             // get_raw_element_ns += ElapsedNanosecondsSince(t0);
 
             // auto t1 = std::chrono::steady_clock::now();
@@ -261,10 +263,12 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
 
         auto loop_start = std::chrono::steady_clock::now();
         size_t output_index = 0;
-        tcb::span<const uint8_t> raw_bytes;
+
+        // ++++++ Restore the while (auto rawbytes = input_buffer.ElementsIteratorNext()) {} form.
         while (true) {
             // auto t0 = std::chrono::steady_clock::now();
-            if (!input_buffer.ElementsIteratorNext(raw_bytes)) break;
+            const auto raw_bytes = input_buffer.ElementsIteratorNext();
+            if (raw_bytes.empty()) break;
             // get_raw_element_ns += ElapsedNanosecondsSince(t0);
 
             // auto t1 = std::chrono::steady_clock::now();
