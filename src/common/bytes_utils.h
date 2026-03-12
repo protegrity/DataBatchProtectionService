@@ -81,6 +81,13 @@ inline void write_u32_le_at(std::vector<uint8_t>& buf, size_t offset, uint32_t v
     buf[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
 }
 
+inline void write_u32_le(uint8_t* p, uint32_t v) {
+    p[0] = static_cast<uint8_t>(v);
+    p[1] = static_cast<uint8_t>(v >> 8);
+    p[2] = static_cast<uint8_t>(v >> 16);
+    p[3] = static_cast<uint8_t>(v >> 24);
+}
+
 inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
     return static_cast<uint32_t>(in[offset]) |
         (static_cast<uint32_t>(in[offset + 1]) << 8) |
