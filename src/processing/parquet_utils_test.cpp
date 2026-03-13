@@ -657,7 +657,7 @@ TEST(ParquetUtils, Reinterpret_INT32) {
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
 
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+        bytes, values.size(), Type::INT32, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferI32>(&result);
     ASSERT_NE(nullptr, buf);
@@ -676,7 +676,7 @@ TEST(ParquetUtils, Reinterpret_DOUBLE) {
                                reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(double));
 
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::DOUBLE, std::nullopt, Encoding::PLAIN);
+        bytes, values.size(), Type::DOUBLE, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferDouble>(&result);
     ASSERT_NE(nullptr, buf);
@@ -704,7 +704,7 @@ TEST(ParquetUtils, Reinterpret_INT96) {
     }
 
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::INT96, std::nullopt, Encoding::PLAIN);
+        bytes, expected.size(), Type::INT96, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferInt96>(&result);
     ASSERT_NE(nullptr, buf);
@@ -736,7 +736,7 @@ TEST(ParquetUtils, Reinterpret_BYTE_ARRAY) {
     }
 
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+        bytes, expected.size(), Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
     ASSERT_NE(nullptr, buf);
@@ -764,7 +764,7 @@ TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY) {
     }
 
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
+        bytes, expected.size(), Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferRawBytesFixedSized>(&result);
     ASSERT_NE(nullptr, buf);
@@ -780,28 +780,28 @@ TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY) {
 TEST(ParquetUtils, Reinterpret_UnsupportedEncoding) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::INT32, std::nullopt, Encoding::RLE),
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, 1u, Type::INT32, std::nullopt, Encoding::RLE),
         DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, Reinterpret_RLE_DICTIONARY_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03, 0x04};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::INT32, std::nullopt, Encoding::RLE_DICTIONARY),
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, 1u, Type::INT32, std::nullopt, Encoding::RLE_DICTIONARY),
         DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, Reinterpret_BOOLEAN_Throws) {
     std::vector<uint8_t> bytes = {0xB4};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, 1u, Type::BOOLEAN, std::nullopt, Encoding::PLAIN),
         DBPSUnsupportedException);
 }
 
 TEST(ParquetUtils, Reinterpret_InvalidDataSize) {
     std::vector<uint8_t> bytes = {0xAA, 0xBB, 0xCC};
     auto result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+        bytes, 1u, Type::INT32, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferI32>(&result);
     ASSERT_NE(nullptr, buf);
@@ -813,28 +813,29 @@ TEST(ParquetUtils, Reinterpret_InvalidDataSize) {
 TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_MissingLength_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, std::nullopt, Encoding::PLAIN),
+        ReinterpretValueBytesAsTypedValuesBuffer(
+            bytes, 1u, Type::FIXED_LEN_BYTE_ARRAY, std::nullopt, Encoding::PLAIN),
         InvalidInputException);
 }
 
 TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_ZeroLength_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, 0, Encoding::PLAIN),
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, 1u, Type::FIXED_LEN_BYTE_ARRAY, 0, Encoding::PLAIN),
         InvalidInputException);
 }
 
 TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY_NegativeLength_Throws) {
     std::vector<uint8_t> bytes = {0x01, 0x02, 0x03};
     EXPECT_THROW(
-        ReinterpretValueBytesAsTypedValuesBuffer(bytes, Type::FIXED_LEN_BYTE_ARRAY, -1, Encoding::PLAIN),
+        ReinterpretValueBytesAsTypedValuesBuffer(bytes, 1u, Type::FIXED_LEN_BYTE_ARRAY, -1, Encoding::PLAIN),
         InvalidInputException);
 }
 
 TEST(ParquetUtils, Reinterpret_EmptyBytes_FixedSize) {
     std::vector<uint8_t> bytes;
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::DOUBLE, std::nullopt, Encoding::PLAIN);
+        bytes, 0u, Type::DOUBLE, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferDouble>(&result);
     ASSERT_NE(nullptr, buf);
@@ -846,7 +847,7 @@ TEST(ParquetUtils, Reinterpret_EmptyBytes_FixedSize) {
 TEST(ParquetUtils, Reinterpret_EmptyBytes_VariableSize) {
     std::vector<uint8_t> bytes;
     TypedValuesBuffer result = ReinterpretValueBytesAsTypedValuesBuffer(
-        bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+        bytes, 0u, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
 
     auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
     ASSERT_NE(nullptr, buf);
@@ -866,7 +867,7 @@ TEST(ParquetUtils, RoundTrip_INT32) {
         reinterpret_cast<const uint8_t*>(values.data()) + values.size() * sizeof(int32_t));
 
     auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
-        input_bytes, Type::INT32, std::nullopt, Encoding::PLAIN);
+        input_bytes, values.size(), Type::INT32, std::nullopt, Encoding::PLAIN);
 
     auto* src = std::get_if<TypedBufferI32>(&read_buf);
     ASSERT_NE(nullptr, src);
@@ -900,7 +901,7 @@ TEST(ParquetUtils, RoundTrip_BYTE_ARRAY) {
     }
 
     auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
-        input_bytes, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+        input_bytes, payloads.size(), Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
 
     auto* src = std::get_if<TypedBufferRawBytesVariableSized>(&read_buf);
     ASSERT_NE(nullptr, src);
@@ -931,7 +932,7 @@ TEST(ParquetUtils, RoundTrip_FIXED_LEN_BYTE_ARRAY) {
     }
 
     auto read_buf = ReinterpretValueBytesAsTypedValuesBuffer(
-        input_bytes, Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
+        input_bytes, payloads.size(), Type::FIXED_LEN_BYTE_ARRAY, element_len, Encoding::PLAIN);
 
     auto* src = std::get_if<TypedBufferRawBytesFixedSized>(&read_buf);
     ASSERT_NE(nullptr, src);

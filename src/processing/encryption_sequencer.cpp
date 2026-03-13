@@ -181,7 +181,8 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
         
         // Parse value bytes into typed values buffer
         stage_start = std::chrono::steady_clock::now();
-        auto typed_buffer = ReinterpretValueBytesAsTypedValuesBuffer(value_bytes, datatype_, datatype_length_, encoding_);
+        auto typed_buffer = ReinterpretValueBytesAsTypedValuesBuffer(
+            value_bytes, num_elements, datatype_, datatype_length_, encoding_);
         parse_value_bytes_into_typed_list_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
         

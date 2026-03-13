@@ -484,7 +484,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
     EXPECT_TRUE(testValidationFailure(0, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive"));
 
     // Test valid case (should pass parameter validation)
-    DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {});
+    DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "2"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {});
     bool result = sequencer.DecodeAndEncrypt(FIXED_LEN_BYTE_ARRAY_DATA);
     
     if (!result && sequencer.error_stage_ == "parameter_validation") {

@@ -113,6 +113,7 @@ std::vector<uint8_t> CompressAndJoin(
  */
 dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
     tcb::span<const uint8_t> value_bytes,
+    size_t num_elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding);

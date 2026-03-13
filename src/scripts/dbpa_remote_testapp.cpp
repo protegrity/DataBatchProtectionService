@@ -247,7 +247,10 @@ public:
             auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             
             // Encrypt once for the combined payload
-            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
+            std::map<std::string, std::string> encoding_attributes = {
+                {"page_encoding", "PLAIN"},
+                {"page_type", "DICTIONARY_PAGE"},
+                {"dict_page_num_values", std::to_string(sample_data.size())}};
             auto encrypt_result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {

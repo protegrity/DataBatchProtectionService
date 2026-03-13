@@ -40,7 +40,7 @@ TEST(TypedBufferValuesTest, Int32_ReadBack) {
     append_i32_le(bytes, 0);
     append_i32_le(bytes, 2147483647);
 
-    TypedBufferI32 buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferI32 buffer{tcb::span<const uint8_t>(bytes), 4u};
 
     EXPECT_EQ(buffer.GetElement(0), 42);
     EXPECT_EQ(buffer.GetElement(1), -1);
@@ -67,7 +67,7 @@ TEST(TypedBufferValuesTest, Int32_WriteRoundTrip) {
     writer.SetElement(2, 30);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized), 3u};
 
     EXPECT_EQ(reader.GetElement(0), 10);
     EXPECT_EQ(reader.GetElement(1), 20);
@@ -80,7 +80,7 @@ TEST(TypedBufferValuesTest, Int32_Iterate) {
     append_i32_le(bytes, 10);
     append_i32_le(bytes, 15);
 
-    TypedBufferI32 buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferI32 buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     std::vector<int32_t> collected;
     for (const auto value : buffer) {
@@ -105,7 +105,7 @@ TEST(TypedBufferValuesTest, Int32_OutOfOrderWrite_RoundTrip) {
     writer.SetElement(2, 30);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized), 4u};
 
     EXPECT_EQ(reader.GetElement(0), 10);
     EXPECT_EQ(reader.GetElement(1), 20);
@@ -125,7 +125,7 @@ TEST(TypedBufferValuesTest, Int32_OverwriteThenRoundTrip) {
     EXPECT_EQ(writer.GetElement(1), 222);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferI32 reader{tcb::span<const uint8_t>(finalized), 2u};
 
     EXPECT_EQ(reader.GetElement(0), 999);
     EXPECT_EQ(reader.GetElement(1), 222);
@@ -159,7 +159,7 @@ TEST(TypedBufferValuesTest, Int96_ReadBack) {
     AppendInt96LE(bytes, b);
     AppendInt96LE(bytes, c);
 
-    TypedBufferInt96 buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferInt96 buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     ExpectInt96Eq(buffer.GetElement(0), a);
     ExpectInt96Eq(buffer.GetElement(1), b);
@@ -175,7 +175,7 @@ TEST(TypedBufferValuesTest, Int96_WriteRoundTrip) {
     writer.SetElement(1, b);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferInt96 reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferInt96 reader{tcb::span<const uint8_t>(finalized), 2u};
 
     ExpectInt96Eq(reader.GetElement(0), a);
     ExpectInt96Eq(reader.GetElement(1), b);
@@ -189,7 +189,7 @@ TEST(TypedBufferValuesTest, Int96_Iterate) {
     AppendInt96LE(bytes, a);
     AppendInt96LE(bytes, b);
 
-    TypedBufferInt96 buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferInt96 buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<Int96> collected;
     for (const auto value : buffer) {
@@ -212,7 +212,7 @@ TEST(TypedBufferValuesTest, Int96_OutOfOrderWrite_RoundTrip) {
     writer.SetElement(1, b);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferInt96 reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferInt96 reader{tcb::span<const uint8_t>(finalized), 3u};
 
     ExpectInt96Eq(reader.GetElement(0), a);
     ExpectInt96Eq(reader.GetElement(1), b);
@@ -229,7 +229,7 @@ TEST(TypedBufferValuesTest, Float_ReadBack) {
     append_f32_le(bytes, -0.0f);
     append_f32_le(bytes, 1.0e10f);
 
-    TypedBufferFloat buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferFloat buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     EXPECT_FLOAT_EQ(buffer.GetElement(0), 3.14f);
     EXPECT_FLOAT_EQ(buffer.GetElement(1), -0.0f);
@@ -243,7 +243,7 @@ TEST(TypedBufferValuesTest, Float_WriteRoundTrip) {
     writer.SetElement(2, 0.0f);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferFloat reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferFloat reader{tcb::span<const uint8_t>(finalized), 3u};
 
     EXPECT_FLOAT_EQ(reader.GetElement(0), 1.5f);
     EXPECT_FLOAT_EQ(reader.GetElement(1), -2.25f);
@@ -256,7 +256,7 @@ TEST(TypedBufferValuesTest, Float_Iterate) {
     append_f32_le(bytes, 2.0f);
     append_f32_le(bytes, 3.0f);
 
-    TypedBufferFloat buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferFloat buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     std::vector<float> collected;
     for (const auto value : buffer) {
@@ -284,7 +284,7 @@ TEST(TypedBufferValuesTest, Float_OutOfOrderWrite_InterleavedReads) {
     EXPECT_FLOAT_EQ(writer.GetElement(2), 99.0f);
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferFloat reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferFloat reader{tcb::span<const uint8_t>(finalized), 3u};
 
     EXPECT_FLOAT_EQ(reader.GetElement(0), 10.0f);
     EXPECT_FLOAT_EQ(reader.GetElement(1), 20.0f);
@@ -304,7 +304,7 @@ TEST(TypedBufferValuesTest, StringFixedSized_ReadBack) {
     };
 
     TypedBufferStringFixedSized buffer(
-        tcb::span<const uint8_t>(bytes), 0, StringFixedSizedCodec{4});
+        tcb::span<const uint8_t>(bytes), 3u, 0u, StringFixedSizedCodec{4});
 
     EXPECT_EQ(buffer.GetElement(0), "ABCD");
     EXPECT_EQ(buffer.GetElement(1), "EFGH");
@@ -320,7 +320,7 @@ TEST(TypedBufferValuesTest, StringFixedSized_WriteRoundTrip) {
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
     TypedBufferStringFixedSized reader(
-        tcb::span<const uint8_t>(finalized), 0, StringFixedSizedCodec{4});
+        tcb::span<const uint8_t>(finalized), 3u, 0u, StringFixedSizedCodec{4});
 
     EXPECT_EQ(reader.GetElement(0), "AAAA");
     EXPECT_EQ(reader.GetElement(1), "BBBB");
@@ -334,7 +334,7 @@ TEST(TypedBufferValuesTest, StringFixedSized_Iterate) {
     };
 
     TypedBufferStringFixedSized buffer(
-        tcb::span<const uint8_t>(bytes), 0, StringFixedSizedCodec{4});
+        tcb::span<const uint8_t>(bytes), 2u, 0u, StringFixedSizedCodec{4});
 
     std::vector<std::string> collected;
     for (const auto value : buffer) {
@@ -361,7 +361,7 @@ TEST(TypedBufferValuesTest, StringFixedSized_OutOfOrderWrite_RoundTrip) {
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
     TypedBufferStringFixedSized reader(
-        tcb::span<const uint8_t>(finalized), 0, StringFixedSizedCodec{3});
+        tcb::span<const uint8_t>(finalized), 3u, 0u, StringFixedSizedCodec{3});
 
     EXPECT_EQ(reader.GetElement(0), "ZZZ");
     EXPECT_EQ(reader.GetElement(1), "BBB");
@@ -384,7 +384,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_ReadBack) {
     append_u32_le(bytes, 6u);
     bytes.insert(bytes.end(), {'W', 'o', 'r', 'l', 'd', '!'});
 
-    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     EXPECT_EQ(buffer.GetElement(0), "Hello");
     EXPECT_EQ(buffer.GetElement(1), "World!");
@@ -398,7 +398,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_WriteRoundTrip) {
     writer.SetElement(2, std::string_view("x"));
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized), 3u};
 
     EXPECT_EQ(reader.GetElement(0), "short");
     EXPECT_EQ(reader.GetElement(1), "a longer string value");
@@ -412,7 +412,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_Iterate) {
     append_u32_le(bytes, 6u);
     bytes.insert(bytes.end(), {'b', 'a', 'r', 'b', 'a', 'z'});
 
-    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<std::string> collected;
     for (const auto value : buffer) {
@@ -439,7 +439,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_OutOfOrderWrite_RoundTrip) {
     EXPECT_EQ(writer.GetElement(0), "replaced");
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized), 3u};
 
     EXPECT_EQ(reader.GetElement(0), "replaced");
     EXPECT_EQ(reader.GetElement(1), "second");
@@ -459,7 +459,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_EmptyStringsMixedWithNonEmpty) {
     writer.SetElement(4, std::string_view(""));
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized), 8u};
 
     EXPECT_EQ(reader.GetElement(0), "");
     EXPECT_EQ(reader.GetElement(0).size(), 0u);
@@ -512,7 +512,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_UTF8_ReadBack) {
     append_u32_le(bytes, static_cast<uint32_t>(emojis.size()));
     bytes.insert(bytes.end(), emojis.begin(), emojis.end());
 
-    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes)};
+    TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     EXPECT_EQ(buffer.GetElement(0), "Привет");
     EXPECT_EQ(buffer.GetElement(1), "مرحبا");
@@ -528,7 +528,7 @@ TEST(TypedBufferValuesTest, StringVariableSized_UTF8_WriteRoundTrip) {
     writer.SetElement(3, std::string_view("Ελληνικά"));
 
     std::vector<uint8_t> finalized = writer.FinalizeAndTakeBuffer();
-    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized)};
+    TypedBufferStringVariableSized reader{tcb::span<const uint8_t>(finalized), 4u};
 
     EXPECT_EQ(reader.GetElement(0), "Héllo Wörld");
     EXPECT_EQ(reader.GetElement(1), "中文测试");
@@ -547,7 +547,7 @@ TEST(TypedBufferValuesTest, TypedValuesBufferToString_BasicUsage) {
     append_i32_le(i32_bytes, -1);
     append_i32_le(i32_bytes, 100);
 
-    TypedValuesBuffer i32_variant = TypedBufferI32{tcb::span<const uint8_t>(i32_bytes)};
+    TypedValuesBuffer i32_variant = TypedBufferI32{tcb::span<const uint8_t>(i32_bytes), 3u};
     std::string i32_str = PrintableTypedValuesBuffer(i32_variant);
 
     EXPECT_NE(i32_str.find("INT32"), std::string::npos);
@@ -561,7 +561,7 @@ TEST(TypedBufferValuesTest, TypedValuesBufferToString_BasicUsage) {
     append_f32_le(float_bytes, 3.14f);
     append_f32_le(float_bytes, -0.5f);
 
-    TypedValuesBuffer float_variant = TypedBufferFloat{tcb::span<const uint8_t>(float_bytes)};
+    TypedValuesBuffer float_variant = TypedBufferFloat{tcb::span<const uint8_t>(float_bytes), 2u};
     std::string float_str = PrintableTypedValuesBuffer(float_variant);
 
     EXPECT_NE(float_str.find("FLOAT"), std::string::npos);
@@ -577,7 +577,7 @@ TEST(TypedBufferValuesTest, TypedValuesBufferToString_BasicUsage) {
 
     std::vector<uint8_t> raw_finalized = writer.FinalizeAndTakeBuffer();
     TypedValuesBuffer raw_variant =
-        TypedBufferRawBytesVariableSized{tcb::span<const uint8_t>(raw_finalized)};
+        TypedBufferRawBytesVariableSized{tcb::span<const uint8_t>(raw_finalized), 2u};
     std::string raw_str = PrintableTypedValuesBuffer(raw_variant);
 
     EXPECT_NE(raw_str.find("raw bytes (variable-length)"), std::string::npos);

@@ -47,6 +47,7 @@ public:
     // Elements are stored contiguously in the span.
     ByteBuffer(
         tcb::span<const uint8_t> elements_span,
+        size_t num_elements,
         size_t prefix_size = 0,
         Codec codec = Codec{});
 
@@ -72,11 +73,9 @@ public:
     void SetRawElement(size_t position, tcb::span<const uint8_t> raw);
 
     // Getters for immediately available properties.
+    size_t GetNumElements() const { return num_elements_; }
+    size_t GetElementSize() const { return element_size_; }
     size_t GetRawBufferSize() const { return elements_span_size_; }
-    size_t GetElementSize() const { return codec_.element_size(); }
-
-    // Get the number of elements in the buffer.
-    size_t GetNumElements() const;
 
     // Finalizes the write path and transfers the resulting buffer ownership.
     std::vector<uint8_t> FinalizeAndTakeBuffer();
@@ -138,9 +137,6 @@ protected:
     // Helper for reserve heuristics in variable-size parsing.
     static size_t EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes);
 
-    // Helper for calculating the offset of an element by position.
-    size_t CalculateOffsetOfElement(size_t position) const;
-
     // ++++ Needed after deprecating std iterators?
     // Helper to validate the preconditions for reading the buffer with an iterator.
     void ValidateIteratorReadPreconditions() const;
@@ -151,7 +147,7 @@ protected:
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
     size_t elements_span_size_;
-    mutable size_t num_elements_;
+    const size_t num_elements_;
     Codec codec_;
 
     // Variables for element span iterator.
@@ -160,8 +156,8 @@ protected:
     mutable size_t element_iterator_count_ = 0;
 
     // Variables for determining offset of elements.
-    size_t prefix_size_ = 0;
-    size_t element_size_;                   // for fixed-size elements
+    const size_t prefix_size_ = 0;
+    const size_t element_size_;             // for fixed-size elements
     mutable std::vector<size_t> offsets_;   // for variable-size elements
 
     // Variables for write buffer.
@@ -176,6 +172,7 @@ private:
     // Initialization methods and flags for read-only buffer
     void InitializeFromSpan() const;
     void EnsureInitializedFromSpan() const;
+    static size_t InitElementSize(const Codec& codec);
     mutable bool is_initialized_from_span_ = false;
 
     // Initialization methods and flags for write buffer
@@ -203,26 +200,34 @@ inline size_t ReadSizeAt(tcb::span<const uint8_t> bytes, size_t offset) {
 template <class Codec>
 ByteBuffer<Codec>::ByteBuffer(
     tcb::span<const uint8_t> elements_span,
+    size_t num_elements,
     size_t prefix_size,
     Codec codec)
     : elements_span_(elements_span),
       elements_span_size_(elements_span.size()),
-      element_iterator_current_ptr_(elements_span.data()),
-      element_iterator_end_ptr_(elements_span.data() + elements_span.size()),
-      element_iterator_count_(0),
-      num_elements_(kUnsetSize),
+      num_elements_(num_elements),
       codec_(std::move(codec)),
-      element_size_(0),
+      element_iterator_current_ptr_(
+          elements_span.data() + std::min(prefix_size, elements_span_size_)),
+      element_iterator_end_ptr_(elements_span.data() + elements_span_size_),
+      element_iterator_count_(0),
       prefix_size_(prefix_size),
+      element_size_(InitElementSize(codec_)),
       is_write_buffer_enabled_(false),
-      is_initialized_from_span_(false) {
+      is_initialized_from_span_(false) {}
+
+// Initialize element size based on the codec. Wrapper just needed for readability, all resolves in compile-time.
+template <class Codec>
+inline size_t ByteBuffer<Codec>::InitElementSize(const Codec& codec) {
     if constexpr (is_fixed_sized) {
-        element_size_ = codec_.element_size();
+        return codec.element_size();
     }
+    // For variable-size elements, element size is undefined.
+    return kUnsetSize;
 }
 
-// Initializes `num_elements_` and `offsets_` from the span.
-// Called in a lazy manner when the buffer is accessed with GetElement or GetNumElements, avoiding unnecessary initialization.
+// Initializes `offsets_` from the span.
+// Called in a lazy manner when the buffer is accessed with GetElement[i] avoiding unnecessary initialization.
 template <class Codec>
 inline void ByteBuffer<Codec>::InitializeFromSpan() const {
     if (elements_span_size_ < prefix_size_) {
@@ -233,7 +238,6 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
 
     // No elements to index. Initialize with empty values.
     if (readable_size == 0) {
-        num_elements_ = 0;
         offsets_.clear();
         is_initialized_from_span_ = true;
         return;
@@ -248,12 +252,13 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
         if ((readable_size % element_size_) != 0) {
             throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
         }
-        num_elements_ = readable_size / element_size_;
-        const size_t expected_payload_bytes = num_elements_ * element_size_;
-        if (expected_payload_bytes != readable_size) {
-            throw InvalidInputException(
-                "Malformed fixed-size buffer: computed payload size does not match readable size");
+
+        // Check if the num_elements passed at contruction time coincides with the calculated from the payload size.
+        const size_t num_elements_on_payload = readable_size / element_size_;
+        if (num_elements_on_payload != num_elements_) {
+            throw InvalidInputException("Malformed fixed-size buffer: num_elements on payload != num_elements_ expected.");
         }
+
         offsets_.clear();
         is_initialized_from_span_ = true;
         return;
@@ -262,7 +267,7 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
     // Variable-size layout stores [u32 size][element value] back-to-back.
     // Single pass validates shape and captures per-element prefix offsets.
     offsets_.clear();
-    offsets_.reserve(EstimateOffsetsReserveCountFromSample(elements_span_.subspan(prefix_size_)));
+    offsets_.reserve(num_elements_);
     size_t cursor = prefix_size_;
     while (cursor < elements_span_size_) {
         if (elements_span_size_ - cursor < kSizePrefixBytes) {
@@ -276,7 +281,13 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
         }
         cursor += current_element_size;
     }
-    num_elements_ = offsets_.size();
+
+    // Check if the num_elements passed at contruction time coincides with the calculated from the payload size.
+    const size_t num_elements_on_payload = offsets_.size();
+    if (num_elements_on_payload != num_elements_) {
+        throw InvalidInputException("Malformed variable-size buffer: num_elements on payload != num_elements_ expected.");
+    }
+
     is_initialized_from_span_ = true;
 }
 
@@ -293,19 +304,8 @@ inline void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
     InitializeFromSpan();
 }
 
-// For read-only buffers, gets the number of elements in the buffer and sets num_elements_ if not already set.
-// A lighter version to only get num_elements_ and avoid calling InitializeFromSpan that also builds offsets_.
-template <class Codec>
-inline size_t ByteBuffer<Codec>::GetNumElements() const {
-    if (num_elements_ != kUnsetSize) {
-        return num_elements_;
-    }
-
-    // If the buffer is not initialized, initialize it from the span.
-    EnsureInitializedFromSpan();
-    return num_elements_;
-}
-
+// ++++++ PROBABLY DEPRECATED NOW. MAY LEAVE IT FOR FUTURE USAGE. MARKE IT AS SO +++++++++
+// - Since num_elements_ is now known/an invariant, we no longer need this pretty method (sadly).
 template <class Codec>
 inline size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
     if (bytes.empty())
@@ -354,25 +354,15 @@ inline size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span
 // -----------------------------------------------------------------------------
 
 template <class Codec>
-inline size_t ByteBuffer<Codec>::CalculateOffsetOfElement(size_t position) const {
-    EnsureInitializedFromSpan();
-    if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during CalculateOffsetOfElement");
-    }
-    if constexpr (is_fixed_sized) {
-        return prefix_size_ + (position * element_size_);
-    }
-    return offsets_[position];
-}
-
-template <class Codec>
 inline tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const {
     EnsureInitializedFromSpan();
     
     // For fixed-size elements are stored contiguously.
     if constexpr (is_fixed_sized) {
         if (position >= num_elements_) {
-            throw InvalidInputException("Element position out of range during GetRawElement");
+            throw InvalidInputException(
+                "Element index out of bounds during GetRawElement: index=" + std::to_string(position) +
+                " size=" + std::to_string(num_elements_));
         }
         const size_t offset = prefix_size_ + (position * element_size_);
         return elements_span_.subspan(offset, element_size_);
@@ -380,7 +370,9 @@ inline tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position
 
     // For variable-size elements, we need to read the size first [u32 size][element].
     if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during GetRawElement");
+        throw InvalidInputException(
+            "Element index out of bounds during GetRawElement: index=" + std::to_string(position) +
+            " size=" + std::to_string(num_elements_));
     }
     const size_t offset = offsets_[position];
     if (offset == kUnsetSize) {
@@ -407,16 +399,25 @@ inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size
 // Element span iterator  --  The streamlined version of the iterator.
 // -----------------------------------------------------------------------------
 
-// ++++++ Add validation that this is only used for read-only buffers.
+
 template <class Codec>
 inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const {
+
+    // Check that this is only used for read-only buffers.
+    if (is_write_buffer_enabled_) {
+        throw InvalidInputException("ElementsIteratorNext is only defined for read-only buffers");
+    }
+    if (elements_span_size_ < prefix_size_) {
+        throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
+    }
+
+    // If the last element was consumed, check that the number of elements iterated matches the number of elements expected.
     if (element_iterator_current_ptr_ == element_iterator_end_ptr_) {
-        // ++++++++ RESTORE THIS WHEN WE POPULATE ALWAYS THE num_elements_ FIELD FROM PARQUET DIRECTLY.
-        // if (element_iterator_count_ != num_elements_) {
-        //     throw InvalidInputException(std::string("Malformed buffer: element iterator count does not match num_elements. ")
-        //     + "element_iterator_count_=" + std::to_string(element_iterator_count_) + ", "
-        //     + "num_elements_=" + std::to_string(num_elements_));
-        // }
+        if (element_iterator_count_ != num_elements_) {
+            throw InvalidInputException(
+                "Malformed buffer: iterator count mismatch: actual=" + std::to_string(element_iterator_count_) +
+                " expected=" + std::to_string(num_elements_));
+        }
         raw_bytes = {};
         return false;
     }
@@ -462,6 +463,7 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ra
 
 
 
+// ++++++++++++++ STL ITERATORS ARE DEPRECATED.  REMOVE THIS CODE. ++++++++++++++
 
 // -----------------------------------------------------------------------------
 // Element span iterator
@@ -591,6 +593,22 @@ inline typename ByteBuffer<Codec>::RawElementsView ByteBuffer<Codec>::raw_elemen
     return RawElementsView{this};
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // -----------------------------------------------------------------------------
 // Constructors and initializers for write buffer
 // -----------------------------------------------------------------------------
@@ -603,11 +621,10 @@ ByteBuffer<Codec>::ByteBuffer(
     Codec codec)
     : num_elements_(num_elements),
       codec_(std::move(codec)),
-      element_size_(0),
-      is_write_buffer_enabled_(true),
-      prefix_size_(prefix_size) {
+      prefix_size_(prefix_size),
+      element_size_(InitElementSize(codec_)),
+      is_write_buffer_enabled_(true) {
     static_assert(is_fixed_sized, "ByteBuffer constructor for fixed-size elements only.");
-    element_size_ = codec_.element_size();
     InitializeForWriteBuffer(0);
 }
 
@@ -621,9 +638,9 @@ ByteBuffer<Codec>::ByteBuffer(
     Codec codec)
     : num_elements_(num_elements),
       codec_(std::move(codec)),
-      element_size_(0),
-      is_write_buffer_enabled_(true),
-      prefix_size_(prefix_size) {
+      prefix_size_(prefix_size),
+      element_size_(InitElementSize(codec_)),
+      is_write_buffer_enabled_(true) {
     static_assert(!is_fixed_sized, "ByteBuffer constructor for variable-size elements only.");
     InitializeForWriteBuffer(use_reserve_hint ? reserved_bytes_hint : 0);
 }
@@ -690,8 +707,9 @@ inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t po
     }
 
     if (position >= num_elements_) {
-        throw InvalidInputException(std::string("Element position out of range during GetWriteSpanForElement: ") +
-            "position=" + std::to_string(position) + " num_elements_=" + std::to_string(num_elements_));
+        throw InvalidInputException(
+            "Element index out of bounds during GetWriteSpanForElement: index=" + std::to_string(position) +
+            " size=" + std::to_string(num_elements_));
     }
 
     // For fixed-size elements, we write directly at the fixed offset. No need to re-bind the span.

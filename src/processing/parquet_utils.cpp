@@ -390,7 +390,9 @@ std::vector<uint8_t> CompressAndJoin(
 // Public functions to build Parquet formatted value bytes into TypedValuesBuffer
 // -----------------------------------------------------------------------------
 
-TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8_t> value_bytes,
+TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
+    tcb::span<const uint8_t> value_bytes,
+    size_t num_elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding) {
@@ -414,24 +416,24 @@ TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8
 
     switch (datatype) {
         case Type::INT32:
-            return TypedBufferI32{value_bytes};
+            return TypedBufferI32{value_bytes, num_elements};
         case Type::INT64:
-            return TypedBufferI64{value_bytes};
+            return TypedBufferI64{value_bytes, num_elements};
         case Type::FLOAT:
-            return TypedBufferFloat{value_bytes};
+            return TypedBufferFloat{value_bytes, num_elements};
         case Type::DOUBLE:
-            return TypedBufferDouble{value_bytes};
+            return TypedBufferDouble{value_bytes, num_elements};
         case Type::INT96:
-            return TypedBufferInt96{value_bytes};
+            return TypedBufferInt96{value_bytes, num_elements};
         case Type::FIXED_LEN_BYTE_ARRAY: {
             if (!datatype_length.has_value() || datatype_length.value() <= 0) {
                 throw InvalidInputException("FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
             }
             return TypedBufferRawBytesFixedSized{
-                value_bytes, 0, RawBytesFixedSizedCodec{static_cast<size_t>(datatype_length.value())}};
+                value_bytes, num_elements, 0, RawBytesFixedSizedCodec{static_cast<size_t>(datatype_length.value())}};
         }
         case Type::BYTE_ARRAY:
-            return TypedBufferRawBytesVariableSized{value_bytes};
+            return TypedBufferRawBytesVariableSized{value_bytes, num_elements};
         default:
             throw InvalidInputException(
                 "Invalid datatype: " + std::string(to_string(datatype)));

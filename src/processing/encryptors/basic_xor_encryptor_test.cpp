@@ -71,7 +71,7 @@ TEST(BasicXorEncryptor, EncryptDecryptValueList_RoundTrip_INT32) {
     // re-wrap bytes as a read buffer to match production read path behavior.
     std::vector<uint8_t> input_buffer_bytes = input_buffer_write.FinalizeAndTakeBuffer();
     const auto input_span = tcb::span<const uint8_t>(input_buffer_bytes.data(), input_buffer_bytes.size());
-    TypedBufferI32 input_buffer_read{input_span};
+    TypedBufferI32 input_buffer_read{input_span, values.size()};
     TypedValuesBuffer typed_buffer = std::move(input_buffer_read);
 
     std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_buffer);
@@ -99,7 +99,7 @@ TEST(BasicXorEncryptor, EncryptDecryptValueList_RoundTrip_DOUBLE) {
     // re-wrap bytes as a read buffer to match production read path behavior.
     std::vector<uint8_t> input_buffer_bytes = input_buffer_write.FinalizeAndTakeBuffer();
     const auto input_span = tcb::span<const uint8_t>(input_buffer_bytes.data(), input_buffer_bytes.size());
-    TypedBufferDouble input_buffer_read{input_span};
+    TypedBufferDouble input_buffer_read{input_span, values.size()};
     TypedValuesBuffer typed_buffer = std::move(input_buffer_read);
 
     std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_buffer);
@@ -149,7 +149,7 @@ TEST(BasicXorEncryptor, EncryptDecryptValueList_RoundTrip_BYTE_ARRAY) {
     // re-wrap bytes as a read buffer to match production read path behavior.
     std::vector<uint8_t> input_buffer_bytes = input_buffer_write.FinalizeAndTakeBuffer();
     const auto input_span = tcb::span<const uint8_t>(input_buffer_bytes.data(), input_buffer_bytes.size());
-    TypedBufferRawBytesVariableSized input_buffer_read{input_span};
+    TypedBufferRawBytesVariableSized input_buffer_read{input_span, values.size()};
     TypedValuesBuffer typed_buffer = std::move(input_buffer_read);
 
     std::vector<uint8_t> encrypted_blob = encryptor.EncryptValueList(typed_buffer);
