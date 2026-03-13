@@ -279,10 +279,21 @@ TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedCanonical_0to7_88
     // Canonical example from Parquet Encodings.md:
     // values 0..7 with bit_width=3 are packed as bytes 0x88, 0xC6, 0xFA.
     // Bit-packed header for one group of 8 values is varint((1 << 1) | 1) = 0x03.
+    //
+    // Important detail: decoder bit_width is derived from max_def_level at runtime.
+    // So this payload is valid only when max_def_level implies bit_width=3 (e.g. 7).
+    // Reusing these same bytes with max_def_level=3 (bit_width=2) is a different
+    // encoding contract and can leave unread trailing bytes by design.
     std::vector<uint8_t> def_payload = {0x03, 0x88, 0xC6, 0xFA};
 
     EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 7));  // only value 7
-    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 3));  // only value 3
+
+    // Separate bit_width=2 payload for max_def_level=3.
+    // This keeps payload bit-width consistent with decoder configuration and
+    // avoids mixing a 3-bit packed stream with a 2-bit decode expectation.
+    std::vector<uint32_t> levels_bw2 = {0, 1, 2, 3, 0, 1, 2, 0};  // one value at level 3
+    auto def_payload_bw2 = MakeBitPackedDefPayload(levels_bw2, 2);
+    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload_bw2, 8, 3));
 }
 
 TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_RleRunLen4_Level1) {
@@ -336,6 +347,31 @@ TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsZeroBitPackedGroups
     // Header 1 means bit-packed with num_groups = 0, which is invalid.
     std::vector<uint8_t> def_payload = {0x01};
     EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedFinalRunAllowsPadding) {
+    // Corner case: a final bit-packed run is encoded as a full 8-value group,
+    // while logical num_values ends mid-group. Decode only the logical values
+    // and ignore padded trailing values in the last group.
+    // Payload: header=0x03 (1 bit-packed group => 8 values), packed=0x07 (bits 1,1,1,0,0,0,0,0).
+    std::vector<uint8_t> def_payload = {0x03, 0x07};
+    EXPECT_EQ(3u, CountPresentFromDefinitionLevelsV1(def_payload, 3, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsTrailingBytesAfterDecoding) {
+    // One full bit-packed group (8 values) plus extra trailing byte that must be rejected.
+    std::vector<uint8_t> def_payload = {0x03, 0xAA, 0xFF};
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsNonPositiveMaxDefLevel) {
+    auto def_payload = MakeRleDefPayload(1, 0, 1);
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 0), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsNegativeNumValues) {
+    auto def_payload = MakeRleDefPayload(1, 1, 1);
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, -1, 1), InvalidInputException);
 }
 
 // -----------------------------------------------------------------------------

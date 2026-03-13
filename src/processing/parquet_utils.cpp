@@ -76,10 +76,22 @@ uint32_t ReadV1RunHeaderUleb128(tcb::span<const uint8_t> bytes, size_t& offset) 
 // - present_count = number of decoded definition levels equal to max_def_level.
 //
 size_t CountPresentFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, int32_t num_values, int32_t max_def_level) {
+    if (num_values < 0) {
+        throw InvalidInputException("Invalid V1 definition levels: num_values must be non-negative, got " + 
+            std::to_string(num_values));
+    }
+    if (max_def_level <= 0) {
+        throw InvalidInputException("Invalid V1 definition levels: max_def_level must be positive, got " + 
+            std::to_string(max_def_level));
+    }
+
     // Definition level bit width is ceil(log2(max_def_level + 1)).
+    // Computes the minimum number of bits needed to represent definition levels from 0..max_def_level.
     int bit_width = 0;
-    while ((1u << bit_width) <= static_cast<uint32_t>(max_def_level)) {
+    uint32_t def_level_domain = static_cast<uint32_t>(max_def_level);
+    while (def_level_domain > 0) {
         ++bit_width;
+        def_level_domain >>= 1;
     }
     if (bit_width <= 0) {
         throw InvalidInputException("Invalid V1 definition levels: computed bit_width must be positive");
@@ -124,7 +136,7 @@ size_t CountPresentFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, 
             const size_t num_groups = static_cast<size_t>(header >> 1);
             const size_t run_len = num_groups * 8;
             const size_t remaining = static_cast<size_t>(num_values) - decoded_values;
-            if (num_groups == 0 || run_len > remaining) {
+            if (num_groups == 0) {
                 throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: invalid bit-packed run length");
             }
 
@@ -148,7 +160,10 @@ size_t CountPresentFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, 
                 return v;
             };
 
-            for (size_t i = 0; i < run_len; ++i) {
+            // A final bit-packed run may include padded trailing values to complete
+            // 8-value groups. Decode only the logical values still remaining.
+            const size_t values_to_decode = std::min(run_len, remaining);
+            for (size_t i = 0; i < values_to_decode; ++i) {
                 uint32_t level = ReadPacked(i * static_cast<size_t>(bit_width));
                 if (level > static_cast<uint32_t>(max_def_level)) {
                     throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: decoded level exceeds max_def_level");
@@ -157,8 +172,11 @@ size_t CountPresentFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, 
                     ++present_count;
                 }
             }
-            decoded_values += run_len;
+            decoded_values += values_to_decode;
         }
+    }
+    if (def_offset != def_payload.size()) {
+        throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: trailing bytes after decoding");
     }
     return present_count;
 }
