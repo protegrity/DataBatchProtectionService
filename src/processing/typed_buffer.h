@@ -21,7 +21,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <limits>
 #include <vector>
 
@@ -65,6 +64,11 @@ public:
         size_t prefix_size = 0,
         Codec codec = Codec{});
 
+    // Getters for immediately available properties.
+    size_t GetNumElements() const { return num_elements_; }
+    size_t GetElementSize() const { return element_size_; }
+    size_t GetRawBufferSize() const { return elements_span_size_; }
+
     // Get and set elements by position with type access from Codec
     value_type GetElement(size_t position) const;
     tcb::span<const uint8_t> GetRawElement(size_t position) const;
@@ -72,74 +76,15 @@ public:
     void SetElement(size_t position, const value_type& element);
     void SetRawElement(size_t position, tcb::span<const uint8_t> raw);
 
-    // Getters for immediately available properties.
-    size_t GetNumElements() const { return num_elements_; }
-    size_t GetElementSize() const { return element_size_; }
-    size_t GetRawBufferSize() const { return elements_span_size_; }
+    // Iterator for read-only elements returning raw bytes.
+    bool ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const;
 
     // Finalizes the write path and transfers the resulting buffer ownership.
     std::vector<uint8_t> FinalizeAndTakeBuffer();
 
-    // Iterator for read-only elements returning raw bytes.
-    bool ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const;
-
-    // Iterator for read-only elements returning a `value_type`
-    class ConstIterator {
-        public:
-            // Iterator traits consumed indirectly by STL iterator machinery.
-            using iterator_category = std::forward_iterator_tag;
-            using value_type = typename ByteBuffer::value_type;
-            using difference_type = std::ptrdiff_t;
-            using pointer = void;
-            using reference = value_type;
-    
-            // Basic forward-iterator operations over encoded elements in elements_span_.
-            ConstIterator(const ByteBuffer* buffer, size_t cursor_offset);
-            value_type operator*() const;
-            ConstIterator& operator++();
-            bool operator==(const ConstIterator& other) const;
-            bool operator!=(const ConstIterator& other) const;
-    
-        protected:
-            size_t ReadAndValidateVariableElementSizeAtCursor() const;
-            tcb::span<const uint8_t> RawSpanAtCursor() const;
-
-            const ByteBuffer* buffer_ = nullptr;
-            size_t cursor_offset_ = 0;
-            size_t elements_span_size_ = 0;
-            mutable size_t current_element_size_ = 0;
-        };
-    // Methods used by the STL iterator machinery to iterate over the buffer.
-    ConstIterator begin() const;
-    ConstIterator end() const;
-
-    // Iterator for read-only elements returning raw bytes.
-    // Subclass of ConstIterator that only overrides operator* to return raw spans.
-    class ConstRawIterator : public ConstIterator {
-    public:
-        using iterator_category = std::forward_iterator_tag;
-        using value_type = tcb::span<const uint8_t>;
-        using difference_type = std::ptrdiff_t;
-        using pointer = void;
-        using reference = value_type;
-
-        using ConstIterator::ConstIterator;
-        tcb::span<const uint8_t> operator*() const;
-    };
-    struct RawElementsView {
-        const ByteBuffer* buffer;
-        ConstRawIterator begin() const { return ConstRawIterator(buffer, buffer->prefix_size_); }
-        ConstRawIterator end() const { return ConstRawIterator(buffer, buffer->elements_span_.size()); }
-    };
-    RawElementsView raw_elements() const;
-
 protected:
     // Helper for reserve heuristics in variable-size parsing.
     static size_t EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes);
-
-    // ++++ Needed after deprecating std iterators?
-    // Helper to validate the preconditions for reading the buffer with an iterator.
-    void ValidateIteratorReadPreconditions() const;
 
     // Helper to get a writable span for an element during SetElement calls.
     tcb::span<uint8_t> GetWritableSpanForElement(size_t position, size_t payload_size);
@@ -172,8 +117,8 @@ private:
     // Initialization methods and flags for read-only buffer
     void InitializeFromSpan() const;
     void EnsureInitializedFromSpan() const;
-    static size_t InitElementSize(const Codec& codec);
     mutable bool is_initialized_from_span_ = false;
+    static size_t InitElementSize(const Codec& codec);
 
     // Initialization methods and flags for write buffer
     void InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint);
@@ -304,8 +249,15 @@ inline void ByteBuffer<Codec>::EnsureInitializedFromSpan() const {
     InitializeFromSpan();
 }
 
-// ++++++ PROBABLY DEPRECATED NOW. MAY LEAVE IT FOR FUTURE USAGE. MARKE IT AS SO +++++++++
-// - Since num_elements_ is now known/an invariant, we no longer need this pretty method (sadly).
+// -----------------------------------------------------------------------------
+// EstimateOffsetsReserveCountFromSample method
+//
+// - Reference method for estimating the number of elements in a span.
+// - Since num_elements_ is now known and is an invariant, this method is no longer in the active codepath.
+// - Nonetheless it captures a useful heuristic for estimating the number of elements in a span from
+//   the payload for future reference.
+// -----------------------------------------------------------------------------
+
 template <class Codec>
 inline size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span<const uint8_t> bytes) {
     if (bytes.empty())
@@ -354,6 +306,11 @@ inline size_t ByteBuffer<Codec>::EstimateOffsetsReserveCountFromSample(tcb::span
 // -----------------------------------------------------------------------------
 
 template <class Codec>
+inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t position) const {
+    return codec_.Decode(GetRawElement(position));
+}
+
+template <class Codec>
 inline tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position) const {
     EnsureInitializedFromSpan();
     
@@ -382,23 +339,9 @@ inline tcb::span<const uint8_t> ByteBuffer<Codec>::GetRawElement(size_t position
     return elements_span_.subspan(offset + kSizePrefixBytes, element_size);
 }
 
-template <class Codec>
-inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size_t position) const {
-    return codec_.Decode(GetRawElement(position));
-}
-
-
-
-
-
-
-
-
-
 // -----------------------------------------------------------------------------
-// Element span iterator  --  The streamlined version of the iterator.
+// Element span iterator
 // -----------------------------------------------------------------------------
-
 
 template <class Codec>
 inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const {
@@ -454,161 +397,6 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ra
     return true;
 }
 
-
-
-
-
-
-
-
-
-
-// ++++++++++++++ STL ITERATORS ARE DEPRECATED.  REMOVE THIS CODE. ++++++++++++++
-
-// -----------------------------------------------------------------------------
-// Element span iterator
-//
-// Allows an alternative read of elements_span_ without need for lazy initialization of offsets_,
-// so saving execution time when the traversal of the buffer is strictly sequential.
-// This is the most common behavior when reading elements in single threaded mode.
-// -----------------------------------------------------------------------------
-
-template <class Codec>
-inline ByteBuffer<Codec>::ConstIterator::ConstIterator(const ByteBuffer<Codec>* buffer, size_t cursor_offset)
-    : buffer_(buffer),
-      cursor_offset_(cursor_offset),
-      elements_span_size_(buffer != nullptr ? buffer->elements_span_size_ : 0u),
-      current_element_size_(kUnsetSize) {}
-
-template <class Codec>
-inline size_t ByteBuffer<Codec>::ConstIterator::ReadAndValidateVariableElementSizeAtCursor() const {
-    // Fixed-sized buffers should not call this method.
-    if constexpr (is_fixed_sized) {
-        throw InvalidInputException("ReadAndValidateVariableElementSizeAtCursor is not valid for fixed-size codecs");
-    }
-
-    // If the current element size has already been read, return it.
-    if (current_element_size_ != kUnsetSize) {
-        return current_element_size_;
-    }
-
-    // Read the current element size and save it to current_element_size_ cached variable.
-    if ((elements_span_size_ - cursor_offset_) < kSizePrefixBytes) {
-        throw InvalidInputException("Malformed variable-size buffer: truncated length prefix");
-    }
-    const size_t current_element_size = ReadSizeAt(buffer_->elements_span_, cursor_offset_);
-    const size_t payload_offset = cursor_offset_ + kSizePrefixBytes;
-    if ((elements_span_size_ - payload_offset) < current_element_size) {
-        throw InvalidInputException("Malformed variable-size buffer: truncated element payload");
-    }
-    current_element_size_ = current_element_size;
-    return current_element_size_;
-}
-
-template <class Codec>
-inline tcb::span<const uint8_t> ByteBuffer<Codec>::ConstIterator::RawSpanAtCursor() const {
-    if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
-        throw InvalidInputException("Cannot dereference ByteBuffer iterator at end position");
-    }
-    if constexpr (is_fixed_sized) {
-        return buffer_->elements_span_.subspan(cursor_offset_, buffer_->element_size_);
-    }
-    const size_t current_element_size = ReadAndValidateVariableElementSizeAtCursor();
-    const size_t payload_offset = cursor_offset_ + kSizePrefixBytes;
-    return buffer_->elements_span_.subspan(payload_offset, current_element_size);
-}
-
-template <class Codec>
-inline typename ByteBuffer<Codec>::ConstIterator::value_type ByteBuffer<Codec>::ConstIterator::operator*() const {
-    // Decode converts raw bytes into the codec's value_type (e.g. int32_t, float, string_view).
-    // This keeps the iterator's return type consistent with GetElement across all codecs.
-    return buffer_->codec_.Decode(RawSpanAtCursor());
-}
-
-template <class Codec>
-inline typename ByteBuffer<Codec>::ConstIterator& ByteBuffer<Codec>::ConstIterator::operator++() {
-    if (buffer_ == nullptr || cursor_offset_ >= elements_span_size_) {
-        return *this;
-    }
-    if constexpr (is_fixed_sized) {
-        cursor_offset_ += buffer_->element_size_;
-        return *this;
-    }
-    const size_t current_element_size = ReadAndValidateVariableElementSizeAtCursor();
-    cursor_offset_ += (kSizePrefixBytes + current_element_size);
-    current_element_size_ = kUnsetSize;
-    return *this;
-}
-
-template <class Codec>
-inline bool ByteBuffer<Codec>::ConstIterator::operator==(const ConstIterator& other) const {
-    return buffer_ == other.buffer_ && cursor_offset_ == other.cursor_offset_;
-}
-
-template <class Codec>
-inline bool ByteBuffer<Codec>::ConstIterator::operator!=(const ConstIterator& other) const {
-    return !(*this == other);
-}
-
-template <class Codec>
-inline tcb::span<const uint8_t> ByteBuffer<Codec>::ConstRawIterator::operator*() const {
-    // Returns the raw bytes for the current element, consistent with GetRawElement.
-    return this->RawSpanAtCursor();
-}
-
-template <class Codec>
-inline void ByteBuffer<Codec>::ValidateIteratorReadPreconditions() const {
-    if (is_write_buffer_enabled_) {
-        throw InvalidInputException("Iterator is only available for read buffers");
-    }
-    if (elements_span_size_ < prefix_size_) {
-        throw InvalidInputException("Malformed buffer: prefix_size exceeds span size");
-    }
-    if constexpr (is_fixed_sized) {
-        if (element_size_ <= 0) {
-            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
-        }
-        const size_t readable_size = elements_span_size_ - prefix_size_;
-        if ((readable_size % element_size_) != 0) {
-            throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
-        }
-    }
-}
-
-template <class Codec>
-inline typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::begin() const {
-    ValidateIteratorReadPreconditions();
-    return ConstIterator(this, prefix_size_);
-}
-
-template <class Codec>
-inline typename ByteBuffer<Codec>::ConstIterator ByteBuffer<Codec>::end() const {
-    ValidateIteratorReadPreconditions();
-    return ConstIterator(this, elements_span_size_);
-}
-
-template <class Codec>
-inline typename ByteBuffer<Codec>::RawElementsView ByteBuffer<Codec>::raw_elements() const {
-    ValidateIteratorReadPreconditions();
-    return RawElementsView{this};
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // -----------------------------------------------------------------------------
 // Constructors and initializers for write buffer
 // -----------------------------------------------------------------------------
@@ -639,7 +427,7 @@ ByteBuffer<Codec>::ByteBuffer(
     : num_elements_(num_elements),
       codec_(std::move(codec)),
       prefix_size_(prefix_size),
-      element_size_(InitElementSize(codec_)),
+      element_size_(kUnsetSize),
       is_write_buffer_enabled_(true) {
     static_assert(!is_fixed_sized, "ByteBuffer constructor for variable-size elements only.");
     InitializeForWriteBuffer(use_reserve_hint ? reserved_bytes_hint : 0);

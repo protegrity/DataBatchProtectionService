@@ -17,6 +17,7 @@
 
 #include "typed_buffer.h"
 #include "typed_buffer_codecs.h"
+#include "typed_buffer_testing_codecs.h"
 
 #include <gtest/gtest.h>
 #include <cstdint>
@@ -31,6 +32,8 @@ using dbps::processing::ByteBuffer;
 using dbps::processing::RawBytesFixedSizedCodec;
 using dbps::processing::RawBytesVariableSizedCodec;
 using dbps::processing::kUnsetSize;
+using dbps::processing::testing::StringFixedSizedCodec;
+using dbps::processing::testing::StringVariableSizedCodec;
 
 template <class Codec>
 class TypedBufferTestProxy : public ByteBuffer<Codec> {
@@ -261,7 +264,8 @@ TEST(TypedBufferTest, Iterate_ReadOnlyVariableSize_WithPrefixSize_SkipsPrefix) {
     ByteBuffer<RawBytesVariableSizedCodec> buffer(tcb::span<const uint8_t>(bytes), 2u, 2u);
 
     std::vector<std::vector<uint8_t>> collected;
-    for (const auto element : buffer) {
+    tcb::span<const uint8_t> element;
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -278,7 +282,8 @@ TEST(TypedBufferTest, Iterate_ReadOnlyFixedSize_WithPrefixSize_SkipsPrefix) {
     RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 3u, 3u, RawBytesFixedSizedCodec{2u});
 
     std::vector<std::vector<uint8_t>> collected;
-    for (const auto element : buffer) {
+    tcb::span<const uint8_t> element;
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -293,7 +298,8 @@ TEST(TypedBufferTest, Iterate_ReadOnlyFixedSize_TraversesInOrder) {
     RawBytesFixedSizedBuffer buffer(tcb::span<const uint8_t>(bytes), 3u, 0u, RawBytesFixedSizedCodec{2});
 
     std::vector<std::vector<uint8_t>> collected;
-    for (const auto element : buffer) {
+    tcb::span<const uint8_t> element;
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -328,7 +334,8 @@ TEST(TypedBufferTest, Iterate_ReadOnlyVariableSize_TraversesInOrder) {
     RawBytesVariableSizedBuffer buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<std::vector<uint8_t>> collected;
-    for (const auto element : buffer) {
+    tcb::span<const uint8_t> element;
+    while (buffer.ElementsIteratorNext(element)) {
         collected.push_back(std::vector<uint8_t>(element.begin(), element.end()));
     }
 
@@ -372,7 +379,8 @@ TEST(TypedBufferTest, TransformFixedSize_ReadIterateWriteFinalize_RoundTrip) {
     // Create a new buffer to write the transformed elements into.
     RawBytesFixedSizedBuffer transformed_buffer(3u, 0, RawBytesFixedSizedCodec{kElementSize});
     size_t position = 0;
-    for (const auto element : source_buffer) {
+    tcb::span<const uint8_t> element;
+    while (source_buffer.ElementsIteratorNext(element)) {
         std::vector<uint8_t> source_element(element.begin(), element.end());
         std::vector<uint8_t> transformed_element = source_element;
         transformed_element[0] = static_cast<uint8_t>(transformed_element[0] + 1u);
@@ -428,7 +436,8 @@ TEST(TypedBufferTest, TransformVariableSize_ReadIterateWriteFinalize_RoundTrip) 
     RawBytesVariableSizedBuffer transformed_buffer(3u, source_bytes.size(), true);
     size_t position = 0;
 
-    for (const auto element : source_buffer) {
+    tcb::span<const uint8_t> element;
+    while (source_buffer.ElementsIteratorNext(element)) {
         std::vector<uint8_t> source_element(element.begin(), element.end());
         std::vector<uint8_t> transformed_element = source_element;
         transformed_element[0] = static_cast<uint8_t>(transformed_element[0] + 1u);
@@ -474,8 +483,8 @@ TEST(TypedBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
     // Fixed-size empty span.
     RawBytesFixedSizedBuffer fixed_buffer(tcb::span<const uint8_t>(empty_bytes), 0u, 0u, RawBytesFixedSizedCodec{2});
     size_t fixed_count = 0;
-    for (const auto element : fixed_buffer) {
-        (void)element;
+    tcb::span<const uint8_t> element;
+    while (fixed_buffer.ElementsIteratorNext(element)) {
         ++fixed_count;
     }
     EXPECT_EQ(fixed_count, 0u);
@@ -483,8 +492,7 @@ TEST(TypedBufferTest, Iterate_ReadOnlyEmptySpan_VisitsNoElements) {
     // Variable-size empty span.
     RawBytesVariableSizedBuffer variable_buffer{tcb::span<const uint8_t>(empty_bytes), 0u};
     size_t variable_count = 0;
-    for (const auto element : variable_buffer) {
-        (void)element;
+    while (variable_buffer.ElementsIteratorNext(element)) {
         ++variable_count;
     }
     EXPECT_EQ(variable_count, 0u);
@@ -946,14 +954,14 @@ TEST(TypedBufferTest, SetElement_OnReadOnlyBuffer_Throws) {
     EXPECT_THROW((void)buffer.SetElement(0, tcb::span<const uint8_t>(replacement)), InvalidInputException);
 }
 
-TEST(TypedBufferTest, Iterate_OnWriteBuffer_Throws) {
+TEST(TypedBufferTest, ElementsIteratorNext_OnWriteBuffer_Throws) {
     RawBytesFixedSizedBuffer buffer(3u, 0, RawBytesFixedSizedCodec{2u});
-    EXPECT_THROW((void)buffer.begin(), InvalidInputException);
-    EXPECT_THROW((void)buffer.end(), InvalidInputException);
+    tcb::span<const uint8_t> element;
+    EXPECT_THROW((void)buffer.ElementsIteratorNext(element), InvalidInputException);
 }
 
 // -----------------------------------------------------------------------------
-// NextRawElementIterator tests
+// ElementsIteratorNext tests
 // -----------------------------------------------------------------------------
 
 TEST(TypedBufferTest, ElementsIteratorNext_FixedSize_TraversesAllElements) {
@@ -1050,17 +1058,17 @@ TEST(TypedBufferTest, GetSpanSize_ReturnsUnderlyingSpanByteCount) {
 }
 
 // -----------------------------------------------------------------------------
-// ConstRawIterator / raw_elements() tests
+// Raw-byte iteration via ElementsIteratorNext tests
 // -----------------------------------------------------------------------------
 
 TEST(TypedBufferTest, RawIterate_FixedSize_ReturnsRawBytesNotDecodedValues) {
-    using dbps::processing::StringFixedSizedCodec;
     std::vector<uint8_t> bytes = {'H', 'i', '!', 'B', 'y', 'e'};
     ByteBuffer<StringFixedSizedCodec> buffer(
         tcb::span<const uint8_t>(bytes), 2u, 0u, StringFixedSizedCodec{3u});
 
     std::vector<std::string_view> decoded;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         decoded.push_back(value);
     }
     ASSERT_EQ(decoded.size(), 2u);
@@ -1068,7 +1076,8 @@ TEST(TypedBufferTest, RawIterate_FixedSize_ReturnsRawBytesNotDecodedValues) {
     EXPECT_EQ(decoded[1], "Bye");
 
     std::vector<std::vector<uint8_t>> raw;
-    for (const auto span : buffer.raw_elements()) {
+    tcb::span<const uint8_t> span;
+    while (buffer.ElementsIteratorNext(span)) {
         raw.push_back(std::vector<uint8_t>(span.begin(), span.end()));
     }
     ASSERT_EQ(raw.size(), 2u);
@@ -1077,7 +1086,6 @@ TEST(TypedBufferTest, RawIterate_FixedSize_ReturnsRawBytesNotDecodedValues) {
 }
 
 TEST(TypedBufferTest, RawIterate_VariableSize_ReturnsRawBytesNotDecodedValues) {
-    using dbps::processing::StringVariableSizedCodec;
     std::vector<uint8_t> bytes;
     append_u32_le(bytes, 5u);
     bytes.insert(bytes.end(), {'H', 'e', 'l', 'l', 'o'});
@@ -1087,7 +1095,8 @@ TEST(TypedBufferTest, RawIterate_VariableSize_ReturnsRawBytesNotDecodedValues) {
     ByteBuffer<StringVariableSizedCodec> buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<std::string_view> decoded;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         decoded.push_back(value);
     }
     ASSERT_EQ(decoded.size(), 2u);
@@ -1095,13 +1104,18 @@ TEST(TypedBufferTest, RawIterate_VariableSize_ReturnsRawBytesNotDecodedValues) {
     EXPECT_EQ(decoded[1], "OK");
 
     std::vector<std::vector<uint8_t>> raw;
-    for (const auto span : buffer.raw_elements()) {
+    tcb::span<const uint8_t> span;
+    while (buffer.ElementsIteratorNext(span)) {
         raw.push_back(std::vector<uint8_t>(span.begin(), span.end()));
     }
     ASSERT_EQ(raw.size(), 2u);
     EXPECT_EQ(raw[0], (std::vector<uint8_t>{'H', 'e', 'l', 'l', 'o'}));
     EXPECT_EQ(raw[1], (std::vector<uint8_t>{'O', 'K'}));
 }
+
+// -----------------------------------------------------------------------------
+// Tests for border cases
+// -----------------------------------------------------------------------------
 
 TEST(TypedBufferTest, ConstructVariableSize_EmptyBuffer_InitializesEmptyState) {
     std::vector<uint8_t> bytes;

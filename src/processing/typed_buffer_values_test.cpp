@@ -16,6 +16,7 @@
 // under the License.
 
 #include "typed_buffer_values.h"
+#include "typed_buffer_testing_codecs.h"
 
 #include <cstdint>
 #include <cstring>
@@ -28,6 +29,9 @@
 #include "exceptions.h"
 
 using namespace dbps::processing; 
+using dbps::processing::testing::StringFixedSizedCodec;
+using dbps::processing::testing::TypedBufferStringFixedSized;
+using dbps::processing::testing::TypedBufferStringVariableSized;
 
 // =============================================================================
 // INT32
@@ -83,7 +87,8 @@ TEST(TypedBufferValuesTest, Int32_Iterate) {
     TypedBufferI32 buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     std::vector<int32_t> collected;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         collected.push_back(value);
     }
 
@@ -192,7 +197,8 @@ TEST(TypedBufferValuesTest, Int96_Iterate) {
     TypedBufferInt96 buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<Int96> collected;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         collected.push_back(value);
     }
 
@@ -259,7 +265,8 @@ TEST(TypedBufferValuesTest, Float_Iterate) {
     TypedBufferFloat buffer{tcb::span<const uint8_t>(bytes), 3u};
 
     std::vector<float> collected;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         collected.push_back(value);
     }
 
@@ -337,7 +344,8 @@ TEST(TypedBufferValuesTest, StringFixedSized_Iterate) {
         tcb::span<const uint8_t>(bytes), 2u, 0u, StringFixedSizedCodec{4});
 
     std::vector<std::string> collected;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         collected.emplace_back(value);
     }
 
@@ -415,7 +423,8 @@ TEST(TypedBufferValuesTest, StringVariableSized_Iterate) {
     TypedBufferStringVariableSized buffer{tcb::span<const uint8_t>(bytes), 2u};
 
     std::vector<std::string> collected;
-    for (const auto value : buffer) {
+    for (size_t i = 0; i < buffer.GetNumElements(); ++i) {
+        const auto value = buffer.GetElement(i);
         collected.emplace_back(value);
     }
 
@@ -477,7 +486,8 @@ TEST(TypedBufferValuesTest, StringVariableSized_EmptyStringsMixedWithNonEmpty) {
 
     size_t element_count = 0;
     std::vector<std::string> collected;
-    for (const auto value : reader) {
+    for (size_t i = 0; i < reader.GetNumElements(); ++i) {
+        const auto value = reader.GetElement(i);
         collected.emplace_back(value);
         ++element_count;
     }

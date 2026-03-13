@@ -302,3 +302,8 @@ inline std::string AddStringAttribute(
     out[key] = value;
     return value;
 }
+
+// Helper function to convert string to binary data
+inline std::vector<uint8_t> StringToBytes(const std::string& str) {
+    return std::vector<uint8_t>(str.begin(), str.end());
+}

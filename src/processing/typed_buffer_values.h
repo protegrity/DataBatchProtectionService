@@ -42,8 +42,6 @@ using TypedBufferI64 = ByteBuffer<PlainValueCodec<int64_t, kI64TypeName>>;
 using TypedBufferFloat = ByteBuffer<PlainValueCodec<float, kF32TypeName>>;
 using TypedBufferDouble = ByteBuffer<PlainValueCodec<double, kF64TypeName>>;
 using TypedBufferInt96 = ByteBuffer<PlainValueCodec<Int96, kInt96TypeName>>;
-using TypedBufferStringFixedSized = ByteBuffer<StringFixedSizedCodec>;
-using TypedBufferStringVariableSized = ByteBuffer<StringVariableSizedCodec>;
 using TypedBufferRawBytesFixedSized = ByteBuffer<RawBytesFixedSizedCodec>;
 using TypedBufferRawBytesVariableSized = ByteBuffer<RawBytesVariableSizedCodec>;
 
@@ -53,8 +51,6 @@ using TypedValuesBuffer = std::variant<
     TypedBufferFloat,
     TypedBufferDouble,
     TypedBufferInt96,
-    TypedBufferStringFixedSized,
-    TypedBufferStringVariableSized,
     TypedBufferRawBytesFixedSized,
     TypedBufferRawBytesVariableSized
 >;
@@ -70,8 +66,8 @@ inline std::string PrintableTypedValuesBuffer(const TypedValuesBuffer& buffer) {
 
         out << BufferType::type_name() << " (" << num_elements << " elements):\n";
 
-        size_t i = 0;
-        for (const auto element : typed_buffer) {
+        for (size_t i = 0; i < num_elements; ++i) {
+            const auto element = typed_buffer.GetElement(i);
             if constexpr (std::is_same_v<ValueType, Int96>) {
                 out << "  [" << i << "] [" << element.lo << ", "
                     << element.mid << ", " << element.hi << "]\n";
@@ -83,7 +79,6 @@ inline std::string PrintableTypedValuesBuffer(const TypedValuesBuffer& buffer) {
             } else {
                 out << "  [" << i << "] " << element << "\n";
             }
-            ++i;
         }
 
         return out.str();

@@ -698,12 +698,11 @@ TEST(ParquetUtils, Reinterpret_INT32) {
     auto* buf = std::get_if<TypedBufferI32>(&result);
     ASSERT_NE(nullptr, buf);
 
-    size_t i = 0;
-    for (auto val : *buf) {
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        const auto val = buf->GetElement(i);
         EXPECT_EQ(values[i], val);
-        ++i;
     }
-    EXPECT_EQ(values.size(), i);
+    EXPECT_EQ(values.size(), buf->GetNumElements());
 }
 
 TEST(ParquetUtils, Reinterpret_DOUBLE) {
@@ -717,12 +716,11 @@ TEST(ParquetUtils, Reinterpret_DOUBLE) {
     auto* buf = std::get_if<TypedBufferDouble>(&result);
     ASSERT_NE(nullptr, buf);
 
-    size_t i = 0;
-    for (auto val : *buf) {
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        const auto val = buf->GetElement(i);
         EXPECT_DOUBLE_EQ(values[i], val);
-        ++i;
     }
-    EXPECT_EQ(values.size(), i);
+    EXPECT_EQ(values.size(), buf->GetNumElements());
 }
 
 TEST(ParquetUtils, Reinterpret_INT96) {
@@ -744,14 +742,13 @@ TEST(ParquetUtils, Reinterpret_INT96) {
 
     auto* buf = std::get_if<TypedBufferInt96>(&result);
     ASSERT_NE(nullptr, buf);
-    size_t i = 0;
-    for (auto val : *buf) {
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        const auto val = buf->GetElement(i);
         EXPECT_EQ(expected[i].lo, val.lo);
         EXPECT_EQ(expected[i].mid, val.mid);
         EXPECT_EQ(expected[i].hi, val.hi);
-        ++i;
     }
-    EXPECT_EQ(expected.size(), i);
+    EXPECT_EQ(expected.size(), buf->GetNumElements());
 }
 
 TEST(ParquetUtils, Reinterpret_BYTE_ARRAY) {
@@ -777,12 +774,11 @@ TEST(ParquetUtils, Reinterpret_BYTE_ARRAY) {
     auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
     ASSERT_NE(nullptr, buf);
 
-    size_t i = 0;
-    for (auto val : *buf) {
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        const auto val = buf->GetElement(i);
         EXPECT_EQ(expected[i], std::vector<uint8_t>(val.begin(), val.end()));
-        ++i;
     }
-    EXPECT_EQ(expected.size(), i);
+    EXPECT_EQ(expected.size(), buf->GetNumElements());
 }
 
 TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY) {
@@ -805,12 +801,11 @@ TEST(ParquetUtils, Reinterpret_FIXED_LEN_BYTE_ARRAY) {
     auto* buf = std::get_if<TypedBufferRawBytesFixedSized>(&result);
     ASSERT_NE(nullptr, buf);
 
-    size_t i = 0;
-    for (auto val : *buf) {
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        const auto val = buf->GetElement(i);
         EXPECT_EQ(expected[i], std::vector<uint8_t>(val.begin(), val.end()));
-        ++i;
     }
-    EXPECT_EQ(expected.size(), i);
+    EXPECT_EQ(expected.size(), buf->GetNumElements());
 }
 
 TEST(ParquetUtils, Reinterpret_UnsupportedEncoding) {
@@ -842,7 +837,10 @@ TEST(ParquetUtils, Reinterpret_InvalidDataSize) {
     auto* buf = std::get_if<TypedBufferI32>(&result);
     ASSERT_NE(nullptr, buf);
     EXPECT_THROW(
-        { for (auto val : *buf) { (void)val; } },
+        {
+            tcb::span<const uint8_t> element;
+            while (buf->ElementsIteratorNext(element)) { (void)element; }
+        },
         InvalidInputException);
 }
 
@@ -876,7 +874,10 @@ TEST(ParquetUtils, Reinterpret_EmptyBytes_FixedSize) {
     auto* buf = std::get_if<TypedBufferDouble>(&result);
     ASSERT_NE(nullptr, buf);
     size_t count = 0;
-    for (auto val : *buf) { (void)val; ++count; }
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        (void)buf->GetElement(i);
+        ++count;
+    }
     EXPECT_EQ(0u, count);
 }
 
@@ -888,7 +889,10 @@ TEST(ParquetUtils, Reinterpret_EmptyBytes_VariableSize) {
     auto* buf = std::get_if<TypedBufferRawBytesVariableSized>(&result);
     ASSERT_NE(nullptr, buf);
     size_t count = 0;
-    for (auto val : *buf) { (void)val; ++count; }
+    for (size_t i = 0; i < buf->GetNumElements(); ++i) {
+        (void)buf->GetElement(i);
+        ++count;
+    }
     EXPECT_EQ(0u, count);
 }
 
@@ -910,7 +914,8 @@ TEST(ParquetUtils, RoundTrip_INT32) {
 
     TypedBufferI32 write_buf{values.size()};
     size_t pos = 0;
-    for (auto val : *src) {
+    for (size_t i = 0; i < src->GetNumElements(); ++i) {
+        const auto val = src->GetElement(i);
         write_buf.SetElement(pos++, val);
     }
 
@@ -944,7 +949,8 @@ TEST(ParquetUtils, RoundTrip_BYTE_ARRAY) {
 
     TypedBufferRawBytesVariableSized write_buf{payloads.size(), input_bytes.size(), true};
     size_t pos = 0;
-    for (auto val : *src) {
+    for (size_t i = 0; i < src->GetNumElements(); ++i) {
+        const auto val = src->GetElement(i);
         write_buf.SetElement(pos++, val);
     }
     EXPECT_EQ(payloads.size(), pos);
@@ -976,7 +982,8 @@ TEST(ParquetUtils, RoundTrip_FIXED_LEN_BYTE_ARRAY) {
     TypedBufferRawBytesFixedSized write_buf{
         payloads.size(), 0, RawBytesFixedSizedCodec{static_cast<size_t>(element_len)}};
     size_t pos = 0;
-    for (auto val : *src) {
+    for (size_t i = 0; i < src->GetNumElements(); ++i) {
+        const auto val = src->GetElement(i);
         write_buf.SetElement(pos++, val);
     }
     EXPECT_EQ(payloads.size(), pos);
