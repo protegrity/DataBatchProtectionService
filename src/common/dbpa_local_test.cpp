@@ -50,7 +50,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = BuildByteArrayValueBytesForTesting("test_ABC");
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -74,7 +74,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulEncryptionCompressedDictiona
         0x03, 0x32, 0x92, 0x12, 0xF3, 0x80, 0x10, 0x00, 0xC7, 0xB8,
         0x50, 0xFC, 0x13, 0x00, 0x00, 0x00
     };
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Encrypt(test_data_gzip, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -93,7 +93,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, SuccessfulDecryption) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, DBPS_ENCRYPTION_METADATA));
     
     std::vector<uint8_t> test_data = BuildByteArrayValueBytesForTesting("test_EFG");
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -113,7 +113,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, RoundTripEncryptDecrypt) {
     
     // Original data to encrypt
     std::vector<uint8_t> original_data = BuildByteArrayValueBytesForTesting("roundtrip_XYZ");
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     
     // Encrypt the data
     auto encrypt_result = encrypt_agent.Encrypt(original_data, encoding_attributes);
@@ -156,7 +156,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, EncryptWithoutInit) {
     LocalDataBatchProtectionAgent agent;
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -171,7 +171,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, DecryptWithoutInit) {
     LocalDataBatchProtectionAgent agent;
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Decrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);
@@ -203,7 +203,7 @@ TEST_F(LocalDataBatchProtectionAgentTest, MissingPageEncoding) {
                                Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, std::nullopt));
     
     std::vector<uint8_t> test_data = {1, 2, 3, 4};
-    std::map<std::string, std::string> encoding_attributes = {{"page_type", "DICTIONARY_PAGE"}};
+    std::map<std::string, std::string> encoding_attributes = {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
     auto result = agent.Encrypt(test_data, encoding_attributes);
     
     ASSERT_NE(result, nullptr);

@@ -33,12 +33,13 @@
 struct LevelAndValueBytes {
     std::vector<uint8_t> level_bytes;
     std::vector<uint8_t> value_bytes;
+    size_t num_elements;
 };
 
 using namespace dbps::external;
 
 // -----------------------------------------------------------------------------
-// Helper functions for processing Parquet formatted data pages and dictionary pages.
+// Helper functions for lower-level Parquet metadata and level bytes parsing.
 // -----------------------------------------------------------------------------
 
 /**
@@ -51,6 +52,24 @@ using namespace dbps::external;
  */
 int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs);
+
+/**
+ * Decode DATA_PAGE_V1 definition-level payload bytes (hybrid RLE/bit-packed)
+ * and return the number of present (non-null) values.
+ *
+ * @param def_payload Definition-level payload bytes only (without [u32 length] prefix)
+ * @param num_values Total logical values in page (includes nulls)
+ * @param max_def_level Maximum definition level for the column
+ * @return Count of decoded definition levels equal to max_def_level
+ */
+size_t CountPresentFromDefinitionLevelsV1(
+    tcb::span<const uint8_t> def_payload,
+    int32_t num_values,
+    int32_t max_def_level);
+
+// -----------------------------------------------------------------------------
+// Functions to decompress and split a Parquet page into level and value bytes.
+// -----------------------------------------------------------------------------
 
 /**
  * Decompresses and splits a Parquet page into level and value bytes.
@@ -74,7 +93,7 @@ std::vector<uint8_t> CompressAndJoin(
 
 
 // -----------------------------------------------------------------------------
-// Helper functions for zero-copy reinterpretation of raw value bytes into a typed buffer.
+// Functions for zero-copy reinterpretation of raw value bytes into a typed buffer.
 // -----------------------------------------------------------------------------
 
 /**
@@ -106,3 +125,5 @@ dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
  */
 std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
     dbps::processing::TypedValuesBuffer&& buffer);
+
+// -----------------------------------------------------------------------------

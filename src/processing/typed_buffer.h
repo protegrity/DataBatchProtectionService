@@ -157,6 +157,7 @@ protected:
     // Variables for element span iterator.
     mutable const uint8_t* element_iterator_current_ptr_;
     const uint8_t* element_iterator_end_ptr_;
+    mutable size_t element_iterator_count_ = 0;
 
     // Variables for determining offset of elements.
     size_t prefix_size_ = 0;
@@ -208,6 +209,7 @@ ByteBuffer<Codec>::ByteBuffer(
       elements_span_size_(elements_span.size()),
       element_iterator_current_ptr_(elements_span.data()),
       element_iterator_end_ptr_(elements_span.data() + elements_span.size()),
+      element_iterator_count_(0),
       num_elements_(kUnsetSize),
       codec_(std::move(codec)),
       element_size_(0),
@@ -405,10 +407,16 @@ inline typename ByteBuffer<Codec>::value_type ByteBuffer<Codec>::GetElement(size
 // Element span iterator  --  The streamlined version of the iterator.
 // -----------------------------------------------------------------------------
 
-// ++++++ Additional validation that this is only used for read-only buffers.
+// ++++++ Add validation that this is only used for read-only buffers.
 template <class Codec>
 inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& raw_bytes) const {
     if (element_iterator_current_ptr_ == element_iterator_end_ptr_) {
+        // ++++++++ RESTORE THIS WHEN WE POPULATE ALWAYS THE num_elements_ FIELD FROM PARQUET DIRECTLY.
+        // if (element_iterator_count_ != num_elements_) {
+        //     throw InvalidInputException(std::string("Malformed buffer: element iterator count does not match num_elements. ")
+        //     + "element_iterator_count_=" + std::to_string(element_iterator_count_) + ", "
+        //     + "num_elements_=" + std::to_string(num_elements_));
+        // }
         raw_bytes = {};
         return false;
     }
@@ -422,6 +430,7 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ra
         }
         raw_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, element_size_);
         element_iterator_current_ptr_ += element_size_;
+        element_iterator_count_++;
         return true;
     }
 
@@ -440,6 +449,7 @@ inline bool ByteBuffer<Codec>::ElementsIteratorNext(tcb::span<const uint8_t>& ra
 
     raw_bytes = tcb::span<const uint8_t>(element_iterator_current_ptr_, current_element_size);
     element_iterator_current_ptr_ += current_element_size;
+    element_iterator_count_++;
     return true;
 }
 
@@ -680,7 +690,8 @@ inline tcb::span<uint8_t> ByteBuffer<Codec>::GetWritableSpanForElement(size_t po
     }
 
     if (position >= num_elements_) {
-        throw InvalidInputException("Element position out of range during GetWriteSpanForElement");
+        throw InvalidInputException(std::string("Element position out of range during GetWriteSpanForElement: ") +
+            "position=" + std::to_string(position) + " num_elements_=" + std::to_string(num_elements_));
     }
 
     // For fixed-size elements, we write directly at the fixed offset. No need to re-bind the span.

@@ -32,6 +32,75 @@ using namespace dbps::external;
 using namespace dbps::compression;
 using namespace dbps::processing;
 
+// -----------------------------------------------------------------------------
+// Helper functions to generate Parquet DATA_PAGE_V1 level bytes payloads for testing.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+std::vector<uint8_t> EncodeUleb128(uint32_t value) {
+    std::vector<uint8_t> out;
+    do {
+        uint8_t byte = static_cast<uint8_t>(value & 0x7F);
+        value >>= 7;
+        if (value != 0) {
+            byte |= 0x80;
+        }
+        out.push_back(byte);
+    } while (value != 0);
+    return out;
+}
+
+std::vector<uint8_t> MakeRleDefPayload(uint32_t run_len, uint32_t level, int bit_width) {
+    std::vector<uint8_t> out = EncodeUleb128(run_len << 1);  // RLE run
+    const size_t byte_width = static_cast<size_t>((bit_width + 7) / 8);
+    for (size_t i = 0; i < byte_width; ++i) {
+        out.push_back(static_cast<uint8_t>((level >> (8 * i)) & 0xFF));
+    }
+    return out;
+}
+
+std::vector<uint8_t> PackBitPackedLevels(
+    const std::vector<uint32_t>& levels,
+    int bit_width) {
+    const size_t total_bits = levels.size() * static_cast<size_t>(bit_width);
+    std::vector<uint8_t> out((total_bits + 7) / 8, 0);
+    size_t bit_offset = 0;
+    for (uint32_t level : levels) {
+        for (int b = 0; b < bit_width; ++b) {
+            uint8_t bit = static_cast<uint8_t>((level >> b) & 0x01);
+            size_t abs_bit = bit_offset + static_cast<size_t>(b);
+            out[abs_bit / 8] |= static_cast<uint8_t>(bit << (abs_bit % 8));
+        }
+        bit_offset += static_cast<size_t>(bit_width);
+    }
+    return out;
+}
+
+std::vector<uint8_t> MakeBitPackedDefPayload(
+    const std::vector<uint32_t>& levels,
+    int bit_width) {
+    EXPECT_EQ(levels.size() % 8, 0u);
+    const uint32_t num_groups = static_cast<uint32_t>(levels.size() / 8);
+    std::vector<uint8_t> out = EncodeUleb128((num_groups << 1) | 1u);  // bit-packed run
+    auto packed = PackBitPackedLevels(levels, bit_width);
+    out.insert(out.end(), packed.begin(), packed.end());
+    return out;
+}
+
+std::vector<uint8_t> WrapLengthPrefixed(const std::vector<uint8_t>& payload) {
+    std::vector<uint8_t> out;
+    append_u32_le(out, static_cast<uint32_t>(payload.size()));
+    out.insert(out.end(), payload.begin(), payload.end());
+    return out;
+}
+
+}  // namespace
+
+// -----------------------------------------------------------------------------
+// Tests for CalculateLevelBytesLength function.
+// -----------------------------------------------------------------------------
+
 TEST(ParquetUtils, CalculateLevelBytesLength_DATA_PAGE_V2) {
     std::vector<uint8_t> raw = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     AttributesMap attribs = {
@@ -158,6 +227,120 @@ TEST(ParquetUtils, CalculateLevelBytesLength_NegativeTotalSize) {
     EXPECT_THROW(CalculateLevelBytesLength(raw, attribs), InvalidInputException);
 }
 
+// -----------------------------------------------------------------------------
+// Tests for CountPresentFromDefinitionLevelsV1 function.
+// -----------------------------------------------------------------------------
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RleAllPresent) {
+    auto def_payload = MakeRleDefPayload(10, 1, 1);
+    EXPECT_EQ(10u, CountPresentFromDefinitionLevelsV1(def_payload, 10, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RleAllNull) {
+    auto def_payload = MakeRleDefPayload(10, 0, 1);
+    EXPECT_EQ(0u, CountPresentFromDefinitionLevelsV1(def_payload, 10, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedMixed) {
+    std::vector<uint32_t> levels = {1, 0, 1, 0, 1, 0, 1, 0};
+    auto def_payload = MakeBitPackedDefPayload(levels, 1);
+    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_MixedRuns) {
+    auto rle_part = MakeRleDefPayload(4, 1, 1);  // 4 present
+    std::vector<uint32_t> levels = {0, 1, 0, 1, 0, 0, 0, 0};  // +2 present
+    auto bp_part = MakeBitPackedDefPayload(levels, 1);
+    rle_part.insert(rle_part.end(), bp_part.begin(), bp_part.end());
+    EXPECT_EQ(6u, CountPresentFromDefinitionLevelsV1(rle_part, 12, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_InvalidRunLength) {
+    auto def_payload = MakeRleDefPayload(9, 1, 1);  // run_len > num_values
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_InvalidLevelExceedsMax) {
+    auto def_payload = MakeRleDefPayload(1, 2, 1);  // level 2 > max_def_level 1
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_TruncatedVarint) {
+    std::vector<uint8_t> def_payload = {0x80};  // continuation bit set, no next byte
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_TruncatedRleValue) {
+    auto def_payload = EncodeUleb128(2);  // run_len = 1, but missing repeated value byte
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedCanonical_0to7_88C6FA) {
+    // Canonical example from Parquet Encodings.md:
+    // values 0..7 with bit_width=3 are packed as bytes 0x88, 0xC6, 0xFA.
+    // Bit-packed header for one group of 8 values is varint((1 << 1) | 1) = 0x03.
+    std::vector<uint8_t> def_payload = {0x03, 0x88, 0xC6, 0xFA};
+
+    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 7));  // only value 7
+    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 3));  // only value 3
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_RleRunLen4_Level1) {
+    // Manual payload:
+    // - header 0x08 => RLE run, run_len = 0x08 >> 1 = 4
+    // - repeated value byte = 0x01 (bit_width=1, level=1)
+    std::vector<uint8_t> def_payload = {0x08, 0x01};
+    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 4, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_BitPackedAlternating_0xAA) {
+    // Manual payload:
+    // - header 0x03 => bit-packed, num_groups = 1, run_len = 8
+    // - packed byte 0xAA => bits (LSB->MSB): 0,1,0,1,0,1,0,1
+    std::vector<uint8_t> def_payload = {0x03, 0xAA};
+    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_MixedRleAndBitPacked) {
+    // Manual payload:
+    // - 0x06,0x01 => RLE run_len=3, level=1
+    // - 0x03,0x0F => bit-packed 8 values, bits: 1,1,1,1,0,0,0,0
+    // Total values = 3 + 8 = 11; present count at max_def_level=1 is 3 + 4 = 7.
+    std::vector<uint8_t> def_payload = {0x06, 0x01, 0x03, 0x0F};
+    EXPECT_EQ(7u, CountPresentFromDefinitionLevelsV1(def_payload, 11, 1));
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitWidth1_ExhaustiveOneGroup) {
+    // Exhaustive check for all 8-value bit-packed patterns at bit_width=1.
+    // Payload form: [0x03][packed-byte], where 0x03 means one bit-packed group (8 values).
+    for (int packed = 0; packed <= 0xFF; ++packed) {
+        std::vector<uint8_t> def_payload = {0x03, static_cast<uint8_t>(packed)};
+
+        size_t ones = 0;
+        for (int bit = 0; bit < 8; ++bit) {
+            ones += static_cast<size_t>((packed >> bit) & 0x01);
+        }
+
+        EXPECT_EQ(ones, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1))
+            << "packed=0x" << std::hex << packed;
+    }
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsZeroRleRunLength) {
+    // Header 0 means RLE with run_len = 0, which is invalid.
+    std::vector<uint8_t> def_payload = {0x00, 0x00};
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+}
+
+TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsZeroBitPackedGroups) {
+    // Header 1 means bit-packed with num_groups = 0, which is invalid.
+    std::vector<uint8_t> def_payload = {0x01};
+    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+}
+
+// -----------------------------------------------------------------------------
+// Tests for DecompressAndSplit function.
+// -----------------------------------------------------------------------------
 
 TEST(ParquetUtils, DecompressAndSplit_DataPageV2_Uncompressed) {
     AttributesMap attribs_conv = {
@@ -229,6 +412,95 @@ TEST(ParquetUtils, DecompressAndSplit_DataPageV2_UnsupportedCompression) {
         DBPSUnsupportedException);
 }
 
+TEST(ParquetUtils, DecompressAndSplit_DataPageV1_Required_NoLevels) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(4)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"data_page_max_definition_level", int32_t(0)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    std::vector<uint8_t> value_bytes = {0x11, 0x22, 0x33, 0x44};
+    auto result = DecompressAndSplit(value_bytes, CompressionCodec::UNCOMPRESSED, attribs);
+
+    EXPECT_TRUE(result.level_bytes.empty());
+    EXPECT_EQ(value_bytes, result.value_bytes);
+    EXPECT_EQ(4u, result.num_elements);
+}
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV1_Nullable_RleAllPresent) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(5)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    std::vector<uint8_t> def_payload = MakeRleDefPayload(5, 1, 1);
+    std::vector<uint8_t> level_bytes = WrapLengthPrefixed(def_payload);
+    std::vector<uint8_t> value_bytes = {0x10, 0x20, 0x30, 0x40, 0x50};
+    std::vector<uint8_t> plaintext = Join(level_bytes, value_bytes);
+
+    auto result = DecompressAndSplit(plaintext, CompressionCodec::UNCOMPRESSED, attribs);
+    EXPECT_EQ(level_bytes, result.level_bytes);
+    EXPECT_EQ(value_bytes, result.value_bytes);
+    EXPECT_EQ(5u, result.num_elements);
+}
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV1_Nullable_BitPackedWithRepLevels) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(8)},
+        {"data_page_max_repetition_level", int32_t(1)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    // Rep levels are present but ignored for present-count logic.
+    std::vector<uint8_t> rep_payload = MakeRleDefPayload(8, 0, 1);
+    std::vector<uint8_t> def_payload = MakeBitPackedDefPayload({1, 0, 1, 0, 1, 0, 0, 0}, 1);
+    std::vector<uint8_t> level_bytes = WrapLengthPrefixed(rep_payload);
+    auto def_wrapped = WrapLengthPrefixed(def_payload);
+    level_bytes.insert(level_bytes.end(), def_wrapped.begin(), def_wrapped.end());
+
+    std::vector<uint8_t> value_bytes = {0x01, 0x02, 0x03};
+    std::vector<uint8_t> plaintext = Join(level_bytes, value_bytes);
+
+    auto result = DecompressAndSplit(plaintext, CompressionCodec::UNCOMPRESSED, attribs);
+    EXPECT_EQ(level_bytes, result.level_bytes);
+    EXPECT_EQ(value_bytes, result.value_bytes);
+    EXPECT_EQ(3u, result.num_elements);
+}
+
+TEST(ParquetUtils, DecompressAndSplit_DataPageV1_InvalidDefinitionPayload) {
+    AttributesMap attribs = {
+        {"page_type", std::string("DATA_PAGE_V1")},
+        {"data_page_num_values", int32_t(4)},
+        {"data_page_max_repetition_level", int32_t(0)},
+        {"data_page_max_definition_level", int32_t(1)},
+        {"page_v1_repetition_level_encoding", std::string("RLE")},
+        {"page_v1_definition_level_encoding", std::string("RLE")}
+    };
+
+    std::vector<uint8_t> def_payload = {0x80};  // truncated varint run header
+    std::vector<uint8_t> level_bytes = WrapLengthPrefixed(def_payload);
+    std::vector<uint8_t> value_bytes = {0xAA, 0xBB, 0xCC, 0xDD};
+    std::vector<uint8_t> plaintext = Join(level_bytes, value_bytes);
+
+    EXPECT_THROW(
+        DecompressAndSplit(plaintext, CompressionCodec::UNCOMPRESSED, attribs),
+        InvalidInputException);
+}
+
+// -----------------------------------------------------------------------------
+// Tests for CompressAndJoin function.
+// -----------------------------------------------------------------------------
+
 TEST(ParquetUtils, CompressAndJoin_DataPageV1_Compressed) {
     AttributesMap attribs = {
         {"page_type", std::string("DATA_PAGE_V1")},
@@ -241,7 +513,7 @@ TEST(ParquetUtils, CompressAndJoin_DataPageV1_Compressed) {
 
     std::vector<uint8_t> level_bytes;
     append_u32_le(level_bytes, 2); // RLE block length
-    level_bytes.insert(level_bytes.end(), {0x0A, 0x0B});
+    level_bytes.insert(level_bytes.end(), {0x04, 0x01});  // RLE run: len=2, level=1
     std::vector<uint8_t> value_bytes = {0x21, 0x22, 0x23, 0x24};
 
     auto joined = CompressAndJoin(level_bytes, value_bytes, CompressionCodec::SNAPPY, attribs);

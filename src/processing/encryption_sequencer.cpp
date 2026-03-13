@@ -62,7 +62,7 @@ namespace {
         int64_t join_with_length_prefix_ns,
         int64_t compress_ns) {
 
-        std::cout << "+++++ DecodeAndEncrypt timings (microseconds + nanoseconds) +++++" << std::endl;
+        std::cout << "----- DecodeAndEncrypt timings (microseconds + nanoseconds) -----" << std::endl;
         PrintDurationLine("DecompressAndSplit", decompress_and_split_ns);
         PrintDurationLine("ParseValueBytesIntoTypedList", parse_value_bytes_into_typed_list_ns);
         PrintDurationLine("EncryptValueList", encrypt_value_list_ns);
@@ -174,7 +174,7 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
 
         // Decompress and split plaintext into level and value bytes
         auto stage_start = std::chrono::steady_clock::now();
-        auto [level_bytes, value_bytes] = DecompressAndSplit(
+        auto [level_bytes, value_bytes, num_elements] = DecompressAndSplit(
             plaintext, compression_, encoding_attributes_converted_);
         decompress_and_split_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - stage_start).count();
@@ -355,7 +355,7 @@ bool DataBatchEncryptionSequencer::ConvertEncodingAttributesToValues() {
             add_int("page_v2_num_nulls");
             add_bool("page_v2_is_compressed");
         } else if (page_type == "DICTIONARY_PAGE") {
-            // DICTIONARY_PAGE has no specific encoding attributes
+            add_int("dict_page_num_values");
         } else {
             throw InvalidInputException("Unexpected page type: " + page_type);
         }
