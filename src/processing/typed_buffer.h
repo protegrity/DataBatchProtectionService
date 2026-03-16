@@ -94,8 +94,8 @@ protected:
     size_t elements_span_size_;
     Codec codec_;
 
-    // Variable for the number of elements in the buffer.
-    // - `num_elements_` is a `const` and passed during construction of both read-only and write buffers.
+    // Attribute for the number of elements in the buffer (a const)
+    // - `num_elements_` is a const and passed during construction of both read-only and write buffers.
     // - It indicates the expected number of elements in the buffer payload declared upfront.
     // - This is treated as an invariant, so if the payload count mismatches, exceptions are thrown.
     const size_t num_elements_;
