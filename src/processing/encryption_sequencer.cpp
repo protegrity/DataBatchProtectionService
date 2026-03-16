@@ -147,10 +147,10 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
         // Encrypt the typed values buffer and level bytes, then join them into a single encrypted byte vector.
         auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_buffer);
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
-        auto joined_encrypted_bytes = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
-        
-        // Compress the joined encrypted bytes
-        encrypted_result_ = Compress(joined_encrypted_bytes, encrypted_compression_);
+
+        // Encrypted payloads mostly have a low-compression ratio, so the gains in size from compression are minimal or negative.
+        // Therefore, the final joined encrypted bytes are returned as-is without compression.
+        encrypted_result_ = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
 
         // Set the encryption type to per-value
         encryption_metadata_[encryption_mode_key] = ENCRYPTION_MODE_PER_VALUE;
@@ -226,16 +226,15 @@ bool DataBatchEncryptionSequencer::DecryptAndEncode(tcb::span<const uint8_t> cip
         error_message_ = "Failed to get encryption_mode from encryption_metadata";
         return false;
     }
-    std::string encryption_mode = encryption_mode_opt.value();
+    const std::string& encryption_mode = encryption_mode_opt.value();
     
     // Per-value encryption
     if (encryption_mode == ENCRYPTION_MODE_PER_VALUE) {
-        // Decompress the encrypted bytes
-        auto decompressed_encrypted_bytes = Decompress(ciphertext, encrypted_compression_);
-        
+
         // Split the joined encrypted bytes, then decrypt the level and value bytes separately.
-        auto [encrypted_level_bytes, encrypted_value_bytes] =
-            SplitWithLengthPrefix(tcb::span<const uint8_t>(decompressed_encrypted_bytes));
+        // The ciphertext payload is already the joined bytes without compression.
+        auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(ciphertext);
+        
         auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
         auto typed_buffer = encryptor_->DecryptValueList(encrypted_value_bytes);
         

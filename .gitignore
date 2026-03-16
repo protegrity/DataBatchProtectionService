@@ -33,6 +33,7 @@ _deps/
 
 # macOS
 .DS_Store
+**/.!*.DS_Store
 
 # Editor/IDE config
 .vscode/

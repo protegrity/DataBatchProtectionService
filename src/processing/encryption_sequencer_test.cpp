@@ -597,3 +597,234 @@ TEST(EncryptionSequencer, ConvertEncodingAttributesToValues_Negative) {
     EXPECT_FALSE(sequencer3.TestConvertEncodingAttributesToValues());
     EXPECT_EQ(sequencer3.error_stage_, "encoding_attribute_conversion");
 }
+
+// -----------------------------------------------------------------------------
+// DATA_PAGE end-to-end coverage through DataBatchEncryptionSequencer.
+// -----------------------------------------------------------------------------
+
+TEST(EncryptionSequencer, DataPageV1NullableByteArray_PerValueRoundTrip) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'a', 'l', 'p', 'h', 'a'},
+        {'b', 'e', 't', 'a'},
+        {'g', 'a', 'm', 'm', 'a', '3'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // Nullable DATA_PAGE_V1 levels: one RLE run with 3 present values.
+    // level bytes = [u32 len=2][0x06, 0x01]
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 2u);
+    level_bytes.push_back(0x06);  // run_len = 3
+    level_bytes.push_back(0x01);  // def level value = 1 (present)
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_v1",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV2NullableByteArray_PerValueRoundTrip) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'x', 'x'},
+        {'y', 'y', 'y'},
+        {'z', 'z', 'z', 'z'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // DATA_PAGE_V2: logical rows=5, nulls=2, so num_elements in value bytes is 3.
+    std::vector<uint8_t> level_bytes = {0x00};  // one byte of definition-level section
+    auto plaintext = Join(level_bytes, value_bytes);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "5"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v2_definition_levels_byte_length", "1"},
+        {"page_v2_repetition_levels_byte_length", "0"},
+        {"page_v2_num_nulls", "2"},
+        {"page_v2_is_compressed", "false"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_v2",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_v2",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV1NullableFloat_PerValueRoundTrip) {
+    std::vector<float> float_values = {1.25f, -2.5f, 100.75f};
+    std::vector<uint8_t> value_bytes;
+    value_bytes.reserve(float_values.size() * sizeof(float));
+    for (float v : float_values) {
+        append_f32_le(value_bytes, v);
+    }
+
+    // Nullable DATA_PAGE_V1 levels: one RLE run with 3 present values.
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 2u);
+    level_bytes.push_back(0x06);  // run_len = 3
+    level_bytes.push_back(0x01);  // def level value = 1 (present)
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "float_col_v1",
+        Type::FLOAT,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_float_v1",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV2NullableFloat_PerValueRoundTrip) {
+    std::vector<float> float_values = {9.5f, 0.0f, -7.25f};
+    std::vector<uint8_t> value_bytes;
+    value_bytes.reserve(float_values.size() * sizeof(float));
+    for (float v : float_values) {
+        append_f32_le(value_bytes, v);
+    }
+
+    // DATA_PAGE_V2: logical rows=5, nulls=2, so num_elements in value bytes is 3.
+    std::vector<uint8_t> level_bytes = {0x00};
+    auto plaintext = Join(level_bytes, value_bytes);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "5"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v2_definition_levels_byte_length", "1"},
+        {"page_v2_repetition_levels_byte_length", "0"},
+        {"page_v2_num_nulls", "2"},
+        {"page_v2_is_compressed", "false"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "float_col_v2",
+        Type::FLOAT,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_float_v2",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV1MalformedDefinitionPayload_Throws) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'a', 'l', 'p', 'h', 'a'},
+        {'b', 'e', 't', 'a'},
+        {'g', 'a', 'm', 'm', 'a', '3'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // Malformed DATA_PAGE_V1 definition payload: truncated varint run header.
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 1u);
+    level_bytes.push_back(0x80);  // continuation bit set, missing next byte
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_bad_v1",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_bad_v1",
+        "test_user",
+        "{}",
+        {});
+
+    EXPECT_THROW((void)sequencer.DecodeAndEncrypt(plaintext), InvalidInputException);
+}

@@ -39,35 +39,6 @@ struct LevelAndValueBytes {
 using namespace dbps::external;
 
 // -----------------------------------------------------------------------------
-// Helper functions for lower-level Parquet metadata and level bytes parsing.
-// -----------------------------------------------------------------------------
-
-/**
- * Calculates the total length of level bytes based on encoding attributes.
- * Assumes the input encoding attributes are already validated with the required keys and expected value types.
- * 
- * @param raw Raw binary data (currently unused but kept for future V1 implementation)
- * @param encoding_attribs Converted encoding attributes map
- * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
- */
-int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
-    const AttributesMap& encoding_attribs);
-
-/**
- * Decode DATA_PAGE_V1 definition-level payload bytes (hybrid RLE/bit-packed)
- * and return the number of present (non-null) values.
- *
- * @param def_payload Definition-level payload bytes only (without [u32 length] prefix)
- * @param num_values Total logical values in page (includes nulls)
- * @param max_def_level Maximum definition level for the column
- * @return Count of decoded definition levels equal to max_def_level
- */
-size_t CountPresentFromDefinitionLevelsV1(
-    tcb::span<const uint8_t> def_payload,
-    int32_t num_values,
-    int32_t max_def_level);
-
-// -----------------------------------------------------------------------------
 // Functions to decompress and split a Parquet page into level and value bytes.
 // -----------------------------------------------------------------------------
 

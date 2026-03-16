@@ -92,8 +92,13 @@ protected:
     // Variables for span elements reading
     tcb::span<const uint8_t> elements_span_;
     size_t elements_span_size_;
-    const size_t num_elements_;
     Codec codec_;
+
+    // Variable for the number of elements in the buffer.
+    // - `num_elements_` is a `const` and passed during construction of both read-only and write buffers.
+    // - It indicates the expected number of elements in the buffer payload declared upfront.
+    // - This is treated as an invariant, so if the payload count mismatches, exceptions are thrown.
+    const size_t num_elements_;
 
     // Variables for element span iterator.
     mutable const uint8_t* element_iterator_current_ptr_;
@@ -152,8 +157,12 @@ ByteBuffer<Codec>::ByteBuffer(
       elements_span_size_(elements_span.size()),
       num_elements_(num_elements),
       codec_(std::move(codec)),
+      // `element_iterator_current_ptr_` is initialized to the start of the span.
+      // - it points to the start of the span + the prefix size if there is one.
       element_iterator_current_ptr_(
           elements_span.data() + std::min(prefix_size, elements_span_size_)),
+      // `element_iterator_end_ptr_` is initialized to the end of the span.
+      // - it points to the start of the span + the size.
       element_iterator_end_ptr_(elements_span.data() + elements_span_size_),
       element_iterator_count_(0),
       prefix_size_(prefix_size),
@@ -165,7 +174,11 @@ ByteBuffer<Codec>::ByteBuffer(
 template <class Codec>
 inline size_t ByteBuffer<Codec>::InitElementSize(const Codec& codec) {
     if constexpr (is_fixed_sized) {
-        return codec.element_size();
+        auto codec_element_size = codec.element_size();
+        if (codec_element_size <= 0) {
+            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
+        }
+        return codec_element_size;
     }
     // For variable-size elements, element size is undefined.
     return kUnsetSize;
@@ -199,6 +212,7 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
         }
 
         // Check if the num_elements passed at contruction time coincides with the calculated from the payload size.
+        // This is a division of integer values, however it results in a correct integer result because of the modulo guard above.
         const size_t num_elements_on_payload = readable_size / element_size_;
         if (num_elements_on_payload != num_elements_) {
             throw InvalidInputException("Malformed fixed-size buffer: num_elements on payload != num_elements_ expected.");

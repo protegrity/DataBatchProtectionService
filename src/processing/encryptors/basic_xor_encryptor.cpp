@@ -27,6 +27,8 @@ using namespace dbps::external;
 // Functions for encrypting and decrypting byte arrays.
 // ---------------------------------------------------------------------------
 
+// XorEncryptInto uses a writable span `out` to encrypt the data in-place.
+// This is a performance optimization to avoid copying the data to a buffer and then returning it.
 void BasicXorEncryptor::XorEncryptInto(tcb::span<const uint8_t> data, tcb::span<uint8_t> out) {
     size_t data_size = data.size();
     size_t out_size = out.size();
@@ -103,8 +105,6 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     const TypedBuffer& input_buffer) {
     constexpr bool is_fixed = TypedBuffer::is_fixed_sized;
     constexpr size_t prefix_length = is_fixed ? kFixedHeaderLength : kVariableHeaderLength;
-
-    // GetNumElements is read from Parquet metadata and level bytes, not calculated from payload.
     const size_t num_elements = input_buffer.GetNumElements();
 
     // If there are no elements, return an empty buffer with the header.

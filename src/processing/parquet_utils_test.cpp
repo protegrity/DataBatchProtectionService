@@ -32,12 +32,30 @@ using namespace dbps::external;
 using namespace dbps::compression;
 using namespace dbps::processing;
 
+// Forward declaration for internal helper tested here without exposing it in parquet_utils.h.
+uint32_t ReadV1RunHeaderUleb128(tcb::span<const uint8_t> bytes, size_t& offset);
+
+size_t CountPresentValuesFromDefinitionLevelsV1(
+    tcb::span<const uint8_t> def_payload,
+    int32_t num_values,
+    int32_t max_def_level);
+
+int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
+    const AttributesMap& encoding_attribs);
+
 // -----------------------------------------------------------------------------
 // Helper functions to generate Parquet DATA_PAGE_V1 level bytes payloads for testing.
 // -----------------------------------------------------------------------------
 
 namespace {
 
+// Encodes an unsigned integer as ULEB128 bytes (base-128 varint) for test payload construction.
+// Each output byte stores 7 data bits; the MSB is a continuation flag.
+// - Example: 6   -> {0x06}        (single byte, continuation flag not set)
+// - Example: 300 -> {0xAC, 0x02}:
+//   300 = 2*128 + 44, so the first 7-bit chunk is 44 (0x2C) and the remaining value is 2.
+//   First byte is 0x2C | 0x80 = 0xAC (set continuation bit because more chunks follow),
+//   second byte is 0x02 (final chunk, continuation bit cleared).
 std::vector<uint8_t> EncodeUleb128(uint32_t value) {
     std::vector<uint8_t> out;
     do {
@@ -51,6 +69,7 @@ std::vector<uint8_t> EncodeUleb128(uint32_t value) {
     return out;
 }
 
+// Builds a DATA_PAGE_V1 RLE run payload: varint run header + repeated level value bytes.
 std::vector<uint8_t> MakeRleDefPayload(uint32_t run_len, uint32_t level, int bit_width) {
     std::vector<uint8_t> out = EncodeUleb128(run_len << 1);  // RLE run
     const size_t byte_width = static_cast<size_t>((bit_width + 7) / 8);
@@ -60,6 +79,7 @@ std::vector<uint8_t> MakeRleDefPayload(uint32_t run_len, uint32_t level, int bit
     return out;
 }
 
+// Packs level values into Parquet's LSB-first bit-packed byte layout for a given bit width.
 std::vector<uint8_t> PackBitPackedLevels(
     const std::vector<uint32_t>& levels,
     int bit_width) {
@@ -77,6 +97,7 @@ std::vector<uint8_t> PackBitPackedLevels(
     return out;
 }
 
+// Builds a DATA_PAGE_V1 bit-packed run payload: varint run header + packed level bytes.
 std::vector<uint8_t> MakeBitPackedDefPayload(
     const std::vector<uint32_t>& levels,
     int bit_width) {
@@ -88,6 +109,7 @@ std::vector<uint8_t> MakeBitPackedDefPayload(
     return out;
 }
 
+// Prepends a 4-byte little-endian length prefix used by DATA_PAGE_V1 level streams.
 std::vector<uint8_t> WrapLengthPrefixed(const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> out;
     append_u32_le(out, static_cast<uint32_t>(payload.size()));
@@ -228,54 +250,54 @@ TEST(ParquetUtils, CalculateLevelBytesLength_NegativeTotalSize) {
 }
 
 // -----------------------------------------------------------------------------
-// Tests for CountPresentFromDefinitionLevelsV1 function.
+// Tests for CountPresentValuesFromDefinitionLevelsV1 function.
 // -----------------------------------------------------------------------------
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RleAllPresent) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RleAllPresent) {
     auto def_payload = MakeRleDefPayload(10, 1, 1);
-    EXPECT_EQ(10u, CountPresentFromDefinitionLevelsV1(def_payload, 10, 1));
+    EXPECT_EQ(10u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 10, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RleAllNull) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RleAllNull) {
     auto def_payload = MakeRleDefPayload(10, 0, 1);
-    EXPECT_EQ(0u, CountPresentFromDefinitionLevelsV1(def_payload, 10, 1));
+    EXPECT_EQ(0u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 10, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedMixed) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_BitPackedMixed) {
     std::vector<uint32_t> levels = {1, 0, 1, 0, 1, 0, 1, 0};
     auto def_payload = MakeBitPackedDefPayload(levels, 1);
-    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1));
+    EXPECT_EQ(4u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_MixedRuns) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_MixedRuns) {
     auto rle_part = MakeRleDefPayload(4, 1, 1);  // 4 present
     std::vector<uint32_t> levels = {0, 1, 0, 1, 0, 0, 0, 0};  // +2 present
     auto bp_part = MakeBitPackedDefPayload(levels, 1);
     rle_part.insert(rle_part.end(), bp_part.begin(), bp_part.end());
-    EXPECT_EQ(6u, CountPresentFromDefinitionLevelsV1(rle_part, 12, 1));
+    EXPECT_EQ(6u, CountPresentValuesFromDefinitionLevelsV1(rle_part, 12, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_InvalidRunLength) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_InvalidRunLength) {
     auto def_payload = MakeRleDefPayload(9, 1, 1);  // run_len > num_values
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_InvalidLevelExceedsMax) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_InvalidLevelExceedsMax) {
     auto def_payload = MakeRleDefPayload(1, 2, 1);  // level 2 > max_def_level 1
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_TruncatedVarint) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_TruncatedVarint) {
     std::vector<uint8_t> def_payload = {0x80};  // continuation bit set, no next byte
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_TruncatedRleValue) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_TruncatedRleValue) {
     auto def_payload = EncodeUleb128(2);  // run_len = 1, but missing repeated value byte
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedCanonical_0to7_88C6FA) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_BitPackedCanonical_0to7_88C6FA) {
     // Canonical example from Parquet Encodings.md:
     // values 0..7 with bit_width=3 are packed as bytes 0x88, 0xC6, 0xFA.
     // Bit-packed header for one group of 8 values is varint((1 << 1) | 1) = 0x03.
@@ -286,42 +308,42 @@ TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedCanonical_0to7_88
     // encoding contract and can leave unread trailing bytes by design.
     std::vector<uint8_t> def_payload = {0x03, 0x88, 0xC6, 0xFA};
 
-    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 7));  // only value 7
+    EXPECT_EQ(1u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 7));  // only value 7
 
     // Separate bit_width=2 payload for max_def_level=3.
     // This keeps payload bit-width consistent with decoder configuration and
     // avoids mixing a 3-bit packed stream with a 2-bit decode expectation.
     std::vector<uint32_t> levels_bw2 = {0, 1, 2, 3, 0, 1, 2, 0};  // one value at level 3
     auto def_payload_bw2 = MakeBitPackedDefPayload(levels_bw2, 2);
-    EXPECT_EQ(1u, CountPresentFromDefinitionLevelsV1(def_payload_bw2, 8, 3));
+    EXPECT_EQ(1u, CountPresentValuesFromDefinitionLevelsV1(def_payload_bw2, 8, 3));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_RleRunLen4_Level1) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_ManualBytes_RleRunLen4_Level1) {
     // Manual payload:
     // - header 0x08 => RLE run, run_len = 0x08 >> 1 = 4
     // - repeated value byte = 0x01 (bit_width=1, level=1)
     std::vector<uint8_t> def_payload = {0x08, 0x01};
-    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 4, 1));
+    EXPECT_EQ(4u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 4, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_BitPackedAlternating_0xAA) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_ManualBytes_BitPackedAlternating_0xAA) {
     // Manual payload:
     // - header 0x03 => bit-packed, num_groups = 1, run_len = 8
     // - packed byte 0xAA => bits (LSB->MSB): 0,1,0,1,0,1,0,1
     std::vector<uint8_t> def_payload = {0x03, 0xAA};
-    EXPECT_EQ(4u, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1));
+    EXPECT_EQ(4u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_ManualBytes_MixedRleAndBitPacked) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_ManualBytes_MixedRleAndBitPacked) {
     // Manual payload:
     // - 0x06,0x01 => RLE run_len=3, level=1
     // - 0x03,0x0F => bit-packed 8 values, bits: 1,1,1,1,0,0,0,0
     // Total values = 3 + 8 = 11; present count at max_def_level=1 is 3 + 4 = 7.
     std::vector<uint8_t> def_payload = {0x06, 0x01, 0x03, 0x0F};
-    EXPECT_EQ(7u, CountPresentFromDefinitionLevelsV1(def_payload, 11, 1));
+    EXPECT_EQ(7u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 11, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitWidth1_ExhaustiveOneGroup) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_BitWidth1_ExhaustiveOneGroup) {
     // Exhaustive check for all 8-value bit-packed patterns at bit_width=1.
     // Payload form: [0x03][packed-byte], where 0x03 means one bit-packed group (8 values).
     for (int packed = 0; packed <= 0xFF; ++packed) {
@@ -332,46 +354,82 @@ TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitWidth1_ExhaustiveOneGro
             ones += static_cast<size_t>((packed >> bit) & 0x01);
         }
 
-        EXPECT_EQ(ones, CountPresentFromDefinitionLevelsV1(def_payload, 8, 1))
+        EXPECT_EQ(ones, CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1))
             << "packed=0x" << std::hex << packed;
     }
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsZeroRleRunLength) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RejectsZeroRleRunLength) {
     // Header 0 means RLE with run_len = 0, which is invalid.
     std::vector<uint8_t> def_payload = {0x00, 0x00};
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 1, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsZeroBitPackedGroups) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RejectsZeroBitPackedGroups) {
     // Header 1 means bit-packed with num_groups = 0, which is invalid.
     std::vector<uint8_t> def_payload = {0x01};
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_BitPackedFinalRunAllowsPadding) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_BitPackedFinalRunAllowsPadding) {
     // Corner case: a final bit-packed run is encoded as a full 8-value group,
     // while logical num_values ends mid-group. Decode only the logical values
     // and ignore padded trailing values in the last group.
     // Payload: header=0x03 (1 bit-packed group => 8 values), packed=0x07 (bits 1,1,1,0,0,0,0,0).
     std::vector<uint8_t> def_payload = {0x03, 0x07};
-    EXPECT_EQ(3u, CountPresentFromDefinitionLevelsV1(def_payload, 3, 1));
+    EXPECT_EQ(3u, CountPresentValuesFromDefinitionLevelsV1(def_payload, 3, 1));
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsTrailingBytesAfterDecoding) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RejectsTrailingBytesAfterDecoding) {
     // One full bit-packed group (8 values) plus extra trailing byte that must be rejected.
     std::vector<uint8_t> def_payload = {0x03, 0xAA, 0xFF};
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 8, 1), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsNonPositiveMaxDefLevel) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RejectsNonPositiveMaxDefLevel) {
     auto def_payload = MakeRleDefPayload(1, 0, 1);
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, 1, 0), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, 1, 0), InvalidInputException);
 }
 
-TEST(ParquetUtils, CountPresentFromDefinitionLevelsV1_RejectsNegativeNumValues) {
+TEST(ParquetUtils, CountPresentValuesFromDefinitionLevelsV1_RejectsNegativeNumValues) {
     auto def_payload = MakeRleDefPayload(1, 1, 1);
-    EXPECT_THROW(CountPresentFromDefinitionLevelsV1(def_payload, -1, 1), InvalidInputException);
+    EXPECT_THROW(CountPresentValuesFromDefinitionLevelsV1(def_payload, -1, 1), InvalidInputException);
+}
+
+// -----------------------------------------------------------------------------
+// Tests for ReadV1RunHeaderUleb128 helper function.
+// -----------------------------------------------------------------------------
+
+TEST(ParquetUtils, ReadV1RunHeaderUleb128_SingleByteHeader) {
+    std::vector<uint8_t> bytes = {0x06};  // value 6
+    size_t offset = 0;
+
+    const uint32_t header = ReadV1RunHeaderUleb128(bytes, offset);
+    EXPECT_EQ(6u, header);
+    EXPECT_EQ(1u, offset);
+}
+
+TEST(ParquetUtils, ReadV1RunHeaderUleb128_MultiByteHeaderAndOffsetAdvance) {
+    std::vector<uint8_t> bytes = {0xAA, 0xAC, 0x02};  // second varint = 300
+    size_t offset = 1;
+
+    const uint32_t header = ReadV1RunHeaderUleb128(bytes, offset);
+    EXPECT_EQ(300u, header);
+    EXPECT_EQ(3u, offset);
+}
+
+TEST(ParquetUtils, ReadV1RunHeaderUleb128_TruncatedVarintThrows) {
+    std::vector<uint8_t> bytes = {0x80};  // continuation bit set, but no following byte
+    size_t offset = 0;
+
+    EXPECT_THROW(ReadV1RunHeaderUleb128(bytes, offset), InvalidInputException);
+}
+
+TEST(ParquetUtils, ReadV1RunHeaderUleb128_VarintTooLargeThrows) {
+    std::vector<uint8_t> bytes = {0x80, 0x80, 0x80, 0x80, 0x80};
+    size_t offset = 0;
+
+    EXPECT_THROW(ReadV1RunHeaderUleb128(bytes, offset), InvalidInputException);
 }
 
 // -----------------------------------------------------------------------------

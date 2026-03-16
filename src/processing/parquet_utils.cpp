@@ -66,6 +66,8 @@ uint32_t ReadV1RunHeaderUleb128(tcb::span<const uint8_t> bytes, size_t& offset) 
 // Decodes a DATA_PAGE_V1 definition-level payload (hybrid RLE/bit-packed) and
 // returns the number of present (non-null) values in the page.
 //
+// Reference: https://parquet.apache.org/docs/file-format/data-pages/encodings/#RLE
+//
 // Inputs:
 // - def_payload: bytes of the V1 definition-level stream payload only
 //   (without the outer [u32 length] prefix).
@@ -75,7 +77,7 @@ uint32_t ReadV1RunHeaderUleb128(tcb::span<const uint8_t> bytes, size_t& offset) 
 // Output:
 // - present_count = number of decoded definition levels equal to max_def_level.
 //
-size_t CountPresentFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, int32_t num_values, int32_t max_def_level) {
+size_t CountPresentValuesFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, int32_t num_values, int32_t max_def_level) {
     if (num_values < 0) {
         throw InvalidInputException("Invalid V1 definition levels: num_values must be non-negative, got " + 
             std::to_string(num_values));
@@ -223,6 +225,8 @@ tcb::span<const uint8_t> ReadDefinitionLevelBytesV1(tcb::span<const uint8_t> lev
 // Helper function to calculate level bytes length
 // -----------------------------------------------------------------------------
 
+// Calculates the total length of level bytes based on encoding attributes.
+// Assumes the input encoding attributes are already validated with the required keys and expected value types.
 int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs) {
 
@@ -305,7 +309,9 @@ LevelAndValueBytes DecompressAndSplit(
             decompressed_bytes, encoding_attributes);
         auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
 
-        // For DATA_PAGE_V1, calculate num_elements by parsing the level bytes.
+        // For DATA_PAGE_V1, data_page_num_values is the count of logical rows (includes nulls).
+        // The V1 header does not carry num_nulls, so we cannot derive present values as in V2.
+        // To get the number of encoded physical values in value_bytes, we must parse definition levels.
         size_t num_elements = 0;
         const int32_t num_values = std::get<int32_t>(encoding_attributes.at("data_page_num_values"));
         int32_t max_def_level = std::get<int32_t>(encoding_attributes.at("data_page_max_definition_level"));
@@ -317,7 +323,7 @@ LevelAndValueBytes DecompressAndSplit(
         // If max_def_level > 0, there are definition levels bytes. So parse it and count the present values.
         else {
             auto def_bytes_payload = ReadDefinitionLevelBytesV1(level_bytes, max_rep_level);
-            num_elements = CountPresentFromDefinitionLevelsV1(def_bytes_payload, num_values, max_def_level);
+            num_elements = CountPresentValuesFromDefinitionLevelsV1(def_bytes_payload, num_values, max_def_level);
         }
 
         return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes), num_elements};
@@ -341,7 +347,9 @@ LevelAndValueBytes DecompressAndSplit(
             value_bytes = std::vector<uint8_t>(compressed_value_bytes_span.begin(), compressed_value_bytes_span.end());
         }
 
-        // For DATA_PAGE_V2, get num_elements from num_values and num_nulls in encoding_attributes.
+        // For DATA_PAGE_V2, data_page_num_values is the count of logical rows, not present values. data_page_num_values includes nulls. 
+        // num_nulls is the count of nulls in the page.
+        // So num_elements (the present values) is num_values - num_nulls.
         int32_t num_values = std::get<int32_t>(encoding_attributes.at("data_page_num_values"));
         int32_t num_nulls = std::get<int32_t>(encoding_attributes.at("page_v2_num_nulls"));
         if (num_nulls > num_values) {
