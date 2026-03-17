@@ -19,9 +19,6 @@
 #include "encryptor_utils.h"
 #include "../../common/exceptions.h"
 #include "../../common/enum_utils.h"
-#include <cstring>
-#include <iostream>
-#include <type_traits>
 
 using namespace dbps::processing;
 using namespace dbps::external;
@@ -30,21 +27,26 @@ using namespace dbps::external;
 // Functions for encrypting and decrypting byte arrays.
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> BasicXorEncryptor::XorEncrypt(tcb::span<const uint8_t> data) {
-    if (data.empty()) {
-        return {};
+// XorEncryptInto uses a writable span `out` to encrypt the data in-place.
+// This is a performance optimization to avoid copying the data to a buffer and then returning it.
+void BasicXorEncryptor::XorEncryptInto(tcb::span<const uint8_t> data, tcb::span<uint8_t> out) {
+    size_t data_size = data.size();
+    size_t out_size = out.size();
+    if (data_size != out_size) {
+        throw InvalidInputException("XorEncryptInto: input and output sizes must match");
     }
+    const size_t n = data_size;
+    const uint8_t* src = data.data();
+    uint8_t* dst = out.data();
     size_t key_hash = key_id_hash_;
-    std::vector<uint8_t> out(data.size());
-    for (size_t i = 0; i < data.size(); ++i) {
-        out[i] = data[i] ^ (key_hash & 0xFF);
+    for (size_t i = 0; i < n; ++i) {
+        dst[i] = src[i] ^ (key_hash & 0xFF);
         key_hash = (key_hash << 1) | (key_hash >> 31);
     }
-    return out;
 }
 
-std::vector<uint8_t> BasicXorEncryptor::XorDecrypt(tcb::span<const uint8_t> data) {
-    return XorEncrypt(data);
+void BasicXorEncryptor::XorDecryptInto(tcb::span<const uint8_t> data, tcb::span<uint8_t> out) {
+    XorEncryptInto(data, out);
 }
 
 // ---------------------------------------------------------------------------
@@ -52,11 +54,21 @@ std::vector<uint8_t> BasicXorEncryptor::XorDecrypt(tcb::span<const uint8_t> data
 // ---------------------------------------------------------------------------
 
 std::vector<uint8_t> BasicXorEncryptor::EncryptBlock(tcb::span<const uint8_t> data) {
-    return XorEncrypt(data);
+    if (data.empty()) {
+        return {};
+    }
+    std::vector<uint8_t> out(data.size());
+    XorEncryptInto(data, tcb::span<uint8_t>(out.data(), out.size()));
+    return out;
 }
 
 std::vector<uint8_t> BasicXorEncryptor::DecryptBlock(tcb::span<const uint8_t> data) {
-    return XorDecrypt(data);
+    if (data.empty()) {
+        return {};
+    }
+    std::vector<uint8_t> out(data.size());
+    XorDecryptInto(data, tcb::span<uint8_t>(out.data(), out.size()));
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +116,7 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
 
     // Encrypt the elements by traversing the typed input buffer and encrypt each element separately:
     // - Create an output raw-bytes buffer to capture the encrypted elements as bytes.
-    // - For each element: read its raw bytes, encrypt them, write into the output buffer.
+    // - For each element: read its raw bytes, get a writable span on the output, and encrypt in-place.
     // - Finalize the output buffer into a contiguous byte vector.
 
     std::vector<uint8_t> final_buffer;
@@ -115,24 +127,30 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
         element_size = input_buffer.GetElementSize();
         TypedBufferRawBytesFixedSized output_buffer{
             num_elements, prefix_length, RawBytesFixedSizedCodec{element_size}};
+
         size_t output_index = 0;
-        for (const auto raw_bytes : input_buffer.raw_elements()) {
-            auto encrypted = XorEncrypt(raw_bytes);
-            output_buffer.SetElement(output_index, tcb::span<const uint8_t>(encrypted));
+        tcb::span<const uint8_t> raw_bytes;
+        
+        while (input_buffer.ElementsIteratorNext(raw_bytes)) {
+            auto write_span = output_buffer.GetWritableRawElement(output_index, element_size);
+            XorEncryptInto(raw_bytes, write_span);
             output_index++;
         }
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
-    }
+    }   
     
     // Encrypt variable-size elements
     else {
         auto reserved_bytes_hint = input_buffer.GetRawBufferSize();
         TypedBufferRawBytesVariableSized output_buffer{
             num_elements, reserved_bytes_hint, true, prefix_length};
+
         size_t output_index = 0;
-        for (const auto raw_bytes : input_buffer.raw_elements()) {
-            auto encrypted = XorEncrypt(raw_bytes);
-            output_buffer.SetElement(output_index, tcb::span<const uint8_t>(encrypted));
+        tcb::span<const uint8_t> raw_bytes;
+        
+        while (input_buffer.ElementsIteratorNext(raw_bytes)) {
+            auto write_span = output_buffer.GetWritableRawElement(output_index, raw_bytes.size());
+            XorEncryptInto(raw_bytes, write_span);
             output_index++;
         }
         final_buffer = output_buffer.FinalizeAndTakeBuffer();
@@ -142,12 +160,12 @@ std::vector<uint8_t> BasicXorEncryptor::EncryptTypedElements(
     WriteHeader(final_buffer, {is_fixed,
         static_cast<uint32_t>(num_elements),
         static_cast<uint32_t>(element_size)});
+
     return final_buffer;
 }
 
 std::vector<uint8_t> BasicXorEncryptor::EncryptValueList(
     const TypedValuesBuffer& typed_buffer) {
-
     // Printable context string for logging
     // std::string context_str = std::string("Context parameters:")
     //    + "\n  column_name: " + column_name_
@@ -178,9 +196,11 @@ template <typename TypedBuffer>
 TypedBuffer BasicXorEncryptor::DecryptFixedSizedElementsIntoTypedBuffer(
     const TypedBufferRawBytesFixedSized& encrypted_buffer, TypedBuffer output_buffer) {
     size_t output_index = 0;
-    for (const auto raw_bytes : encrypted_buffer.raw_elements()) {
-        auto decrypted_bytes = XorDecrypt(raw_bytes);
-        output_buffer.SetRawElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
+    tcb::span<const uint8_t> element_bytes;
+    size_t element_size = encrypted_buffer.GetElementSize();
+    while (encrypted_buffer.ElementsIteratorNext(element_bytes)) {
+        auto write_span = output_buffer.GetWritableRawElement(output_index, element_size);
+        XorDecryptInto(element_bytes, write_span);
         output_index++;
     }
     return output_buffer;
@@ -197,7 +217,7 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
 
         // Create a fixed-sized byte buffer for reading the encrypted elements.
         TypedBufferRawBytesFixedSized encrypted_buffer{
-            encrypted_bytes, kFixedHeaderLength, RawBytesFixedSizedCodec{header.element_size}};
+            encrypted_bytes, num_elements, kFixedHeaderLength, RawBytesFixedSizedCodec{header.element_size}};
 
         // Populate a typed buffer with the decrypted elements in the corresponding type.
         switch (datatype_) {
@@ -230,7 +250,7 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
     // Decrypt variable-size elements
     else {
         // Create a variable-sized byte buffer for reading the encrypted elements.
-        TypedBufferRawBytesVariableSized encrypted_buffer{ encrypted_bytes, kVariableHeaderLength};
+        TypedBufferRawBytesVariableSized encrypted_buffer{ encrypted_bytes, num_elements, kVariableHeaderLength};
 
         switch (datatype_) {
             // Create a BYTE-ARRAY typed buffer for storing the decrypted elements.
@@ -238,11 +258,12 @@ TypedValuesBuffer BasicXorEncryptor::DecryptValueList(
                 auto reserved_bytes_hint = encrypted_buffer.GetRawBufferSize();
                 TypedBufferRawBytesVariableSized output_buffer{num_elements, reserved_bytes_hint, true};
                 size_t output_index = 0;
-                for (const auto element : encrypted_buffer) {
-                    auto decrypted_bytes = XorDecrypt(element);
-                    output_buffer.SetElement(output_index, tcb::span<const uint8_t>(decrypted_bytes));
+                tcb::span<const uint8_t> element_bytes;
+                while (encrypted_buffer.ElementsIteratorNext(element_bytes)) {
+                    auto write_span = output_buffer.GetWritableRawElement(output_index, element_bytes.size());
+                    XorDecryptInto(element_bytes, write_span);
                     output_index++;
-                }
+                }   
                 return output_buffer;
             }
             default:

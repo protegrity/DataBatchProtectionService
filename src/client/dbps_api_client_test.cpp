@@ -23,18 +23,13 @@
 #include "tcb/span.hpp"
 #include "dbps_api_client.h"
 #include "http_client_base.h"
+#include "../common/bytes_utils.h"
 #include "../common/enums.h"
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
 using namespace dbps::external;
 using namespace dbps::enum_utils;
-
-// TODO: Move this to a common test utility file.
-// Helper function to convert string to binary data
-std::vector<uint8_t> StringToBytes(const std::string& str) {
-    return std::vector<uint8_t>(str.begin(), str.end());
-}
 
 // Utility function to compare JSON strings, ignoring specified fields
 bool CompareJsonStrings(const std::string& json1, const std::string& json2, const std::vector<std::string>& ignore_fields = {}) {

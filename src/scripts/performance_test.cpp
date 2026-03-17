@@ -173,20 +173,26 @@ namespace {
         size_t num_values,
         CompressionCodec::type compression_type,
         const std::string& page_encoding,
-        int32_t max_definition_level = 1,
+        int32_t max_definition_level = 0,
         int32_t max_repetition_level = 2,
         uint32_t definition_level_block_length = 3,
         uint32_t repetition_level_block_length = 5) {
         DataPageBuildResult result;
         result.level_bytes.clear();
-        append_u32_le(result.level_bytes, repetition_level_block_length); // repetition level block length
-        result.level_bytes.insert(result.level_bytes.end(),
-                                  repetition_level_block_length,
-                                  0xAA);
-        append_u32_le(result.level_bytes, definition_level_block_length); // definition level block length
-        result.level_bytes.insert(result.level_bytes.end(),
-                                  definition_level_block_length,
-                                  0xBB);
+
+        // V1 level bytes are emitted only when the corresponding max level is > 0.
+        if (max_repetition_level > 0) {
+            append_u32_le(result.level_bytes, repetition_level_block_length); // repetition level block length
+            result.level_bytes.insert(result.level_bytes.end(),
+                                      repetition_level_block_length,
+                                      0xAA);
+        }
+        if (max_definition_level > 0) {
+            append_u32_le(result.level_bytes, definition_level_block_length); // definition level block length
+            result.level_bytes.insert(result.level_bytes.end(),
+                                      definition_level_block_length,
+                                      0xBB);
+        }
         auto combined_uncompressed = Join(result.level_bytes, value_bytes);
         result.payload = Compress(combined_uncompressed, compression_type);
         result.attrs = {
@@ -204,6 +210,7 @@ namespace {
 
     DataPageBuildResult BuildDictionaryPagePayload(
         const std::vector<uint8_t>& value_bytes,
+        size_t num_values,
         CompressionCodec::type compression_type,
         const std::string& page_encoding) {
         DataPageBuildResult result;
@@ -211,7 +218,8 @@ namespace {
         result.payload = Compress(value_bytes, compression_type);
         result.attrs = {
             {"page_type", "DICTIONARY_PAGE"},
-            {"page_encoding", page_encoding}
+            {"page_encoding", page_encoding},
+            {"dict_page_num_values", std::to_string(num_values)}
         };
         return result;
     }
@@ -297,6 +305,7 @@ public:
         } else if (scenario.page_type == "DICTIONARY_PAGE") {
             page = BuildDictionaryPagePayload(
                 value_bytes,
+                num_values,
                 scenario.compression,
                 scenario.page_encoding);
         } else {

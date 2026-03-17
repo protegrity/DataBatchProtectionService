@@ -240,3 +240,48 @@ TEST(BytesUtils, AttributesMap_AddBool) {
     std::map<std::string, std::string> bad_attrs{{"page_v2_is_compressed", "maybe"}};
     EXPECT_THROW(AddBoolAttribute(out, bad_attrs, "page_v2_is_compressed"), InvalidInputException);
 }
+
+TEST(BytesUtils, StringToBytes_AsciiText) {
+    const std::string input = "dbps";
+    const std::vector<uint8_t> result = StringToBytes(input);
+
+    EXPECT_EQ((std::vector<uint8_t>{'d', 'b', 'p', 's'}), result);
+}
+
+TEST(BytesUtils, StringToBytes_EmptyString) {
+    const std::string input;
+    const std::vector<uint8_t> result = StringToBytes(input);
+
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(BytesUtils, StringToBytes_PreservesRawBytesAndNulls) {
+    std::string input;
+    input.push_back('D');
+    input.push_back('B');
+    input.push_back('P');
+    input.push_back('S');
+    input.push_back('\0');
+    input.push_back('X');
+    input.push_back('Y');
+    input.push_back(static_cast<char>(0xFF));
+    input.push_back(static_cast<char>(0x80));
+    input.push_back('\0');
+    input.push_back('Z');
+
+    const std::vector<uint8_t> result = StringToBytes(input);
+    const std::vector<uint8_t> expected = {
+        static_cast<uint8_t>('D'),
+        static_cast<uint8_t>('B'),
+        static_cast<uint8_t>('P'),
+        static_cast<uint8_t>('S'),
+        static_cast<uint8_t>(0x00),
+        static_cast<uint8_t>('X'),
+        static_cast<uint8_t>('Y'),
+        static_cast<uint8_t>(0xFF),
+        static_cast<uint8_t>(0x80),
+        static_cast<uint8_t>(0x00),
+        static_cast<uint8_t>('Z')};
+
+    EXPECT_EQ(expected, result);
+}

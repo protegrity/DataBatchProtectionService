@@ -81,7 +81,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
             std::nullopt,      // datatype_length
             CompressionCodec::UNCOMPRESSED,    // compression
             Encoding::PLAIN,           // encoding
-            {{"page_type", "DICTIONARY_PAGE"}},   // encoding_attributes (mostly empty for basic test)
+            {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}},   // encoding_attributes (mostly empty for basic test)
             CompressionCodec::UNCOMPRESSED,    // encrypted_compression
             "test_key_123",     // key_id
             "test_user",       // user_id
@@ -97,11 +97,11 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
     // Test 2: Different key_id produces different encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "key1", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "key1", "test_user", "{}", {}
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "key2", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "key2", "test_user", "{}", {}
         );
         
         
@@ -115,11 +115,11 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
     // Test 3: Same key_id produces consistent encryption
     {
         DataBatchEncryptionSequencer sequencer1(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "same_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "same_key", "test_user", "{}", {}
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "same_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "same_key", "test_user", "{}", {}
         );
         
         
@@ -133,7 +133,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
     // Test 4: Empty data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         
         // This should fail because empty input is rejected
@@ -144,7 +144,7 @@ TEST(EncryptionSequencer, EncryptionDecryption) {
     // Test 5: Binary data encryption
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         
         // Binary data: 0x00, 0x01, 0x02, 0x03, 0x04, 0x05
@@ -160,7 +160,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
     // Test 1: Valid parameters, should succeed
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Valid parameters test failed: " << sequencer.error_stage_ << " - " << sequencer.error_message_;
@@ -169,7 +169,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
     // Test 2: Invalid compression (should succeed with warning)
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::GZIP, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::GZIP, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result);
@@ -179,7 +179,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
     // Test 3: Undefined encoding is supported
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::UNDEFINED, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::UNDEFINED, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Encoding UNDEFINED should be supported: " << sequencer.error_message_;
@@ -189,7 +189,7 @@ TEST(EncryptionSequencer, ParameterValidation) {
     // Test 4: All encodings now supported (including RLE)
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::RLE, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::RLE, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         ASSERT_TRUE(result) << "Encoding RLE should now be supported: " << sequencer.error_message_;
@@ -203,7 +203,7 @@ TEST(EncryptionSequencer, InputValidation) {
     // Test 1: Empty plaintext
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(EMPTY_DATA);
         EXPECT_FALSE(result) << "Empty plaintext test should have failed";
@@ -213,7 +213,7 @@ TEST(EncryptionSequencer, InputValidation) {
     // Test 2: Empty ciphertext
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         bool result = sequencer.DecryptAndEncode(EMPTY_DATA);
         EXPECT_FALSE(result) << "Empty ciphertext test should have failed";
@@ -223,7 +223,7 @@ TEST(EncryptionSequencer, InputValidation) {
     // Test 3: Empty key_id
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "", "test_user", "{}", {}
         );
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
         EXPECT_FALSE(result) << "Empty key_id test should have failed";
@@ -233,7 +233,7 @@ TEST(EncryptionSequencer, InputValidation) {
     // Test 4: Missing encryption_metadata
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
             {}  // encryption_metadata, setting it to empty map.
         );
         bool result = sequencer.DecryptAndEncode(HELLO_WORLD_DATA);
@@ -245,7 +245,7 @@ TEST(EncryptionSequencer, InputValidation) {
     // Test 5: Incorrect encryption_metadata version
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}",
             {{"dbps_agent_version", "v0.09"}}  // encryption_metadata, setting it to incorrect version.
         );
         bool result = sequencer.DecryptAndEncode(HELLO_WORLD_DATA);
@@ -261,7 +261,7 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
     // Test 1: Basic round trip - "Hello, World!"
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {}
         );
         
         // Encrypt
@@ -280,7 +280,7 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
     // Test 2: Binary data round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "binary_test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "binary_test_key", "test_user", "{}", {}
         );
         
         // Encrypt
@@ -299,7 +299,7 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
     // Test 3: Single character round trip
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "single_char_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "single_char_key", "test_user", "{}", {}
         );
         
         // "A"
@@ -320,11 +320,11 @@ TEST(EncryptionSequencer, RoundTripEncryption) {
     // Test 4: Different keys produce different encrypted results
     {
         DataBatchEncryptionSequencer sequencer1(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "key1", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "key1", "test_user", "{}", {}
         );
         
         DataBatchEncryptionSequencer sequencer2(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "key2", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "key2", "test_user", "{}", {}
         );
         
         bool result1 = sequencer1.DecodeAndEncrypt(HELLO_WORLD_DATA);
@@ -355,7 +355,7 @@ TEST(EncryptionSequencer, ResultStorage) {
     // Test 1: Verify encrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
@@ -370,7 +370,7 @@ TEST(EncryptionSequencer, ResultStorage) {
     // Test 2: Verify decrypted result is stored
     {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
+            "test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {}
         );
         
         // First encrypt something
@@ -401,7 +401,7 @@ TEST(EncryptionSequencer, BooleanTypeUsesPerBlockEncryption) {
         std::nullopt,
         CompressionCodec::UNCOMPRESSED,
         Encoding::PLAIN,
-        {{"page_type", "DICTIONARY_PAGE"}},
+        {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}},
         CompressionCodec::UNCOMPRESSED,
         "test_key",
         "test_user",
@@ -433,7 +433,7 @@ TEST(EncryptionSequencer, RleDictionaryEncodingUsesPerBlockEncryption) {
         std::nullopt,
         CompressionCodec::UNCOMPRESSED,
         Encoding::RLE_DICTIONARY,
-        {{"page_type", "DICTIONARY_PAGE"}},
+        {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}},
         CompressionCodec::UNCOMPRESSED,
         "test_key",
         "test_user",
@@ -460,7 +460,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
     // Helper function to test validation failure
     auto testValidationFailure = [&](const std::optional<int>& datatype_length, const std::string& expected_msg) -> bool {
         DataBatchEncryptionSequencer sequencer(
-            "test_column", Type::FIXED_LEN_BYTE_ARRAY, datatype_length, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {}
+            "test_column", Type::FIXED_LEN_BYTE_ARRAY, datatype_length, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {}
         );
         
         bool result = sequencer.DecodeAndEncrypt(HELLO_WORLD_DATA);
@@ -484,7 +484,7 @@ TEST(EncryptionSequencer, FixedLenByteArrayValidation) {
     EXPECT_TRUE(testValidationFailure(0, "FIXED_LEN_BYTE_ARRAY datatype_length must be positive"));
 
     // Test valid case (should pass parameter validation)
-    DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {});
+    DataBatchEncryptionSequencer sequencer("test_column", Type::FIXED_LEN_BYTE_ARRAY, 16, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, {{"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "2"}}, CompressionCodec::UNCOMPRESSED, "test_key_123", "test_user", "{}", {});
     bool result = sequencer.DecodeAndEncrypt(FIXED_LEN_BYTE_ARRAY_DATA);
     
     if (!result && sequencer.error_stage_ == "parameter_validation") {
@@ -596,4 +596,235 @@ TEST(EncryptionSequencer, ConvertEncodingAttributesToValues_Negative) {
     TestDataBatchEncryptionSequencer sequencer3("test_column", Type::BYTE_ARRAY, std::nullopt, CompressionCodec::UNCOMPRESSED, Encoding::PLAIN, invalid_bool, CompressionCodec::UNCOMPRESSED, "test_key", "test_user", "{}", {});
     EXPECT_FALSE(sequencer3.TestConvertEncodingAttributesToValues());
     EXPECT_EQ(sequencer3.error_stage_, "encoding_attribute_conversion");
+}
+
+// -----------------------------------------------------------------------------
+// DATA_PAGE end-to-end coverage through DataBatchEncryptionSequencer.
+// -----------------------------------------------------------------------------
+
+TEST(EncryptionSequencer, DataPageV1NullableByteArray_PerValueRoundTrip) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'a', 'l', 'p', 'h', 'a'},
+        {'b', 'e', 't', 'a'},
+        {'g', 'a', 'm', 'm', 'a', '3'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // Nullable DATA_PAGE_V1 levels: one RLE run with 3 present values.
+    // level bytes = [u32 len=2][0x06, 0x01]
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 2u);
+    level_bytes.push_back(0x06);  // run_len = 3
+    level_bytes.push_back(0x01);  // def level value = 1 (present)
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_v1",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV2NullableByteArray_PerValueRoundTrip) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'x', 'x'},
+        {'y', 'y', 'y'},
+        {'z', 'z', 'z', 'z'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // DATA_PAGE_V2: logical rows=5, nulls=2, so num_elements in value bytes is 3.
+    std::vector<uint8_t> level_bytes = {0x00};  // one byte of definition-level section
+    auto plaintext = Join(level_bytes, value_bytes);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "5"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v2_definition_levels_byte_length", "1"},
+        {"page_v2_repetition_levels_byte_length", "0"},
+        {"page_v2_num_nulls", "2"},
+        {"page_v2_is_compressed", "false"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_v2",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_v2",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV1NullableFloat_PerValueRoundTrip) {
+    std::vector<float> float_values = {1.25f, -2.5f, 100.75f};
+    std::vector<uint8_t> value_bytes;
+    value_bytes.reserve(float_values.size() * sizeof(float));
+    for (float v : float_values) {
+        append_f32_le(value_bytes, v);
+    }
+
+    // Nullable DATA_PAGE_V1 levels: one RLE run with 3 present values.
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 2u);
+    level_bytes.push_back(0x06);  // run_len = 3
+    level_bytes.push_back(0x01);  // def level value = 1 (present)
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "float_col_v1",
+        Type::FLOAT,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_float_v1",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV2NullableFloat_PerValueRoundTrip) {
+    std::vector<float> float_values = {9.5f, 0.0f, -7.25f};
+    std::vector<uint8_t> value_bytes;
+    value_bytes.reserve(float_values.size() * sizeof(float));
+    for (float v : float_values) {
+        append_f32_le(value_bytes, v);
+    }
+
+    // DATA_PAGE_V2: logical rows=5, nulls=2, so num_elements in value bytes is 3.
+    std::vector<uint8_t> level_bytes = {0x00};
+    auto plaintext = Join(level_bytes, value_bytes);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V2"},
+        {"data_page_num_values", "5"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v2_definition_levels_byte_length", "1"},
+        {"page_v2_repetition_levels_byte_length", "0"},
+        {"page_v2_num_nulls", "2"},
+        {"page_v2_is_compressed", "false"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "float_col_v2",
+        Type::FLOAT,
+        std::nullopt,
+        CompressionCodec::UNCOMPRESSED,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_float_v2",
+        "test_user",
+        "{}",
+        {});
+
+    ASSERT_TRUE(sequencer.DecodeAndEncrypt(plaintext))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    ASSERT_TRUE(sequencer.encryption_metadata_.count("encrypt_mode_data_page") == 1);
+    EXPECT_EQ(sequencer.encryption_metadata_.at("encrypt_mode_data_page"), "per_value");
+
+    ASSERT_TRUE(sequencer.DecryptAndEncode(sequencer.encrypted_result_))
+        << sequencer.error_stage_ << " - " << sequencer.error_message_;
+    EXPECT_EQ(sequencer.decrypted_result_, plaintext);
+}
+
+TEST(EncryptionSequencer, DataPageV1MalformedDefinitionPayload_Throws) {
+    std::vector<RawValueBytes> byte_array_elements = {
+        {'a', 'l', 'p', 'h', 'a'},
+        {'b', 'e', 't', 'a'},
+        {'g', 'a', 'm', 'm', 'a', '3'}};
+    auto value_bytes = CombineRawBytesIntoValueBytesForTesting(
+        byte_array_elements, Type::BYTE_ARRAY, std::nullopt, Encoding::PLAIN);
+
+    // Malformed DATA_PAGE_V1 definition payload: truncated varint run header.
+    std::vector<uint8_t> level_bytes;
+    append_u32_le(level_bytes, 1u);
+    level_bytes.push_back(0x80);  // continuation bit set, missing next byte
+
+    auto page_payload = Join(level_bytes, value_bytes);
+    auto plaintext = Compress(page_payload, CompressionCodec::SNAPPY);
+
+    std::map<std::string, std::string> attribs = {
+        {"page_type", "DATA_PAGE_V1"},
+        {"data_page_num_values", "3"},
+        {"data_page_max_definition_level", "1"},
+        {"data_page_max_repetition_level", "0"},
+        {"page_v1_repetition_level_encoding", "RLE"},
+        {"page_v1_definition_level_encoding", "RLE"}};
+
+    DataBatchEncryptionSequencer sequencer(
+        "byte_array_col_bad_v1",
+        Type::BYTE_ARRAY,
+        std::nullopt,
+        CompressionCodec::SNAPPY,
+        Encoding::PLAIN,
+        attribs,
+        CompressionCodec::UNCOMPRESSED,
+        "test_key_bad_v1",
+        "test_user",
+        "{}",
+        {});
+
+    EXPECT_THROW((void)sequencer.DecodeAndEncrypt(plaintext), InvalidInputException);
 }

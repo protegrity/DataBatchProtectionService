@@ -247,7 +247,10 @@ public:
             auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
             
             // Encrypt once for the combined payload
-            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+            std::map<std::string, std::string> encoding_attributes = {
+                {"page_encoding", "PLAIN"},
+                {"page_type", "DICTIONARY_PAGE"},
+                {"dict_page_num_values", std::to_string(sample_data.size())}};
             auto encrypt_result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
             
             if (!encrypt_result || !encrypt_result->success()) {
@@ -361,7 +364,7 @@ public:
                 auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
                 
                 // Encrypt
-                std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+                std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
                 auto encrypt_result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
                 
                 if (!encrypt_result || !encrypt_result->success()) {
@@ -619,12 +622,17 @@ public:
             std::cout << "Test data: 3 fixed-length strings (8 bytes each)" << std::endl;
             std::cout << "Original size: " << fixed_length_data.size() << " bytes" << std::endl;
             
-            // Build DATA_PAGE_V1 payload: level bytes use RLE blocks with length prefixes
+            // Build a minimal valid DATA_PAGE_V1 nullable payload (max_def_level=1, max_rep_level=0):
+            // level bytes layout is [u32 def_payload_len][def_payload].
+            // def_payload is hybrid RLE/bit-packed:
+            //   - 0x06 = varint header for an RLE run (LSB=0), run_len = 0x06 >> 1 = 3
+            //   - 0x01 = repeated definition level value (bit_width=1, value=1 => "present")
+            // This yields 3 definition levels, all present, matching the 3 fixed-length values below.
             std::vector<uint8_t> level_bytes;
-            append_u32_le(level_bytes, 3); // repetition level block length
-            level_bytes.insert(level_bytes.end(), 3, 0xAA);
-            append_u32_le(level_bytes, 5); // definition level block length
-            level_bytes.insert(level_bytes.end(), 5, 0xBB);
+            std::vector<uint8_t> def_payload = {0x06, 0x01};
+            append_u32_le(level_bytes, static_cast<uint32_t>(def_payload.size()));
+            level_bytes.insert(level_bytes.end(), def_payload.begin(), def_payload.end());
+
             auto combined_uncompressed = Join(level_bytes, fixed_length_data);
             auto joined_plaintext = Compress(combined_uncompressed, CompressionCodec::SNAPPY);
             std::cout << "Compressed size: " << joined_plaintext.size() << " bytes" << std::endl;
@@ -632,7 +640,7 @@ public:
                 {"page_type", "DATA_PAGE_V1"},
                 {"data_page_num_values", std::to_string(std::size(test_strings))},
                 {"data_page_max_definition_level", "1"},
-                {"data_page_max_repetition_level", "2"},
+                {"data_page_max_repetition_level", "0"},
                 {"page_v1_repetition_level_encoding", "RLE"},
                 {"page_v1_definition_level_encoding", "RLE"},
                 {"page_encoding", "PLAIN"}
@@ -691,25 +699,17 @@ public:
                 CompressionCodec::SNAPPY);
             size_t offset = 0;
             if (offset + 4 > decompressed_combined.size()) {
-                std::cout << "ERROR: Decompressed payload too small for rep level length" << std::endl;
-                return false;
-            }
-            uint32_t rep_len = read_u32_le(decompressed_combined, static_cast<int>(offset));
-            offset += 4;
-            if (offset + rep_len > decompressed_combined.size()) {
-                std::cout << "ERROR: Decompressed payload too small for rep level bytes" << std::endl;
-                return false;
-            }
-            auto rep_bytes = std::vector<uint8_t>(decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset),
-                                                  decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset + rep_len));
-            offset += rep_len;
-
-            if (offset + 4 > decompressed_combined.size()) {
                 std::cout << "ERROR: Decompressed payload too small for def level length" << std::endl;
                 return false;
             }
             uint32_t def_len = read_u32_le(decompressed_combined, static_cast<int>(offset));
             offset += 4;
+            if (def_len != 2) {
+                std::cout << "ERROR: Unexpected definition-level payload length" << std::endl;
+                std::cout << "  Expected def_len: 2" << std::endl;
+                std::cout << "  Got def_len: " << def_len << std::endl;
+                return false;
+            }
             if (offset + def_len > decompressed_combined.size()) {
                 std::cout << "ERROR: Decompressed payload too small for def level bytes" << std::endl;
                 return false;
@@ -718,8 +718,19 @@ public:
                                                   decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset + def_len));
             offset += def_len;
 
-            if (rep_bytes != std::vector<uint8_t>{0xAA, 0xAA, 0xAA} || def_bytes != std::vector<uint8_t>{0xBB, 0xBB, 0xBB, 0xBB, 0xBB}) {
-                std::cout << "ERROR: Level bytes content mismatch" << std::endl;
+            // Expected def-level payload for this demo:
+            // - 0x06: RLE run header => run_len = 3
+            // - 0x01: repeated def level value 1 (present)
+            if (def_bytes != std::vector<uint8_t>{0x06, 0x01}) {
+                std::cout << "ERROR: Definition-level bytes content mismatch" << std::endl;
+                return false;
+            }
+
+            const size_t expected_total_decompressed_size = 4u + 2u + fixed_length_data.size();
+            if (decompressed_combined.size() != expected_total_decompressed_size) {
+                std::cout << "ERROR: Unexpected decompressed payload size" << std::endl;
+                std::cout << "  Expected size: " << expected_total_decompressed_size << std::endl;
+                std::cout << "  Got size: " << decompressed_combined.size() << std::endl;
                 return false;
             }
 
@@ -729,6 +740,12 @@ public:
             }
             auto value_bytes = std::vector<uint8_t>(decompressed_combined.begin() + static_cast<std::ptrdiff_t>(offset),
                                                     decompressed_combined.end());
+            if (offset != 6u) {
+                std::cout << "ERROR: Unexpected value-byte offset after level bytes" << std::endl;
+                std::cout << "  Expected offset: 6" << std::endl;
+                std::cout << "  Got offset: " << offset << std::endl;
+                return false;
+            }
             std::cout << "Decompressed value size: " << value_bytes.size() << " bytes" << std::endl;
             
             // Verify data integrity
@@ -760,7 +777,7 @@ public:
         try {
             auto empty_data = BuildByteArrayValueBytesForTesting("");
             auto compressed_empty = Compress(empty_data, CompressionCodec::SNAPPY);
-            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_empty), encoding_attributes);
             
             if (result && result->success()) {
@@ -780,7 +797,7 @@ public:
             std::string large_data(1000, 'X');  // 1KB of data
             auto plaintext = BuildByteArrayValueBytesForTesting(large_data);
             auto compressed_plaintext = Compress(plaintext, CompressionCodec::SNAPPY);
-            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}};
+            std::map<std::string, std::string> encoding_attributes = {{"page_encoding", "PLAIN"}, {"page_type", "DICTIONARY_PAGE"}, {"dict_page_num_values", "1"}};
             auto result = agent_->Encrypt(span<const uint8_t>(compressed_plaintext), encoding_attributes);
             
             if (result && result->success()) {

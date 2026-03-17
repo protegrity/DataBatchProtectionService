@@ -33,24 +33,14 @@
 struct LevelAndValueBytes {
     std::vector<uint8_t> level_bytes;
     std::vector<uint8_t> value_bytes;
+    size_t num_elements;
 };
 
 using namespace dbps::external;
 
 // -----------------------------------------------------------------------------
-// Helper functions for processing Parquet formatted data pages and dictionary pages.
+// Functions to decompress and split a Parquet page into level and value bytes.
 // -----------------------------------------------------------------------------
-
-/**
- * Calculates the total length of level bytes based on encoding attributes.
- * Assumes the input encoding attributes are already validated with the required keys and expected value types.
- * 
- * @param raw Raw binary data (currently unused but kept for future V1 implementation)
- * @param encoding_attribs Converted encoding attributes map
- * @return Total length of level bytes. Throws exceptions if calculation fails or page type is unsupported
- */
-int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
-    const AttributesMap& encoding_attribs);
 
 /**
  * Decompresses and splits a Parquet page into level and value bytes.
@@ -74,7 +64,7 @@ std::vector<uint8_t> CompressAndJoin(
 
 
 // -----------------------------------------------------------------------------
-// Helper functions for zero-copy reinterpretation of raw value bytes into a typed buffer.
+// Functions for zero-copy reinterpretation of raw value bytes into a typed buffer.
 // -----------------------------------------------------------------------------
 
 /**
@@ -94,6 +84,7 @@ std::vector<uint8_t> CompressAndJoin(
  */
 dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
     tcb::span<const uint8_t> value_bytes,
+    size_t num_elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding);
@@ -106,3 +97,5 @@ dbps::processing::TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
  */
 std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(
     dbps::processing::TypedValuesBuffer&& buffer);
+
+// -----------------------------------------------------------------------------

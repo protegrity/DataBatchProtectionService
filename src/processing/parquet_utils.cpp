@@ -28,31 +28,208 @@ using namespace dbps::compression;
 using namespace dbps::processing;
 
 // -----------------------------------------------------------------------------
-// Process Parquet formatted Dictionary and Data pages
+// Helper functions for Parquet DATA_PAGE_V1 definition level bytes parsing to count present values.
 // -----------------------------------------------------------------------------
 
+// Decodes one unsigned LEB128 (base-128 varint) run header from `bytes`,
+// starting at `offset`, and advances `offset` past the decoded header bytes.
+//
+// A "run header" is a variable-length encoded integer that indicates the length of a run.
+//
+// In Parquet V1 hybrid RLE/bit-packed streams, this run header indicates:
+// - RLE run when (header & 1) == 0, with run_length = header >> 1
+// - Bit-packed run when (header & 1) == 1, with num_groups = header >> 1
+//   and run_length = num_groups * 8 values
+//
+// This is used by V1 definition-level decoding to iterate runs and compute
+// the count of present (non-null) values in nullable data pages.
+//
+uint32_t ReadV1RunHeaderUleb128(tcb::span<const uint8_t> bytes, size_t& offset) {
+    uint32_t value = 0;
+    int shift = 0;
+    while (true) {
+        if (offset >= bytes.size()) {
+            throw InvalidInputException("Invalid DATA_PAGE_V1 level stream: truncated varint header");
+        }
+        uint8_t b = bytes[offset++];
+        value |= static_cast<uint32_t>(b & 0x7F) << shift;
+        if ((b & 0x80) == 0) {
+            return value;
+        }
+        shift += 7;
+        if (shift > 28) {
+            throw InvalidInputException("Invalid DATA_PAGE_V1 level stream: varint header too large");
+        }
+    }
+}
+
+// Decodes a DATA_PAGE_V1 definition-level payload (hybrid RLE/bit-packed) and
+// returns the number of present (non-null) values in the page.
+//
+// Reference: https://parquet.apache.org/docs/file-format/data-pages/encodings/#RLE
+//
+// Inputs:
+// - def_payload: bytes of the V1 definition-level stream payload only
+//   (without the outer [u32 length] prefix).
+// - num_values: total number of logical values in the page (includes nulls).
+// - max_def_level: maximum definition level for the column in this page.
+//
+// Output:
+// - present_count = number of decoded definition levels equal to max_def_level.
+//
+size_t CountPresentValuesFromDefinitionLevelsV1(tcb::span<const uint8_t> def_payload, int32_t num_values, int32_t max_def_level) {
+    if (num_values < 0) {
+        throw InvalidInputException("Invalid V1 definition levels: num_values must be non-negative, got " + 
+            std::to_string(num_values));
+    }
+    if (max_def_level <= 0) {
+        throw InvalidInputException("Invalid V1 definition levels: max_def_level must be positive, got " + 
+            std::to_string(max_def_level));
+    }
+
+    // Definition level bit width is ceil(log2(max_def_level + 1)).
+    // Computes the minimum number of bits needed to represent definition levels from 0..max_def_level.
+    int bit_width = 0;
+    uint32_t def_level_domain = static_cast<uint32_t>(max_def_level);
+    while (def_level_domain > 0) {
+        ++bit_width;
+        def_level_domain >>= 1;
+    }
+    if (bit_width <= 0) {
+        throw InvalidInputException("Invalid V1 definition levels: computed bit_width must be positive");
+    }
+
+    size_t present_count = 0;
+    size_t decoded_values = 0;
+    size_t def_offset = 0;
+
+    // Hybrid RLE/bit-packed decode loop.
+    while (decoded_values < static_cast<size_t>(num_values)) {
+        uint32_t header = ReadV1RunHeaderUleb128(def_payload, def_offset);
+
+        if ((header & 1u) == 0u) {
+            // RLE run: header = (run_len << 1), then repeated value in ceil(bit_width/8) bytes.
+            const size_t run_len = static_cast<size_t>(header >> 1);
+            const size_t remaining = static_cast<size_t>(num_values) - decoded_values;
+            if (run_len == 0 || run_len > remaining) {
+                throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: invalid RLE run length");
+            }
+
+            const size_t byte_width = static_cast<size_t>((bit_width + 7) / 8);
+            if (def_offset + byte_width > def_payload.size()) {
+                throw InvalidInputException("Invalid V1 definition levels: truncated RLE run value");
+            }
+
+            uint32_t level = 0;
+            for (size_t i = 0; i < byte_width; ++i) {
+                level |= static_cast<uint32_t>(def_payload[def_offset + i]) << (8 * i);
+            }
+            def_offset += byte_width;
+            if (level > static_cast<uint32_t>(max_def_level)) {
+                throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: decoded level exceeds max_def_level");
+            }
+
+            if (level == static_cast<uint32_t>(max_def_level)) {
+                present_count += run_len;
+            }
+            decoded_values += run_len;
+        } else {
+            // Bit-packed run: header = (num_groups << 1) | 1, each group has 8 values.
+            const size_t num_groups = static_cast<size_t>(header >> 1);
+            const size_t run_len = num_groups * 8;
+            const size_t remaining = static_cast<size_t>(num_values) - decoded_values;
+            if (num_groups == 0) {
+                throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: invalid bit-packed run length");
+            }
+
+            const size_t total_bits = run_len * static_cast<size_t>(bit_width);
+            const size_t byte_len = (total_bits + 7) / 8;
+            if (def_offset + byte_len > def_payload.size()) {
+                throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: truncated bit-packed run payload");
+            }
+            auto packed = tcb::span<const uint8_t>(def_payload.data() + def_offset, byte_len);
+            def_offset += byte_len;
+
+            auto ReadPacked = [&](size_t bit_offset) -> uint32_t {
+                uint32_t v = 0;
+                for (int b = 0; b < bit_width; ++b) {
+                    size_t abs_bit = bit_offset + static_cast<size_t>(b);
+                    size_t byte_index = abs_bit / 8;
+                    size_t bit_index = abs_bit % 8;
+                    uint8_t bit = static_cast<uint8_t>((packed[byte_index] >> bit_index) & 0x01);
+                    v |= static_cast<uint32_t>(bit) << b;
+                }
+                return v;
+            };
+
+            // A final bit-packed run may include padded trailing values to complete
+            // 8-value groups. Decode only the logical values still remaining.
+            const size_t values_to_decode = std::min(run_len, remaining);
+            for (size_t i = 0; i < values_to_decode; ++i) {
+                uint32_t level = ReadPacked(i * static_cast<size_t>(bit_width));
+                if (level > static_cast<uint32_t>(max_def_level)) {
+                    throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: decoded level exceeds max_def_level");
+                }
+                if (level == static_cast<uint32_t>(max_def_level)) {
+                    ++present_count;
+                }
+            }
+            decoded_values += values_to_decode;
+        }
+    }
+    if (def_offset != def_payload.size()) {
+        throw InvalidInputException("Invalid DATA_PAGE_V1 definition levels: trailing bytes after decoding");
+    }
+    return present_count;
+}
+
+// -----------------------------------------------------------------------------
+// Helper functions to read/split DATA_PAGE_V1 level bytes -- Read length-prefixed level bytes
+// -----------------------------------------------------------------------------
+
+// Function to read a length-prefixed payload from the level bytes.
+tcb::span<const uint8_t> ReadV1LengthPrefixedPayload(tcb::span<const uint8_t> bytes, size_t& offset) {
+    if (offset + 4 > bytes.size()) {
+        throw InvalidInputException(
+            "Invalid Parquet DATA_PAGE_V1 level bytes: missing 4-byte length prefix");
+    }
+    uint32_t len = read_u32_le(bytes, offset);
+    const size_t payload_offset = offset + 4;
+    if (len > bytes.size() - payload_offset) {
+        throw InvalidInputException(
+            "Invalid Parquet DATA_PAGE_V1 level bytes: length-prefixed block exceeds bounds");
+    }
+    offset = payload_offset + static_cast<size_t>(len);
+    return tcb::span<const uint8_t>(bytes.data() + payload_offset, static_cast<size_t>(len));
+}
+
+// Function to skip the repetition levels bytes and return the definition levels bytes payload.
+tcb::span<const uint8_t> ReadDefinitionLevelBytesV1(tcb::span<const uint8_t> level_bytes, int32_t max_rep_level) {
+    // V1 level bytes are [rep_levels?][def_levels], each as [u32 len][payload].
+    size_t level_offset = 0;
+
+    // Skip the repetition levels bytes if any.
+    if (max_rep_level > 0) {
+        (void) ReadV1LengthPrefixedPayload(level_bytes, level_offset);
+    }
+
+    // Read the definition levels bytes.
+    auto def_payload = ReadV1LengthPrefixedPayload(level_bytes, level_offset);
+    if (level_offset != level_bytes.size()) {
+        throw InvalidInputException("Invalid Parquet DATA_PAGE_V1 level bytes: trailing bytes after definition levels block");
+    }
+    return def_payload;
+}
+
+// -----------------------------------------------------------------------------
+// Helper function to calculate level bytes length
+// -----------------------------------------------------------------------------
+
+// Calculates the total length of level bytes based on encoding attributes.
+// Assumes the input encoding attributes are already validated with the required keys and expected value types.
 int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     const AttributesMap& encoding_attribs) {
-    
-    // Helper function to skip V1 RLE level data in raw bytes
-    // Returns number of bytes consumed: [4-byte len] + [level bytes indicated by `len`]
-    auto SkipV1RLELevel = [&raw](size_t& offset) -> int {
-        if (offset + 4 > raw.size()) {
-            throw InvalidInputException(
-                "Invalid RLE level data: offset + 4 exceeds data size (offset=" + 
-                std::to_string(offset) + ", size=" + std::to_string(raw.size()) + ")");
-        }
-        uint32_t len = read_u32_le(raw, offset);
-        if (offset + 4 + len > raw.size()) {
-            throw InvalidInputException(
-                "Invalid RLE level data: length field overflows (offset=" + 
-                std::to_string(offset) + ", len=" + std::to_string(len) + ", size=" + 
-                std::to_string(raw.size()) + ")");
-        }
-        offset += 4 + len;
-        return 4 + len;
-    };
-    
+
     // Get page_type from the converted attributes
     const std::string& page_type = std::get<std::string>(encoding_attribs.at("page_type"));
     int total_level_bytes = 0;
@@ -72,17 +249,21 @@ int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
                 ", definition_level_encoding=" + def_encoding + " (only RLE is expected)");
         }
 
-        // if max_rep_level > 0, there are repetition levels bytes. Same for definition levels.
+        // Read and skip the repetition/definition level bytes to calculate the final offset where
+        // the level bytes end and the value bytes start.
+        // - If max_rep_level > 0, there are repetition levels bytes. Same for definition levels.
         int32_t max_rep_level = std::get<int32_t>(encoding_attribs.at("data_page_max_repetition_level"));
         int32_t max_def_level = std::get<int32_t>(encoding_attribs.at("data_page_max_definition_level"));
         size_t offset = 0;
         if (max_rep_level > 0) {
-            int bytes_skipped = SkipV1RLELevel(offset);
-            total_level_bytes += bytes_skipped;
+            size_t start_offset = offset;
+            (void) ReadV1LengthPrefixedPayload(raw, offset);
+            total_level_bytes += static_cast<int>(offset - start_offset);
         }
         if (max_def_level > 0) {
-            int bytes_skipped = SkipV1RLELevel(offset);
-            total_level_bytes += bytes_skipped;
+            size_t start_offset = offset;
+            (void) ReadV1LengthPrefixedPayload(raw, offset);
+            total_level_bytes += static_cast<int>(offset - start_offset);
         }
 
     } else if (page_type == "DICTIONARY_PAGE") {
@@ -107,6 +288,10 @@ int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
     return total_level_bytes;
 }
 
+// -----------------------------------------------------------------------------
+// Public functions to process Parquet formatted Dictionary and Data pages
+// -----------------------------------------------------------------------------
+
 LevelAndValueBytes DecompressAndSplit(
     tcb::span<const uint8_t> plaintext,
     CompressionCodec::type compression,
@@ -123,7 +308,25 @@ LevelAndValueBytes DecompressAndSplit(
         int leading_bytes_to_strip = CalculateLevelBytesLength(
             decompressed_bytes, encoding_attributes);
         auto [level_bytes, value_bytes] = Split(decompressed_bytes, leading_bytes_to_strip);
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+
+        // For DATA_PAGE_V1, data_page_num_values is the count of logical rows (includes nulls).
+        // The V1 header does not carry num_nulls, so we cannot derive present values as in V2.
+        // To get the number of encoded physical values in value_bytes, we must parse definition levels.
+        size_t num_elements = 0;
+        const int32_t num_values = std::get<int32_t>(encoding_attributes.at("data_page_num_values"));
+        int32_t max_def_level = std::get<int32_t>(encoding_attributes.at("data_page_max_definition_level"));
+        int32_t max_rep_level = std::get<int32_t>(encoding_attributes.at("data_page_max_repetition_level"));
+        if (max_def_level == 0) {
+            // All values are present in the value bytes section.
+            num_elements = static_cast<size_t>(num_values);
+        }
+        // If max_def_level > 0, there are definition levels bytes. So parse it and count the present values.
+        else {
+            auto def_bytes_payload = ReadDefinitionLevelBytesV1(level_bytes, max_rep_level);
+            num_elements = CountPresentValuesFromDefinitionLevelsV1(def_bytes_payload, num_values, max_def_level);
+        }
+
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes), num_elements};
     }
 
     // On DATA_PAGE_V2, only the value bytes are compressed.
@@ -143,14 +346,28 @@ LevelAndValueBytes DecompressAndSplit(
         } else {
             value_bytes = std::vector<uint8_t>(compressed_value_bytes_span.begin(), compressed_value_bytes_span.end());
         }
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+
+        // For DATA_PAGE_V2, data_page_num_values is the count of logical rows, not present values. data_page_num_values includes nulls. 
+        // num_nulls is the count of nulls in the page.
+        // So num_elements (the present values) is num_values - num_nulls.
+        int32_t num_values = std::get<int32_t>(encoding_attributes.at("data_page_num_values"));
+        int32_t num_nulls = std::get<int32_t>(encoding_attributes.at("page_v2_num_nulls"));
+        if (num_nulls > num_values) {
+            throw InvalidInputException(
+                "Invalid num_nulls: " + std::to_string(num_nulls) + " > num_values: " +
+                std::to_string(num_values) + " in DATA_PAGE_V2 encoding attributes");
+        }
+        size_t num_elements = static_cast<size_t>(num_values - num_nulls);
+
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes), num_elements};
     }
 
     // DICTIONARY_PAGE has no level bytes.
     if (page_type == "DICTIONARY_PAGE") {
         auto level_bytes = std::vector<uint8_t>();
         auto value_bytes = Decompress(plaintext, compression);
-        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes)};
+        size_t num_elements = static_cast<size_t>( std::get<int32_t>(encoding_attributes.at("dict_page_num_values")));
+        return LevelAndValueBytes{std::move(level_bytes), std::move(value_bytes), num_elements};
     }
 
     throw InvalidInputException("Unexpected page type: " + page_type);
@@ -196,10 +413,12 @@ std::vector<uint8_t> CompressAndJoin(
 }
 
 // -----------------------------------------------------------------------------
-// Build Parquet formatted value bytes into TypedValuesBuffer
+// Public functions to build Parquet formatted value bytes into TypedValuesBuffer
 // -----------------------------------------------------------------------------
 
-TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8_t> value_bytes,
+TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(
+    tcb::span<const uint8_t> value_bytes,
+    size_t num_elements,
     Type::type datatype,
     const std::optional<int>& datatype_length,
     Encoding::type encoding) {
@@ -223,24 +442,24 @@ TypedValuesBuffer ReinterpretValueBytesAsTypedValuesBuffer(tcb::span<const uint8
 
     switch (datatype) {
         case Type::INT32:
-            return TypedBufferI32{value_bytes};
+            return TypedBufferI32{value_bytes, num_elements};
         case Type::INT64:
-            return TypedBufferI64{value_bytes};
+            return TypedBufferI64{value_bytes, num_elements};
         case Type::FLOAT:
-            return TypedBufferFloat{value_bytes};
+            return TypedBufferFloat{value_bytes, num_elements};
         case Type::DOUBLE:
-            return TypedBufferDouble{value_bytes};
+            return TypedBufferDouble{value_bytes, num_elements};
         case Type::INT96:
-            return TypedBufferInt96{value_bytes};
+            return TypedBufferInt96{value_bytes, num_elements};
         case Type::FIXED_LEN_BYTE_ARRAY: {
             if (!datatype_length.has_value() || datatype_length.value() <= 0) {
                 throw InvalidInputException("FIXED_LEN_BYTE_ARRAY requires a positive datatype_length");
             }
             return TypedBufferRawBytesFixedSized{
-                value_bytes, 0, RawBytesFixedSizedCodec{static_cast<size_t>(datatype_length.value())}};
+                value_bytes, num_elements, 0, RawBytesFixedSizedCodec{static_cast<size_t>(datatype_length.value())}};
         }
         case Type::BYTE_ARRAY:
-            return TypedBufferRawBytesVariableSized{value_bytes};
+            return TypedBufferRawBytesVariableSized{value_bytes, num_elements};
         default:
             throw InvalidInputException(
                 "Invalid datatype: " + std::string(to_string(datatype)));
@@ -254,3 +473,5 @@ std::vector<uint8_t> GetTypedValuesBufferAsValueBytes(TypedValuesBuffer&& buffer
         return buf.FinalizeAndTakeBuffer();
     }, buffer);
 }
+
+// -----------------------------------------------------------------------------
