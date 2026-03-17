@@ -147,9 +147,6 @@ bool DataBatchEncryptionSequencer::DecodeAndEncrypt(tcb::span<const uint8_t> pla
         // Encrypt the typed values buffer and level bytes, then join them into a single encrypted byte vector.
         auto encrypted_value_bytes = encryptor_->EncryptValueList(typed_buffer);
         auto encrypted_level_bytes = encryptor_->EncryptBlock(level_bytes);
-
-        // Encrypted payloads mostly have a low-compression ratio, so the gains in size from compression are minimal or negative.
-        // Therefore, the final joined encrypted bytes are returned as-is without compression.
         encrypted_result_ = JoinWithLengthPrefix(encrypted_level_bytes, encrypted_value_bytes);
 
         // Set the encryption type to per-value
@@ -232,9 +229,7 @@ bool DataBatchEncryptionSequencer::DecryptAndEncode(tcb::span<const uint8_t> cip
     if (encryption_mode == ENCRYPTION_MODE_PER_VALUE) {
 
         // Split the joined encrypted bytes, then decrypt the level and value bytes separately.
-        // The ciphertext payload is already the joined bytes without compression.
         auto [encrypted_level_bytes, encrypted_value_bytes] = SplitWithLengthPrefix(ciphertext);
-        
         auto level_bytes = encryptor_->DecryptBlock(encrypted_level_bytes);
         auto typed_buffer = encryptor_->DecryptValueList(encrypted_value_bytes);
         

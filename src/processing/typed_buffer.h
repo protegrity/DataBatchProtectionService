@@ -155,14 +155,16 @@ ByteBuffer<Codec>::ByteBuffer(
     Codec codec)
     : elements_span_(elements_span),
       elements_span_size_(elements_span.size()),
+      // `num_elements_` is the expected number of elements in the buffer declared upfront.
+      // - if the actual payload count mismatches, exceptions are thrown.
       num_elements_(num_elements),
       codec_(std::move(codec)),
       // `element_iterator_current_ptr_` is initialized to the start of the span.
-      // - it points to the start of the span + the prefix size if there is one.
+      // - it is calculated to point to the start of the span + the prefix size if there is one.
       element_iterator_current_ptr_(
           elements_span.data() + std::min(prefix_size, elements_span_size_)),
       // `element_iterator_end_ptr_` is initialized to the end of the span.
-      // - it points to the start of the span + the size.
+      // - it is calculated to point to the start of the span + the size.
       element_iterator_end_ptr_(elements_span.data() + elements_span_size_),
       element_iterator_count_(0),
       prefix_size_(prefix_size),
