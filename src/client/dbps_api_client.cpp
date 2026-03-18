@@ -28,8 +28,10 @@ using namespace dbps::external;
 using namespace dbps::enum_utils;
 
 // Generate a simple unique reference ID using timestamp
-// TODO: Potentially not-unique if concurrent calls are made on the same millisecond.
-//       Can use atomic counters but may not be an issue to justify the complexity.
+
+// Potential improvement:
+// - Potentially not-unique if concurrent calls are made on the same millisecond.
+// - Can use atomic counters but may not be an issue to justify the complexity.
 std::string GenerateReferenceId() {
     auto now = std::chrono::system_clock::now();
     auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(

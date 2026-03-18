@@ -104,8 +104,10 @@ public:
     // Constructor with HTTP client passed. Creates API_client immediately on the contructor.
     explicit RemoteDataBatchProtectionAgent(std::shared_ptr<HttpClientBase> http_client);
     
-    // TODO: Split credentials config file key and credentials file from connection config.
-    //   Currently these live on the same file, but should be separate as they may have different access permissions.
+    // Potential improvement:
+    // - Split credentials config file key and credentials file from connection config.
+    // - Currently these live on the same file, but should be separate as they may have different access permissions.
+    
     // Configuration map keys
     inline static const std::string k_connection_config_key_ = "connection_config_file_path";
 

@@ -341,7 +341,7 @@ std::unique_ptr<DecryptionResult> RemoteDataBatchProtectionAgent::Decrypt(span<c
     );
 
     // Validate that response fields match request fields
-    // TODO: Add validation for encoding when these are expanded beyond PLAIN.
+    // Potential improvement: Add validation for encoding when these are expanded beyond PLAIN.
     if (response.Success()) {
         const auto& response_attrs = response.GetResponseAttributes();
         
@@ -452,7 +452,7 @@ std::shared_ptr<HttpClientBase> RemoteDataBatchProtectionAgent::InstantiateHttpC
     // get the client for the given server_url_ with configured number of worker threads
     std::size_t num_worker_threads = ExtractNumWorkerThreads(*config_json_opt);
     
-    // TODO: Split credentials config file key and credentials file from connection config.
+    // Potential improvement: Split credentials config file key and credentials file from connection config.
     HttpClientBase::ClientCredentials credentials = ExtractClientCredentials(*config_json_opt);
     
     std::shared_ptr<HttpClientBase> http_client =
@@ -549,7 +549,7 @@ HttplibPoolRegistry::PoolConfig RemoteDataBatchProtectionAgent::ExtractPoolConfi
     pool_config.write_timeout = std::chrono::seconds(
         get_int_or_default(config_json, "connection_pool.write_timeout_seconds", HttplibPoolRegistry::kDefaultWriteTimeout_s.count()));
 
-    //TODO: find a better way to log this.
+    //Potential improvement: find a better way to log this.
     // Log the configured pool values for observability
     std::cerr << "INFO: RemoteDataBatchProtectionAgent::init() - HTTP pool config {"
     << " max_pool_size=" << pool_config.max_pool_size

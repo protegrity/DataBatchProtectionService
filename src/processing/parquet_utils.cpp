@@ -239,6 +239,7 @@ int CalculateLevelBytesLength(tcb::span<const uint8_t> raw,
         int32_t def_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_definition_levels_byte_length"));
         int32_t rep_level_length = std::get<int32_t>(encoding_attribs.at("page_v2_repetition_levels_byte_length"));
         total_level_bytes = def_level_length + rep_level_length;
+        
     } else if (page_type == "DATA_PAGE_V1") {
         // Check that encoding types are RLE (instead of BIT_PACKED which is deprecated)
         const std::string& rep_encoding = std::get<std::string>(encoding_attribs.at("page_v1_repetition_level_encoding"));
@@ -301,7 +302,7 @@ LevelAndValueBytes DecompressAndSplit(
     auto page_type = std::get<std::string>(encoding_attributes.at("page_type"));
 
     // On DATA_PAGE_V1, the whole payload is compressed.
-    // So the split of level and value byte requires to
+    // So the split of level and value byte requires to:
     // (1) decompress the whole payload, (2) calculate length of level bytes, (3) split into level and value bytes.
     if (page_type == "DATA_PAGE_V1") {
         auto decompressed_bytes = Decompress(plaintext, compression);
@@ -330,7 +331,7 @@ LevelAndValueBytes DecompressAndSplit(
     }
 
     // On DATA_PAGE_V2, only the value bytes are compressed.
-    // So the split of level and value byte requires to
+    // So the split of level and value byte requires to:
     // (1) calculate length of level bytes, (2) split into level, (3) decompress only the value bytes.
     if (page_type == "DATA_PAGE_V2") {
         int leading_bytes_to_strip = CalculateLevelBytesLength(

@@ -55,8 +55,11 @@ int main(int argc, char* argv[]) {
     // Initialize credentials file path and JWT secret key with parsed command line options
     std::optional<std::string> credentials_file_path = std::nullopt;
     std::string jwt_secret_key = "default-secret-key-overwritten-by-command-line";
-    // TODO: Flip allow_missing_credentials=False when instructions are updated with the cmdline flags to run the server.
+
+    // `allow_missing_credentials` is set to true to allow a missing credentials file to be used.
+    // This is useful for development and testing purposes, but should be set to false in production.
     bool allow_missing_credentials = true;
+
     try {
         cxxopts::Options options("dbps_api_server", "Data Batch Protection Service API Server");
         options.add_options()
