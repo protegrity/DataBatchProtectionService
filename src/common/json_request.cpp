@@ -143,8 +143,9 @@ std::string EncodeBase64Safe(const std::vector<uint8_t>& data) {
     }
 }
 
+// Potential improvement: Unify usage of nlohmann or crow json for parsing and dumping.
+
 // Allow strings or nested structures in the JSON payload for authentication credentials.
-// TODO(Issue #205): Unify usage of nlohmann or crow json for parsing and dumping.
 std::optional<std::string> TokenRequest::ParseWithError(const std::string& request_body) {
     credential_values_.clear();
 

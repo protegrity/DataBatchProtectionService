@@ -96,8 +96,8 @@ protected:
 
     // Attribute for the number of elements in the buffer (a const)
     // - `num_elements_` is a const and passed during construction of both read-only and write buffers.
-    // - It indicates the expected number of elements in the buffer payload declared upfront.
-    // - This is treated as an invariant, so if the payload count mismatches, exceptions are thrown.
+    // - It indicates the expected number of elements in the buffer payload.
+    // - This is treated as an invariant. If the actual payload count mismatches, exceptions are thrown.
     const size_t num_elements_;
 
     // Variables for element span iterator.
@@ -155,7 +155,7 @@ ByteBuffer<Codec>::ByteBuffer(
     Codec codec)
     : elements_span_(elements_span),
       elements_span_size_(elements_span.size()),
-      // `num_elements_` is the expected number of elements in the buffer declared upfront.
+      // `num_elements_` is the expected number of elements in the buffer.
       // - if the actual payload count mismatches, exceptions are thrown.
       num_elements_(num_elements),
       codec_(std::move(codec)),
@@ -206,15 +206,12 @@ inline void ByteBuffer<Codec>::InitializeFromSpan() const {
     // Fixed-size layout has implicit offsets from index * element_size.
     // We validate shape and derive element count. No need to store offsets.
     if constexpr (is_fixed_sized) {
-        if (element_size_ <= 0) {
-            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
-        }
         if ((readable_size % element_size_) != 0) {
             throw InvalidInputException("Malformed fixed-size buffer: buffer does not align with element_size");
         }
 
         // Check if the num_elements passed at contruction time coincides with the calculated from the payload size.
-        // This is a division of integer values, however it results in a correct integer result because of the modulo guard above.
+        // Although this is a division of integers, the result is an integer (no remainder) because of the modulo guard above.
         const size_t num_elements_on_payload = readable_size / element_size_;
         if (num_elements_on_payload != num_elements_) {
             throw InvalidInputException("Malformed fixed-size buffer: num_elements on payload != num_elements_ expected.");
@@ -454,10 +451,6 @@ template <class Codec>
 inline void ByteBuffer<Codec>::InitializeForWriteBuffer(size_t variable_size_reserved_bytes_hint) {
     // Fixed-size elements
     if constexpr (is_fixed_sized) {
-        if (element_size_ <= 0) {
-            throw InvalidInputException("Invalid fixed-size buffer: element_size must be greater than zero");
-        }
-
         // write_buffer can be allocated to precise size since the element size and number of elements are known.
         // We initialize it to 0s to have random-ish access during writes.
         const size_t fixed_size_total_bytes = prefix_size_ + (num_elements_ * element_size_);
