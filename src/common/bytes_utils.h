@@ -403,10 +403,5 @@ inline std::vector<uint8_t> StringToBytes(const std::string& str) {
 }
 
 inline std::string BytesToString(tcb::span<const uint8_t> span) {
-    std::string result;
-    result.reserve(span.size());
-    for (const uint8_t byte : span) {
-        result += static_cast<char>(byte);
-    }
-    return result;
+    return std::string(reinterpret_cast<const char*>(span.data()), span.size());
 }

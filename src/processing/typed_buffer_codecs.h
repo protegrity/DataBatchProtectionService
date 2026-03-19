@@ -27,6 +27,8 @@
 
 namespace dbps::processing {
 
+// The values in Int96 of low/mid/hi are stored in little endian order.
+// The order of low/mid/hi in the C++ struct should be kept, otherwise the codec will yield incorrect values.
 struct Int96 {
     int32_t lo;
     int32_t mid;
