@@ -18,6 +18,7 @@
 #include "typed_buffer_values.h"
 #include "typed_buffer_testing_codecs.h"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -153,6 +154,27 @@ void ExpectInt96Eq(const Int96& actual, const Int96& expected) {
     EXPECT_EQ(actual.hi, expected.hi);
 }
 } // namespace
+
+TEST(TypedBufferValuesTest, Int96Codec_ElementSizeAndTypeName) {
+    const Int96Codec codec;
+    EXPECT_EQ(codec.element_size(), 12u);
+    EXPECT_EQ(codec.type_name(), "INT96");
+}
+
+TEST(TypedBufferValuesTest, Int96Codec_DecodeWrongSize_Throws) {
+    const Int96Codec codec;
+    const std::array<uint8_t, 11> bytes = {0};
+
+    EXPECT_THROW((void)codec.Decode(tcb::span<const uint8_t>(bytes)), InvalidInputException);
+}
+
+TEST(TypedBufferValuesTest, Int96Codec_EncodeWrongSize_Throws) {
+    const Int96Codec codec;
+    const Int96 value{1, 2, 3};
+    std::array<uint8_t, 11> bytes = {0};
+
+    EXPECT_THROW(codec.Encode(value, tcb::span<uint8_t>(bytes)), InvalidInputException);
+}
 
 TEST(TypedBufferValuesTest, Int96_ReadBack) {
     const Int96 a{1, 2, 3};

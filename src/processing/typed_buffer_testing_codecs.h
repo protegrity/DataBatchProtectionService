@@ -50,7 +50,7 @@ struct StringFixedSizedCodec {
         return element_size_bytes_;
     }
 
-    value_type Decode(tcb::span<const uint8_t> read_span) const {
+    inline value_type Decode(tcb::span<const uint8_t> read_span) const {
         if (read_span.size() != element_size_bytes_) {
             throw InvalidInputException("Decode: read_span size does not match element_size_bytes");
         }
@@ -59,7 +59,7 @@ struct StringFixedSizedCodec {
             read_span.size());
     }
 
-    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
+    inline void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
         if (write_span.size() != element_size_bytes_) {
             throw InvalidInputException("Encode: write_span size does not match element_size_bytes");
         }
@@ -85,13 +85,13 @@ struct StringVariableSizedCodec {
         throw InvalidInputException("StringVariableSizedCodec does not have a fixed element size");
     }
 
-    value_type Decode(tcb::span<const uint8_t> read_span) const noexcept {
+    inline value_type Decode(tcb::span<const uint8_t> read_span) const noexcept {
         return std::string_view(
             reinterpret_cast<const char*>(read_span.data()),
             read_span.size());
     }
 
-    void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
+    inline void Encode(const value_type& value, tcb::span<uint8_t> write_span) const {
         // Exact match required to prevent short values leaving stale trailing bytes,
         // and to prevent longer values from overflowing.
         if (value.size() != write_span.size()) {

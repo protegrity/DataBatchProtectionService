@@ -20,28 +20,22 @@
 #include <sstream>
 #include <string>
 #include <variant>
+#include "../common/bytes_utils.h"
 #include "typed_buffer_codecs.h"
 #include "typed_buffer.h"
 
 namespace dbps::processing {
 
-struct Int96 {
-    int32_t lo;
-    int32_t mid;
-    int32_t hi;
-};
-
 inline constexpr char kI32TypeName[] = "INT32";
 inline constexpr char kI64TypeName[] = "INT64";
 inline constexpr char kF32TypeName[] = "FLOAT";
 inline constexpr char kF64TypeName[] = "DOUBLE";
-inline constexpr char kInt96TypeName[] = "INT96";
 
 using TypedBufferI32 = ByteBuffer<PlainValueCodec<int32_t, kI32TypeName>>;
 using TypedBufferI64 = ByteBuffer<PlainValueCodec<int64_t, kI64TypeName>>;
 using TypedBufferFloat = ByteBuffer<PlainValueCodec<float, kF32TypeName>>;
 using TypedBufferDouble = ByteBuffer<PlainValueCodec<double, kF64TypeName>>;
-using TypedBufferInt96 = ByteBuffer<PlainValueCodec<Int96, kInt96TypeName>>;
+using TypedBufferInt96 = ByteBuffer<Int96Codec>;
 using TypedBufferRawBytesFixedSized = ByteBuffer<RawBytesFixedSizedCodec>;
 using TypedBufferRawBytesVariableSized = ByteBuffer<RawBytesVariableSizedCodec>;
 
@@ -63,10 +57,12 @@ inline std::string PrintableTypedValuesBuffer(const TypedValuesBuffer& buffer) {
 
         std::ostringstream out;
         const size_t num_elements = typed_buffer.GetNumElements();
+        const size_t max_printable_elements = 20;
+        const size_t elements_to_print = std::min(num_elements, max_printable_elements);
 
         out << BufferType::type_name() << " (" << num_elements << " elements):\n";
 
-        for (size_t i = 0; i < num_elements; ++i) {
+        for (size_t i = 0; i < elements_to_print; ++i) {
             const auto element = typed_buffer.GetElement(i);
             if constexpr (std::is_same_v<ValueType, Int96>) {
                 out << "  [" << i << "] [" << element.lo << ", "
@@ -75,10 +71,17 @@ inline std::string PrintableTypedValuesBuffer(const TypedValuesBuffer& buffer) {
                 out << "  [" << i << "] \"" << element
                     << "\" (length: " << element.size() << ")\n";
             } else if constexpr (std::is_same_v<ValueType, tcb::span<const uint8_t>>) {
-                out << "  [" << i << "] <" << element.size() << " bytes>\n";
+                auto printable_span = BytesToString(element);
+                out << "  [" << i << "] \"" << printable_span
+                    << "\" (length: " << element.size() << " bytes)\n";
             } else {
                 out << "  [" << i << "] " << element << "\n";
             }
+        }
+
+        if (num_elements > max_printable_elements) {
+            out << "  ... output truncated, showing first " << max_printable_elements
+                << " of " << num_elements << " elements\n";
         }
 
         return out.str();

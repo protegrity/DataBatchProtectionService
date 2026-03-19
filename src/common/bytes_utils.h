@@ -30,7 +30,7 @@
 
 inline constexpr size_t kSizePrefixBytes = sizeof(uint32_t);
 
-// Utility functions for little-endian number reading and writing.
+// Utility functions for little-endian number reading and writing (vectors and spans)
 
 inline void append_u32_le(std::vector<uint8_t>& out, uint32_t v) {
     const size_t offset = out.size();
@@ -81,13 +81,6 @@ inline void write_u32_le_at(std::vector<uint8_t>& buf, size_t offset, uint32_t v
     buf[offset + 3] = static_cast<uint8_t>((v >> 24) & 0xFF);
 }
 
-inline void write_u32_le(uint8_t* p, uint32_t v) {
-    p[0] = static_cast<uint8_t>(v);
-    p[1] = static_cast<uint8_t>(v >> 8);
-    p[2] = static_cast<uint8_t>(v >> 16);
-    p[3] = static_cast<uint8_t>(v >> 24);
-}
-
 inline uint32_t read_u32_le(const std::vector<uint8_t>& in, size_t offset) {
     return static_cast<uint32_t>(in[offset]) |
         (static_cast<uint32_t>(in[offset + 1]) << 8) |
@@ -102,10 +95,110 @@ inline uint32_t read_u32_le(tcb::span<const uint8_t> in, size_t offset) {
         (static_cast<uint32_t>(in[offset + 3]) << 24);
 }
 
+// Utility functions for reading and writing with templated types.
+
+template <class T>
+inline T read_le(const uint8_t* p) {
+    if constexpr (std::is_same_v<T, int32_t>) {
+        const uint32_t v =
+            (static_cast<uint32_t>(p[0])      ) |
+            (static_cast<uint32_t>(p[1]) <<  8) |
+            (static_cast<uint32_t>(p[2]) << 16) |
+            (static_cast<uint32_t>(p[3]) << 24);
+        return static_cast<int32_t>(v);
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        const uint64_t v =
+            (static_cast<uint64_t>(p[0])      ) |
+            (static_cast<uint64_t>(p[1]) <<  8) |
+            (static_cast<uint64_t>(p[2]) << 16) |
+            (static_cast<uint64_t>(p[3]) << 24) |
+            (static_cast<uint64_t>(p[4]) << 32) |
+            (static_cast<uint64_t>(p[5]) << 40) |
+            (static_cast<uint64_t>(p[6]) << 48) |
+            (static_cast<uint64_t>(p[7]) << 56);
+        return static_cast<int64_t>(v);
+    } else if constexpr (std::is_same_v<T, float>) {
+        const uint32_t bits =
+            (static_cast<uint32_t>(p[0])      ) |
+            (static_cast<uint32_t>(p[1]) <<  8) |
+            (static_cast<uint32_t>(p[2]) << 16) |
+            (static_cast<uint32_t>(p[3]) << 24);
+        float value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    } else if constexpr (std::is_same_v<T, double>) {
+        const uint64_t bits =
+            (static_cast<uint64_t>(p[0])      ) |
+            (static_cast<uint64_t>(p[1]) <<  8) |
+            (static_cast<uint64_t>(p[2]) << 16) |
+            (static_cast<uint64_t>(p[3]) << 24) |
+            (static_cast<uint64_t>(p[4]) << 32) |
+            (static_cast<uint64_t>(p[5]) << 40) |
+            (static_cast<uint64_t>(p[6]) << 48) |
+            (static_cast<uint64_t>(p[7]) << 56);
+        double value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    } else {
+        throw InvalidInputException("read_le<T>: unsupported type");
+    }
+}
+
+template <class T>
+inline void write_le(const T& value, uint8_t* p) {
+    if constexpr (std::is_same_v<T, int32_t>) {
+        const uint32_t v = static_cast<uint32_t>(value);
+        p[0] = static_cast<uint8_t>( v        & 0xFF);
+        p[1] = static_cast<uint8_t>((v >>  8) & 0xFF);
+        p[2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+        p[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        const uint64_t v = static_cast<uint64_t>(value);
+        p[0] = static_cast<uint8_t>( v        & 0xFF);
+        p[1] = static_cast<uint8_t>((v >>  8) & 0xFF);
+        p[2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+        p[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+        p[4] = static_cast<uint8_t>((v >> 32) & 0xFF);
+        p[5] = static_cast<uint8_t>((v >> 40) & 0xFF);
+        p[6] = static_cast<uint8_t>((v >> 48) & 0xFF);
+        p[7] = static_cast<uint8_t>((v >> 56) & 0xFF);
+    } else if constexpr (std::is_same_v<T, float>) {
+        uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        p[0] = static_cast<uint8_t>( bits        & 0xFF);
+        p[1] = static_cast<uint8_t>((bits >>  8) & 0xFF);
+        p[2] = static_cast<uint8_t>((bits >> 16) & 0xFF);
+        p[3] = static_cast<uint8_t>((bits >> 24) & 0xFF);
+    } else if constexpr (std::is_same_v<T, double>) {
+        uint64_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        p[0] = static_cast<uint8_t>( bits        & 0xFF);
+        p[1] = static_cast<uint8_t>((bits >>  8) & 0xFF);
+        p[2] = static_cast<uint8_t>((bits >> 16) & 0xFF);
+        p[3] = static_cast<uint8_t>((bits >> 24) & 0xFF);
+        p[4] = static_cast<uint8_t>((bits >> 32) & 0xFF);
+        p[5] = static_cast<uint8_t>((bits >> 40) & 0xFF);
+        p[6] = static_cast<uint8_t>((bits >> 48) & 0xFF);
+        p[7] = static_cast<uint8_t>((bits >> 56) & 0xFF);
+    } else {
+        throw InvalidInputException("write_le<T>: unsupported type");
+    }
+}
+
+// Utility functions for little-endian number reading and writing (pointers)
+
+inline void write_u32_le(uint8_t* p, uint32_t v) {
+    p[0] = static_cast<uint8_t>(v);
+    p[1] = static_cast<uint8_t>(v >> 8);
+    p[2] = static_cast<uint8_t>(v >> 16);
+    p[3] = static_cast<uint8_t>(v >> 24);
+}
+
 inline uint32_t read_u32_le(const uint8_t* p) {
-    uint32_t v;
-    std::memcpy(&v, p, sizeof(v));
-    return v;
+    return static_cast<uint32_t>(p[0]) |
+        (static_cast<uint32_t>(p[1]) << 8) |
+        (static_cast<uint32_t>(p[2]) << 16) |
+        (static_cast<uint32_t>(p[3]) << 24);
 }
 
 // Utility functions for splitting and joining byte vectors.
@@ -303,7 +396,17 @@ inline std::string AddStringAttribute(
     return value;
 }
 
-// Helper function to convert string to binary data
+// Helper function to convert string to binary data and vice versa
+
 inline std::vector<uint8_t> StringToBytes(const std::string& str) {
     return std::vector<uint8_t>(str.begin(), str.end());
+}
+
+inline std::string BytesToString(tcb::span<const uint8_t> span) {
+    std::string result;
+    result.reserve(span.size());
+    for (const uint8_t byte : span) {
+        result += static_cast<char>(byte);
+    }
+    return result;
 }

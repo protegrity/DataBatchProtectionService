@@ -18,6 +18,8 @@
 #include "bytes_utils.h"
 #include "exceptions.h"
 
+#include <array>
+#include <cmath>
 #include <vector>
 #include <variant>
 #include <gtest/gtest.h>
@@ -284,4 +286,86 @@ TEST(BytesUtils, StringToBytes_PreservesRawBytesAndNulls) {
         static_cast<uint8_t>('Z')};
 
     EXPECT_EQ(expected, result);
+}
+
+TEST(BytesUtils, BytesToString_ConvertsAsciiEmptyAndRawBytes) {
+    {
+        const std::vector<uint8_t> bytes = {'d', 'b', 'p', 's'};
+        const std::string result = BytesToString(tcb::span<const uint8_t>(bytes));
+        EXPECT_EQ(result, "dbps");
+    }
+
+    {
+        const std::vector<uint8_t> bytes;
+        const std::string result = BytesToString(tcb::span<const uint8_t>(bytes));
+        EXPECT_TRUE(result.empty());
+    }
+
+    {
+        const std::vector<uint8_t> bytes = {
+            static_cast<uint8_t>('D'),
+            static_cast<uint8_t>('B'),
+            static_cast<uint8_t>('P'),
+            static_cast<uint8_t>('S'),
+            static_cast<uint8_t>(0x00),
+            static_cast<uint8_t>('X'),
+            static_cast<uint8_t>('Y'),
+            static_cast<uint8_t>(0xFF),
+            static_cast<uint8_t>(0x80),
+            static_cast<uint8_t>(0x00),
+            static_cast<uint8_t>('Z')};
+        const std::string result = BytesToString(tcb::span<const uint8_t>(bytes));
+        const std::string expected = std::string{
+            'D', 'B', 'P', 'S', '\0', 'X', 'Y',
+            static_cast<char>(0xFF), static_cast<char>(0x80), '\0', 'Z'};
+        EXPECT_EQ(result.size(), expected.size());
+        EXPECT_EQ(result, expected);
+    }
+}
+
+TEST(BytesUtils, ReadU32Le_FromPointer_DecodesLittleEndianBytes) {
+    const std::array<uint8_t, 4> bytes = {0x78, 0x56, 0x34, 0x12};
+    const uint32_t value = read_u32_le(bytes.data());
+
+    EXPECT_EQ(value, 0x12345678u);
+}
+
+TEST(BytesUtils, ReadLeWriteLe_Int32_RoundTrip) {
+    const int32_t original = -2147483000;
+    std::array<uint8_t, sizeof(int32_t)> bytes{};
+
+    write_le<int32_t>(original, bytes.data());
+    const int32_t decoded = read_le<int32_t>(bytes.data());
+
+    EXPECT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, ReadLeWriteLe_Int64_RoundTrip) {
+    const int64_t original = -9223372036854000000LL;
+    std::array<uint8_t, sizeof(int64_t)> bytes{};
+
+    write_le<int64_t>(original, bytes.data());
+    const int64_t decoded = read_le<int64_t>(bytes.data());
+
+    EXPECT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, ReadLeWriteLe_Float_RoundTrip) {
+    const float original = -12345.625f;
+    std::array<uint8_t, sizeof(float)> bytes{};
+
+    write_le<float>(original, bytes.data());
+    const float decoded = read_le<float>(bytes.data());
+
+    EXPECT_FLOAT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, ReadLeWriteLe_Double_RoundTrip) {
+    const double original = 9876543210.125;
+    std::array<uint8_t, sizeof(double)> bytes{};
+
+    write_le<double>(original, bytes.data());
+    const double decoded = read_le<double>(bytes.data());
+
+    EXPECT_DOUBLE_EQ(decoded, original);
 }
