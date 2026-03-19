@@ -369,3 +369,119 @@ TEST(BytesUtils, ReadLeWriteLe_Double_RoundTrip) {
 
     EXPECT_DOUBLE_EQ(decoded, original);
 }
+
+TEST(BytesUtils, WriteReadU32Le_OffsetRoundTrip_VerifiesBytesAndGuards) {
+    constexpr size_t kPrefix = 3u;
+    constexpr size_t kValueSize = sizeof(uint32_t);
+    constexpr size_t kSuffix = 5u;
+    std::array<uint8_t, kPrefix + kValueSize + kSuffix> bytes;
+    bytes.fill(0xDD);
+
+    const uint32_t original = 0xD3A5C79Eu;
+    write_u32_le(bytes.data() + kPrefix, original);
+    const uint32_t decoded = read_u32_le(bytes.data() + kPrefix);
+
+    for (size_t i = 0; i < kPrefix; ++i) {
+        EXPECT_EQ(bytes[i], 0xDD);
+    }
+    for (size_t i = 0; i < kSuffix; ++i) {
+        EXPECT_EQ(bytes[kPrefix + kValueSize + i], 0xDD);
+    }
+    EXPECT_EQ(bytes[kPrefix + 0], 0x9E);
+    EXPECT_EQ(bytes[kPrefix + 1], 0xC7);
+    EXPECT_EQ(bytes[kPrefix + 2], 0xA5);
+    EXPECT_EQ(bytes[kPrefix + 3], 0xD3);
+    EXPECT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, WriteReadLeInt32_OffsetRoundTrip_VerifiesBytesAndGuards) {
+    constexpr size_t kPrefix = 3u;
+    constexpr size_t kValueSize = sizeof(int32_t);
+    constexpr size_t kSuffix = 5u;
+    std::array<uint8_t, kPrefix + kValueSize + kSuffix> bytes;
+    bytes.fill(0xDD);
+
+    const int32_t original = 0x6E91A2F3;
+    write_le<int32_t>(original, bytes.data() + kPrefix);
+    const int32_t decoded = read_le<int32_t>(bytes.data() + kPrefix);
+
+    for (size_t i = 0; i < kPrefix; ++i) {
+        EXPECT_EQ(bytes[i], 0xDD);
+    }
+    for (size_t i = 0; i < kSuffix; ++i) {
+        EXPECT_EQ(bytes[kPrefix + kValueSize + i], 0xDD);
+    }
+    EXPECT_EQ(bytes[kPrefix + 0], 0xF3);
+    EXPECT_EQ(bytes[kPrefix + 1], 0xA2);
+    EXPECT_EQ(bytes[kPrefix + 2], 0x91);
+    EXPECT_EQ(bytes[kPrefix + 3], 0x6E);
+    EXPECT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, WriteReadLeInt64_OffsetRoundTrip_VerifiesBytesAndGuards) {
+    constexpr size_t kPrefix = 3u;
+    constexpr size_t kValueSize = sizeof(int64_t);
+    constexpr size_t kSuffix = 5u;
+    std::array<uint8_t, kPrefix + kValueSize + kSuffix> bytes;
+    bytes.fill(0xDD);
+
+    const int64_t original = 0x0102030405060708LL;
+    write_le<int64_t>(original, bytes.data() + kPrefix);
+    const int64_t decoded = read_le<int64_t>(bytes.data() + kPrefix);
+
+    for (size_t i = 0; i < kPrefix; ++i) {
+        EXPECT_EQ(bytes[i], 0xDD);
+    }
+    for (size_t i = 0; i < kSuffix; ++i) {
+        EXPECT_EQ(bytes[kPrefix + kValueSize + i], 0xDD);
+    }
+    EXPECT_EQ(bytes[kPrefix + 0], 0x08);
+    EXPECT_EQ(bytes[kPrefix + 1], 0x07);
+    EXPECT_EQ(bytes[kPrefix + 2], 0x06);
+    EXPECT_EQ(bytes[kPrefix + 3], 0x05);
+    EXPECT_EQ(bytes[kPrefix + 4], 0x04);
+    EXPECT_EQ(bytes[kPrefix + 5], 0x03);
+    EXPECT_EQ(bytes[kPrefix + 6], 0x02);
+    EXPECT_EQ(bytes[kPrefix + 7], 0x01);
+    EXPECT_EQ(decoded, original);
+}
+
+TEST(BytesUtils, WriteReadLeFloat_OffsetRoundTrip_VerifiesBytesAndGuards) {
+    constexpr size_t kPrefix = 3u;
+    constexpr size_t kValueSize = sizeof(float);
+    constexpr size_t kSuffix = 5u;
+    std::array<uint8_t, kPrefix + kValueSize + kSuffix> bytes;
+    bytes.fill(0xDD);
+
+    constexpr float kOriginal = -3.1415927f;
+    write_le<float>(kOriginal, bytes.data() + kPrefix);
+    const float decoded = read_le<float>(bytes.data() + kPrefix);
+
+    for (size_t i = 0; i < kPrefix; ++i) {
+        EXPECT_EQ(bytes[i], 0xDD);
+    }
+    for (size_t i = 0; i < kSuffix; ++i) {
+        EXPECT_EQ(bytes[kPrefix + kValueSize + i], 0xDD);
+    }
+    EXPECT_FLOAT_EQ(decoded, kOriginal);
+}
+
+TEST(BytesUtils, WriteReadLeDouble_OffsetRoundTrip_VerifiesBytesAndGuards) {
+    constexpr size_t kPrefix = 3u;
+    constexpr size_t kValueSize = sizeof(double);
+    constexpr size_t kSuffix = 5u;
+    std::array<uint8_t, kPrefix + kValueSize + kSuffix> bytes;
+    bytes.fill(0xDD);
+
+    constexpr double kOriginal = -3.141592653589793;
+    write_le<double>(kOriginal, bytes.data() + kPrefix);
+    const double decoded = read_le<double>(bytes.data() + kPrefix);
+
+    for (size_t i = 0; i < kPrefix; ++i) {
+        EXPECT_EQ(bytes[i], 0xDD);
+    }
+    for (size_t i = 0; i < kSuffix; ++i) {
+        EXPECT_EQ(bytes[kPrefix + kValueSize + i], 0xDD);
+    }
+    EXPECT_DOUBLE_EQ(decoded, kOriginal);
+}
