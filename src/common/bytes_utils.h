@@ -187,8 +187,9 @@ inline void write_le(const T& value, uint8_t* p) {
 
 // Utility functions for little-endian number reading and writing UINT32 values.
 //
-// These functions are called in tight loops and hot execution paths, so these are kept separate
-//   to be as optimal as possible, even if this results in some code duplication.
+// Since UINT32 functions are called heavily in tight loops and hot execution paths to read/write sizes,
+//   we keep them separate from other functions so they easy to identify in the library code and can be
+//   optimatized separately. This results in some code duplication.
 
 inline void write_u32_le(uint8_t* p, uint32_t v) {
     p[0] = static_cast<uint8_t>(v);
