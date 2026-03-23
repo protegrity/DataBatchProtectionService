@@ -112,29 +112,30 @@ paths:
               int32_data_page_v1_uncompressed:
                 summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
                 description: >
-                  Three INT32 values [198423, 55102, 7839201] encoded as
-                  PLAIN in an uncompressed DATA_PAGE_V1. Definition and
-                  repetition levels use RLE encoding. Max definition level
-                  is 2 (nested nullable), max repetition level is 1
-                  (one repeated ancestor).
+                  Five INT32 values [198423, 55102, 7839201, 4410, 983567]
+                  encoded as PLAIN in an uncompressed DATA_PAGE_V1 with
+                  RLE-encoded level bytes. Max definition level is 2
+                  (nested nullable), max repetition level is 1 (one
+                  repeated ancestor). Repetition levels [0,1,1,0,1],
+                  definition levels all 2 (all present).
                 value:
                   column_reference:
                     name: invoice_amount
                   data_batch:
                     datatype_info:
                       datatype: INT32
-                    value: FwcDAD7XAADhnXcA
+                    value: CAAAAAIABAECAAIBAgAAAAoCFwcDAD7XAADhnXcAOhEAAA8CDwA=
                     value_format:
                       compression: UNCOMPRESSED
                       encoding: PLAIN
                       encoding_attributes:
                         page_encoding: PLAIN
                         page_type: DATA_PAGE_V1
-                        data_page_num_values: "3"
+                        data_page_num_values: "5"
                         data_page_max_definition_level: "2"
                         data_page_max_repetition_level: "1"
                         page_v1_definition_level_encoding: RLE
-                        page_v1_repetition_level_encoding: BIT_PACKED
+                        page_v1_repetition_level_encoding: RLE
                   data_batch_encrypted:
                     value_format:
                       compression: UNCOMPRESSED
@@ -149,18 +150,19 @@ paths:
               int32_data_page_v2_snappy:
                 summary: "INT32 · DATA_PAGE_V2 · SNAPPY · PLAIN"
                 description: >
-                  Three INT32 values [198423, 55102, 7839201] in a
-                  SNAPPY-compressed DATA_PAGE_V2. Definition levels
-                  occupy 6 bytes, repetition levels 4 bytes. Two null
-                  values present. page_v2_is_compressed is true because
-                  the data section is SNAPPY-compressed.
+                  Five logical values in a SNAPPY-compressed DATA_PAGE_V2.
+                  Definition levels [2,2,0,2,0] — 3 present, 2 null.
+                  Repetition levels [0,1,0,0,1]. Level bytes are
+                  uncompressed (8 bytes each), only value section is
+                  SNAPPY-compressed. Value bytes contain 3 INT32s
+                  [198423, 55102, 7839201].
                 value:
                   column_reference:
                     name: invoice_amount
                   data_batch:
                     datatype_info:
                       datatype: INT32
-                    value: FwcDAD7XAADhnXcA
+                    value: AgACAQQAAgEEAgIAAgICABcHAwA+1wAA4Z13AA==
                     value_format:
                       compression: SNAPPY
                       encoding: PLAIN
@@ -170,8 +172,8 @@ paths:
                         data_page_num_values: "5"
                         data_page_max_definition_level: "2"
                         data_page_max_repetition_level: "1"
-                        page_v2_definition_levels_byte_length: "6"
-                        page_v2_repetition_levels_byte_length: "4"
+                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_repetition_levels_byte_length: "8"
                         page_v2_num_nulls: "2"
                         page_v2_is_compressed: "true"
                   data_batch_encrypted:
@@ -190,16 +192,17 @@ paths:
                 description: >
                   Two BYTE_ARRAY values ["jdoe@acme.org",
                   "alice.wong@corp.net"] in PLAIN encoding, uncompressed
-                  DATA_PAGE_V1. Each value is length-prefixed (4-byte
-                  little-endian length followed by the raw bytes).
-                  Max definition level 3, repetition level 0 (flat schema).
+                  DATA_PAGE_V1 with RLE-encoded definition levels. Each
+                  value is length-prefixed (4-byte LE length + raw bytes).
+                  Max definition level 3 (deeply nullable), repetition
+                  level 0 (flat schema — no rep level bytes).
                 value:
                   column_reference:
                     name: contact_email
                   data_batch:
                     datatype_info:
                       datatype: BYTE_ARRAY
-                    value: DQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
+                    value: AgAAAAQDDQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
                     value_format:
                       compression: UNCOMPRESSED
                       encoding: PLAIN
@@ -258,17 +261,19 @@ paths:
               byte_array_data_page_v2_snappy:
                 summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY · PLAIN"
                 description: >
-                  Two non-null BYTE_ARRAY values ["jdoe@acme.org",
-                  "alice.wong@corp.net"] plus one null in a
-                  SNAPPY-compressed DATA_PAGE_V2. Definition levels
-                  occupy 8 bytes, repetition levels 0 bytes.
+                  Three logical values — two non-null BYTE_ARRAY
+                  ["jdoe@acme.org", "alice.wong@corp.net"] plus one null
+                  — in a SNAPPY-compressed DATA_PAGE_V2. Definition
+                  levels [3,3,0] occupy 4 RLE-encoded bytes, repetition
+                  levels 0 bytes (flat schema). Only value section is
+                  SNAPPY-compressed.
                 value:
                   column_reference:
                     name: contact_email
                   data_batch:
                     datatype_info:
                       datatype: BYTE_ARRAY
-                    value: DQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
+                    value: BAMCAA0AAABqZG9lQGFjbWUub3JnEwAAAGFsaWNlLndvbmdAY29ycC5uZXQ=
                     value_format:
                       compression: SNAPPY
                       encoding: PLAIN
@@ -278,7 +283,7 @@ paths:
                         data_page_num_values: "3"
                         data_page_max_definition_level: "3"
                         data_page_max_repetition_level: "0"
-                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_definition_levels_byte_length: "4"
                         page_v2_repetition_levels_byte_length: "0"
                         page_v2_num_nulls: "1"
                         page_v2_is_compressed: "true"
@@ -381,10 +386,10 @@ paths:
               int32_data_page_v1_uncompressed:
                 summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
                 description: >
-                  Decrypt the ciphertext produced by encrypting three INT32
-                  values [198423, 55102, 7839201] in an uncompressed
-                  DATA_PAGE_V1. The encryption_metadata is passed back
-                  verbatim from the encrypt response.
+                  Decrypt the ciphertext produced by encrypting five INT32
+                  values in an uncompressed DATA_PAGE_V1. The
+                  encryption_metadata is passed back verbatim from the
+                  encrypt response.
                 value:
                   column_reference:
                     name: invoice_amount
@@ -397,11 +402,11 @@ paths:
                       encoding_attributes:
                         page_encoding: PLAIN
                         page_type: DATA_PAGE_V1
-                        data_page_num_values: "3"
+                        data_page_num_values: "5"
                         data_page_max_definition_level: "2"
                         data_page_max_repetition_level: "1"
                         page_v1_definition_level_encoding: RLE
-                        page_v1_repetition_level_encoding: BIT_PACKED
+                        page_v1_repetition_level_encoding: RLE
                   data_batch_encrypted:
                     value: hzHDFbkE1nYiapYxTt+cVKZncO5oIqv0qqXIJoPxhJ4=
                     value_format:
@@ -437,8 +442,8 @@ paths:
                         data_page_num_values: "5"
                         data_page_max_definition_level: "2"
                         data_page_max_repetition_level: "1"
-                        page_v2_definition_levels_byte_length: "6"
-                        page_v2_repetition_levels_byte_length: "4"
+                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_repetition_levels_byte_length: "8"
                         page_v2_num_nulls: "2"
                         page_v2_is_compressed: "true"
                   data_batch_encrypted:
@@ -546,7 +551,7 @@ paths:
                         data_page_num_values: "3"
                         data_page_max_definition_level: "3"
                         data_page_max_repetition_level: "0"
-                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_definition_levels_byte_length: "4"
                         page_v2_repetition_levels_byte_length: "0"
                         page_v2_num_nulls: "1"
                         page_v2_is_compressed: "true"
@@ -580,7 +585,7 @@ paths:
                     data_batch:
                       datatype_info:
                         datatype: INT32
-                      value: FwcDAD7XAADhnXcA
+                      value: CAAAAAIABAECAAIBAgAAAAoCFwcDAD7XAADhnXcAOhEAAA8CDwA=
                       value_format:
                         compression: UNCOMPRESSED
                         encoding: PLAIN
@@ -597,7 +602,7 @@ paths:
                     data_batch:
                       datatype_info:
                         datatype: BYTE_ARRAY
-                      value: DQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
+                      value: AgAAAAQDDQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
                       value_format:
                         compression: UNCOMPRESSED
                         encoding: PLAIN
