@@ -150,12 +150,13 @@ paths:
               int32_data_page_v2_snappy:
                 summary: "INT32 · DATA_PAGE_V2 · SNAPPY · PLAIN"
                 description: >
-                  Five logical values in a SNAPPY-compressed DATA_PAGE_V2.
-                  Definition levels [2,2,0,2,0] — 3 present, 2 null.
-                  Repetition levels [0,1,0,0,1]. Level bytes are
-                  uncompressed (8 bytes each), only value section is
-                  SNAPPY-compressed. Value bytes contain 3 INT32s
-                  [198423, 55102, 7839201].
+                  Five logical values in a DATA_PAGE_V2 with column
+                  compression declared as SNAPPY. Definition levels
+                  [2,2,0,2,0] — 3 present, 2 null. Repetition levels
+                  [0,1,0,0,1] — 8 RLE bytes each. page_v2_is_compressed
+                  is false: the value section was not individually
+                  compressed (valid for small pages). Value bytes contain
+                  3 INT32s [198423, 55102, 7839201].
                 value:
                   column_reference:
                     name: invoice_amount
@@ -175,7 +176,7 @@ paths:
                         page_v2_definition_levels_byte_length: "8"
                         page_v2_repetition_levels_byte_length: "8"
                         page_v2_num_nulls: "2"
-                        page_v2_is_compressed: "true"
+                        page_v2_is_compressed: "false"
                   data_batch_encrypted:
                     value_format:
                       compression: SNAPPY
@@ -263,10 +264,11 @@ paths:
                 description: >
                   Three logical values — two non-null BYTE_ARRAY
                   ["jdoe@acme.org", "alice.wong@corp.net"] plus one null
-                  — in a SNAPPY-compressed DATA_PAGE_V2. Definition
-                  levels [3,3,0] occupy 4 RLE-encoded bytes, repetition
-                  levels 0 bytes (flat schema). Only value section is
-                  SNAPPY-compressed.
+                  — in a DATA_PAGE_V2 with column compression declared
+                  as SNAPPY. Definition levels [3,3,0] occupy 4
+                  RLE-encoded bytes, repetition levels 0 bytes (flat
+                  schema, max_rep=0). page_v2_is_compressed is false:
+                  value bytes are not individually compressed.
                 value:
                   column_reference:
                     name: contact_email
@@ -286,7 +288,7 @@ paths:
                         page_v2_definition_levels_byte_length: "4"
                         page_v2_repetition_levels_byte_length: "0"
                         page_v2_num_nulls: "1"
-                        page_v2_is_compressed: "true"
+                        page_v2_is_compressed: "false"
                   data_batch_encrypted:
                     value_format:
                       compression: SNAPPY
@@ -445,7 +447,7 @@ paths:
                         page_v2_definition_levels_byte_length: "8"
                         page_v2_repetition_levels_byte_length: "8"
                         page_v2_num_nulls: "2"
-                        page_v2_is_compressed: "true"
+                        page_v2_is_compressed: "false"
                   data_batch_encrypted:
                     value: rsyH7W6ye7ja1TlIVWhcCoKVfwzYNpr/f3rHFkgoZIg=
                     value_format:
@@ -554,7 +556,7 @@ paths:
                         page_v2_definition_levels_byte_length: "4"
                         page_v2_repetition_levels_byte_length: "0"
                         page_v2_num_nulls: "1"
-                        page_v2_is_compressed: "true"
+                        page_v2_is_compressed: "false"
                   data_batch_encrypted:
                     value: LTYCN+t9LpQ9ctrFmbqfTAWnf5+nmqcZ5LRERqgKYf8=
                     value_format:
