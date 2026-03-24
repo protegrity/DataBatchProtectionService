@@ -313,7 +313,7 @@ paths:
                   summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED — per-value encryption"
                   value:
                     data_batch_encrypted:
-                      value: hzHDFbkE1nYiapYxTt+cVKZncO5oIqv0qqXIJoPxhJ4=
+                      value: EgAAABf////9//v+/f/9/vz8+PHpxAEFAAAABAAAAAj4/P8hKP///mKI/yXu//8Q/fD/
                       value_format:
                         compression: UNCOMPRESSED
                     encryption_metadata:
@@ -330,7 +330,7 @@ paths:
                   summary: "INT32 · DATA_PAGE_V2 · SNAPPY — per-value encryption"
                   value:
                     data_batch_encrypted:
-                      value: rsyH7W6ye7ja1TlIVWhcCoKVfwzYNpr/f3rHFkgoZIg=
+                      value: EAAAAB3//f77//3++/39//z++vEBAwAAAAQAAAAI+Pz/ISj///5iiP8=
                       value_format:
                         compression: SNAPPY
                     encryption_metadata:
@@ -343,11 +343,28 @@ paths:
                     debug:
                       reference_id: txn-91b2d5f8-4a13
 
+                byte_array_data_page_v1_uncompressed:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED — per-value encryption"
+                  value:
+                    data_batch_encrypted:
+                      value: BgAAAPX+//75+QACAAAADQAAAJ2akJu9m5aGsoAyyRATAAAAlpKWnZjUgoS5yR3YGJyslxyAvg==
+                      value_format:
+                        compression: UNCOMPRESSED
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-e4f70c12-7b88
+
                 byte_array_dictionary_page_uncompressed:
                   summary: "BYTE_ARRAY · DICTIONARY_PAGE · UNCOMPRESSED — per-value encryption"
                   value:
                     data_batch_encrypted:
-                      value: cV+0iyiE+hxvuL8ag+qr1nVvfXpKCquGRtzJCA8r/r8=
+                      value: AAAAAAADAAAAEAAAAD6Lno2Lmo2Th9yrlpeg7UoHAAAAJpCJkJacmg4AAAA/i42cl56Mmt6zi5eCvQ==
                       value_format:
                         compression: UNCOMPRESSED
                     encryption_metadata:
@@ -359,6 +376,23 @@ paths:
                       access_control: granted
                     debug:
                       reference_id: doc-3c9a17d4-55e1
+
+                byte_array_data_page_v2_snappy:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY — per-value encryption"
+                  value:
+                    data_batch_encrypted:
+                      value: BAAAAPP9/f4AAgAAAA0AAACdmpCbvZuWhrKAMskQEwAAAJaSlp2Y1IKEuckd2BicrJccgL4=
+                      value_format:
+                        compression: SNAPPY
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-f5a81d23-8c99
 
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -410,7 +444,7 @@ paths:
                         page_v1_definition_level_encoding: RLE
                         page_v1_repetition_level_encoding: RLE
                   data_batch_encrypted:
-                    value: hzHDFbkE1nYiapYxTt+cVKZncO5oIqv0qqXIJoPxhJ4=
+                    value: EgAAABf////9//v+/f/9/vz8+PHpxAEFAAAABAAAAAj4/P8hKP///mKI/yXu//8Q/fD/
                     value_format:
                       compression: UNCOMPRESSED
                   encryption:
@@ -449,7 +483,7 @@ paths:
                         page_v2_num_nulls: "2"
                         page_v2_is_compressed: "false"
                   data_batch_encrypted:
-                    value: rsyH7W6ye7ja1TlIVWhcCoKVfwzYNpr/f3rHFkgoZIg=
+                    value: EAAAAB3//f77//3++/39//z++vEBAwAAAAQAAAAI+Pz/ISj///5iiP8=
                     value_format:
                       compression: SNAPPY
                   encryption:
@@ -486,7 +520,7 @@ paths:
                         page_v1_definition_level_encoding: RLE
                         page_v1_repetition_level_encoding: RLE
                   data_batch_encrypted:
-                    value: UW53gOZv9keNaAE3Betbe4DCa+oEK9I9ZHl/74mPX2c=
+                    value: BgAAAPX+//75+QACAAAADQAAAJ2akJu9m5aGsoAyyRATAAAAlpKWnZjUgoS5yR3YGJyslxyAvg==
                     value_format:
                       compression: UNCOMPRESSED
                   encryption:
@@ -519,7 +553,7 @@ paths:
                         page_type: DICTIONARY_PAGE
                         dict_page_num_values: "3"
                   data_batch_encrypted:
-                    value: cV+0iyiE+hxvuL8ag+qr1nVvfXpKCquGRtzJCA8r/r8=
+                    value: AAAAAAADAAAAEAAAAD6Lno2Lmo2Th9yrlpeg7UoHAAAAJpCJkJacmg4AAAA/i42cl56Mmt6zi5eCvQ==
                     value_format:
                       compression: UNCOMPRESSED
                   encryption:
@@ -558,7 +592,7 @@ paths:
                         page_v2_num_nulls: "1"
                         page_v2_is_compressed: "false"
                   data_batch_encrypted:
-                    value: LTYCN+t9LpQ9ctrFmbqfTAWnf5+nmqcZ5LRERqgKYf8=
+                    value: BAAAAPP9/f4AAgAAAA0AAACdmpCbvZuWhrKAMskQEwAAAJaSlp2Y1IKEuckd2BicrJccgL4=
                     value_format:
                       compression: SNAPPY
                   encryption:
@@ -598,6 +632,23 @@ paths:
                     debug:
                       reference_id: txn-88a1c4e7-3f02
 
+                int32_data_page_v2_snappy:
+                  summary: "INT32 · DATA_PAGE_V2 · SNAPPY — recovered plaintext"
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: INT32
+                      value: AgACAQQAAgEEAgIAAgICABcHAwA+1wAA4Z13AA==
+                      value_format:
+                        compression: SNAPPY
+                        encoding: PLAIN
+                    access:
+                      user_id: svc_etl_finance
+                      role: FinanceWriter
+                      access_control: granted
+                    debug:
+                      reference_id: txn-91b2d5f8-4a13
+
                 byte_array_data_page_v1_uncompressed:
                   summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED — recovered plaintext"
                   value:
@@ -631,6 +682,23 @@ paths:
                       access_control: granted
                     debug:
                       reference_id: doc-3c9a17d4-55e1
+
+                byte_array_data_page_v2_snappy:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY — recovered plaintext"
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: BYTE_ARRAY
+                      value: BAMCAA0AAABqZG9lQGFjbWUub3JnEwAAAGFsaWNlLndvbmdAY29ycC5uZXQ=
+                      value_format:
+                        compression: SNAPPY
+                        encoding: PLAIN
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-f5a81d23-8c99
 
         '400':
           $ref: '#/components/responses/BadRequest'
