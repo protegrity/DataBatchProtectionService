@@ -1,437 +1,797 @@
 openapi: 3.0.3
 info:
-  title: Encryption API
-  version: 1.0.0
+  title: Data Batch Protection Service API
+  description: >
+    API for encrypting and decrypting Parquet column page data.
+    Binary payloads are encoded as Base64 (RFC 4648) strings.
+  version: 0.1.0
 
-# Global security so every operation requires JWT
 security:
   - bearer_auth: []
 
 paths:
-  /encrypt:
+
+  # ───────────────────────────── Health / Status ─────────────────────────────
+
+  /healthz:
+    get:
+      summary: Server health check
+      description: Returns OK when the server is running. No authentication required.
+      security: []
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /statusz:
+    get:
+      summary: Server status
+      description: Returns server configuration status. Requires authentication.
+      responses:
+        '200':
+          description: Server status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enable_credential_check:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ────────────────────────────── Authentication ─────────────────────────────
+
+  /token:
     post:
-      summary: Encrypts a column data_batch using a specified key and data type
-      operationId: encryptBatch
+      summary: Obtain a JWT token
+      description: >
+        Authenticates a client using credentials (client_id / api_key) and
+        returns a signed JWT token for use on subsequent API calls.
+      security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - column_reference
-                - data_batch
-                - data_batch_encrypted
-                - encryption
-                - access
-              properties:
-                column_reference:
-                  $ref: '#/components/schemas/column_reference'
-                data_batch:
-                  $ref: '#/components/schemas/data_batch_with_value'
-                data_batch_encrypted:
-                  $ref: '#/components/schemas/data_batch_encrypted_no_value'
-                encryption:
-                  $ref: '#/components/schemas/encryption'
-                access:
-                  $ref: '#/components/schemas/access_request'
-                application_context:
-                  $ref: '#/components/schemas/application_context'
-                debug:
-                  $ref: '#/components/schemas/debug_info'
+              description: >
+                Key-value pairs containing client credentials.
+                The specific keys depend on the server's credential configuration.
+              additionalProperties:
+                type: string
             examples:
               standard:
-                summary: Encrypt a base64-encoded byte array of emails
+                summary: Client ID and API key
+                value:
+                  client_id: my_client
+                  api_key: my_secret_key
+      responses:
+        '200':
+          description: Token issued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                success:
+                  summary: Successful token response
+                  value:
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    token_type: Bearer
+                    expires_at: 1711900800
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─────────────────────────────── Encryption ────────────────────────────────
+
+  /encrypt:
+    post:
+      summary: Encrypt a Parquet column page
+      operationId: encryptBatch
+      description: >
+        Encrypts a single Parquet column page. The request carries the
+        plaintext payload, column metadata, encoding attributes describing
+        the page structure, and access context. The response returns the
+        ciphertext and encryption metadata that must be persisted for the
+        corresponding decrypt call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EncryptRequest'
+            examples:
+
+              int32_data_page_v1_uncompressed:
+                summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
                 description: >
-                  `data_batch.value` is a Base64 string representing raw bytes of two lines:
-                  user1@example.com\nuser2@example.com
-                  The debug block includes a UUID and a pretty-printed helper for development.
+                  Five INT32 values [198423, 55102, 7839201, 4410, 983567]
+                  encoded as PLAIN in an uncompressed DATA_PAGE_V1 with
+                  RLE-encoded level bytes. Max definition level is 2
+                  (nested nullable), max repetition level is 1 (one
+                  repeated ancestor). Repetition levels [0,1,1,0,1],
+                  definition levels all 2 (all present).
                 value:
                   column_reference:
-                    name: email
-                  data_batch:
-                    datatype_info:
-                      datatype: BYTE_ARRAY
-                    value_format:
-                      compression: UNCOMPRESSED
-                      format: PLAIN
-                    value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
-                  data_batch_encrypted:
-                    value_format:
-                      compression: ZSTD
-                  encryption:
-                    key_id: EMAIL_KEY_001
-                  access:
-                    user_id: user123
-                  application_context:
-                    column_schema:
-                      database: customerdb
-                      schema: public
-                      schema_version: v1
-                      table: users
-                    location:
-                      country: US
-                      region: CA
-                      lat: 37.7749
-                      lon: -122.4194
-                  debug:
-                    pretty_printed_value: "user1@example.com\nuser2@example.com"
-                    reference_id: 550e8400-e29b-41d4-a716-446655440000
-              ints_csv_utf8:
-                summary: Encrypt UNDEFINED of INT32 IDs (BASE64 encoded)
-                description: |
-                  Three INT32 values provided as a UNDEFINED string, BASE64 encoded.
-                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
-                  Encrypted output will be returned in `data_batch_encrypted.value`.
-                value:
-                  column_reference:
-                    name: CustomerID
+                    name: invoice_amount
                   data_batch:
                     datatype_info:
                       datatype: INT32
-                    value: "MzM0NCw1NTY2LDc3ODg="
+                    value: CAAAAAIABAECAAIBAgAAAAoCFwcDAD7XAADhnXcAOhEAAA8CDwA=
                     value_format:
                       compression: UNCOMPRESSED
-                      format: UNDEFINED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V1
+                        data_page_num_values: "5"
+                        data_page_max_definition_level: "2"
+                        data_page_max_repetition_level: "1"
+                        page_v1_definition_level_encoding: RLE
+                        page_v1_repetition_level_encoding: RLE
                   data_batch_encrypted:
                     value_format:
-                      compression: ZSTD
+                      compression: UNCOMPRESSED
                   encryption:
-                    key_id: NumericID001
+                    key_id: FIN_KEY_2024_Q3
                   access:
-                    user_id: GRM_009
-                  application_context:
-                    column_schema:
-                      database: public
-                      schema: Federation
-                      table: Customers
-                    location:
-                      country: US
-                      region: CA
-                      lat: 37.7749
-                      lon: -122.4194
+                    user_id: svc_etl_finance
+                  application_context: '{"user_id":"svc_etl_finance","database":"ledger_prod","schema":"accounting","table":"invoices"}'
+                  debug:
+                    reference_id: txn-88a1c4e7-3f02
+
+              int32_data_page_v2_snappy:
+                summary: "INT32 · DATA_PAGE_V2 · SNAPPY · PLAIN"
+                description: >
+                  Five logical values in a DATA_PAGE_V2 with column
+                  compression declared as SNAPPY. Definition levels
+                  [2,2,0,2,0] — 3 present, 2 null. Repetition levels
+                  [0,1,0,0,1] — 8 RLE bytes each. page_v2_is_compressed
+                  is false: the value section was not individually
+                  compressed (valid for small pages). Value bytes contain
+                  3 INT32s [198423, 55102, 7839201].
+                value:
+                  column_reference:
+                    name: invoice_amount
+                  data_batch:
+                    datatype_info:
+                      datatype: INT32
+                    value: AgACAQQAAgEEAgIAAgICABcHAwA+1wAA4Z13AA==
+                    value_format:
+                      compression: SNAPPY
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V2
+                        data_page_num_values: "5"
+                        data_page_max_definition_level: "2"
+                        data_page_max_repetition_level: "1"
+                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_repetition_levels_byte_length: "8"
+                        page_v2_num_nulls: "2"
+                        page_v2_is_compressed: "false"
+                  data_batch_encrypted:
+                    value_format:
+                      compression: SNAPPY
+                  encryption:
+                    key_id: FIN_KEY_2024_Q3
+                  access:
+                    user_id: svc_etl_finance
+                  application_context: '{"user_id":"svc_etl_finance","database":"ledger_prod","schema":"accounting","table":"invoices"}'
+                  debug:
+                    reference_id: txn-91b2d5f8-4a13
+
+              byte_array_data_page_v1_uncompressed:
+                summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
+                description: >
+                  Two BYTE_ARRAY values ["jdoe@acme.org",
+                  "alice.wong@corp.net"] in PLAIN encoding, uncompressed
+                  DATA_PAGE_V1 with RLE-encoded definition levels. Each
+                  value is length-prefixed (4-byte LE length + raw bytes).
+                  Max definition level 3 (deeply nullable), repetition
+                  level 0 (flat schema — no rep level bytes).
+                value:
+                  column_reference:
+                    name: contact_email
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value: AgAAAAQDDQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
+                    value_format:
+                      compression: UNCOMPRESSED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V1
+                        data_page_num_values: "2"
+                        data_page_max_definition_level: "3"
+                        data_page_max_repetition_level: "0"
+                        page_v1_definition_level_encoding: RLE
+                        page_v1_repetition_level_encoding: RLE
+                  data_batch_encrypted:
+                    value_format:
+                      compression: UNCOMPRESSED
+                  encryption:
+                    key_id: PII_EMAIL_KEY_NA
+                  access:
+                    user_id: dp_analyst_047
+                  application_context: '{"user_id":"dp_analyst_047","database":"crm_west","schema":"contacts","table":"email_addresses"}'
+                  debug:
+                    reference_id: crm-e4f70c12-7b88
+
+              byte_array_dictionary_page_uncompressed:
+                summary: "BYTE_ARRAY · DICTIONARY_PAGE · UNCOMPRESSED · PLAIN"
+                description: >
+                  Dictionary page containing 3 distinct BYTE_ARRAY values
+                  ["Quarterly Report", "Invoice", "Purchase Order"].
+                  Dictionary pages are always PLAIN-encoded and carry only
+                  the distinct value set; data pages then reference these
+                  by index via RLE_DICTIONARY encoding.
+                value:
+                  column_reference:
+                    name: document_type
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value: EAAAAFF1YXJ0ZXJseSBSZXBvcnQHAAAASW52b2ljZQ4AAABQdXJjaGFzZSBPcmRlcg==
+                    value_format:
+                      compression: UNCOMPRESSED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DICTIONARY_PAGE
+                        dict_page_num_values: "3"
+                  data_batch_encrypted:
+                    value_format:
+                      compression: UNCOMPRESSED
+                  encryption:
+                    key_id: DOC_CLASS_KEY_V2
+                  access:
+                    user_id: svc_doc_indexer
+                  application_context: '{"user_id":"svc_doc_indexer","database":"docstore","schema":"metadata","table":"classifications"}'
+                  debug:
+                    reference_id: doc-3c9a17d4-55e1
+
+              byte_array_data_page_v2_snappy:
+                summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY · PLAIN"
+                description: >
+                  Three logical values — two non-null BYTE_ARRAY
+                  ["jdoe@acme.org", "alice.wong@corp.net"] plus one null
+                  — in a DATA_PAGE_V2 with column compression declared
+                  as SNAPPY. Definition levels [3,3,0] occupy 4
+                  RLE-encoded bytes, repetition levels 0 bytes (flat
+                  schema, max_rep=0). page_v2_is_compressed is false:
+                  value bytes are not individually compressed.
+                value:
+                  column_reference:
+                    name: contact_email
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value: BAMCAA0AAABqZG9lQGFjbWUub3JnEwAAAGFsaWNlLndvbmdAY29ycC5uZXQ=
+                    value_format:
+                      compression: SNAPPY
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V2
+                        data_page_num_values: "3"
+                        data_page_max_definition_level: "3"
+                        data_page_max_repetition_level: "0"
+                        page_v2_definition_levels_byte_length: "4"
+                        page_v2_repetition_levels_byte_length: "0"
+                        page_v2_num_nulls: "1"
+                        page_v2_is_compressed: "false"
+                  data_batch_encrypted:
+                    value_format:
+                      compression: SNAPPY
+                  encryption:
+                    key_id: PII_EMAIL_KEY_NA
+                  access:
+                    user_id: dp_analyst_047
+                  application_context: '{"user_id":"dp_analyst_047","database":"crm_west","schema":"contacts","table":"email_addresses"}'
+                  debug:
+                    reference_id: crm-f5a81d23-8c99
+
       responses:
         '200':
           description: Successful encryption
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data_batch_encrypted
-                  - access
-                properties:
-                  data_batch_encrypted:
-                    $ref: '#/components/schemas/data_batch_encrypted_with_value'
-                  access:
-                    $ref: '#/components/schemas/access_response'
-                  debug:
-                    $ref: '#/components/schemas/debug_info'
+                $ref: '#/components/schemas/EncryptResponse'
               examples:
-                success:
-                  summary: Encrypted payload
+
+                int32_data_page_v1_uncompressed:
+                  summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED — per-value encryption"
                   value:
                     data_batch_encrypted:
+                      value: EgAAABf////9//v+/f/9/vz8+PHpxAEFAAAABAAAAAj4/P8hKP///mKI/yXu//8Q/fD/
                       value_format:
-                        compression: ZSTD
-                      value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
+                        compression: UNCOMPRESSED
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
                     access:
-                      user_id: user123
-                      role: EmailReader
+                      user_id: svc_etl_finance
+                      role: FinanceWriter
                       access_control: granted
                     debug:
-                      reference_id: 550e8400-e29b-41d4-a716-446655440000
-                ints_csv_utf8_success:
-                  summary: Encrypted INT32 UNDEFINED IDs
-                  description: |
-                    Encrypted output for the INT32 UNDEFINED "3344,5566,7788".
-                    `data_batch_encrypted.value` contains the Base64-encoded ciphertext.
+                      reference_id: txn-88a1c4e7-3f02
+
+                int32_data_page_v2_snappy:
+                  summary: "INT32 · DATA_PAGE_V2 · SNAPPY — per-value encryption"
                   value:
                     data_batch_encrypted:
+                      value: EAAAAB3//f77//3++/39//z++vEBAwAAAAQAAAAI+Pz/ISj///5iiP8=
                       value_format:
-                        compression: ZSTD
-                      value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                        compression: SNAPPY
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
                     access:
-                      user_id: GRM_009
-                      role: IDReader
+                      user_id: svc_etl_finance
+                      role: FinanceWriter
                       access_control: granted
                     debug:
-                      reference_id: 123e4567-e89b-12d3-a456-426614174000
+                      reference_id: txn-91b2d5f8-4a13
+
+                byte_array_data_page_v1_uncompressed:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED — per-value encryption"
+                  value:
+                    data_batch_encrypted:
+                      value: BgAAAPX+//75+QACAAAADQAAAJ2akJu9m5aGsoAyyRATAAAAlpKWnZjUgoS5yR3YGJyslxyAvg==
+                      value_format:
+                        compression: UNCOMPRESSED
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-e4f70c12-7b88
+
+                byte_array_dictionary_page_uncompressed:
+                  summary: "BYTE_ARRAY · DICTIONARY_PAGE · UNCOMPRESSED — per-value encryption"
+                  value:
+                    data_batch_encrypted:
+                      value: AAAAAAADAAAAEAAAAD6Lno2Lmo2Th9yrlpeg7UoHAAAAJpCJkJacmg4AAAA/i42cl56Mmt6zi5eCvQ==
+                      value_format:
+                        compression: UNCOMPRESSED
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_dict_page: per_value
+                    access:
+                      user_id: svc_doc_indexer
+                      role: DocClassifier
+                      access_control: granted
+                    debug:
+                      reference_id: doc-3c9a17d4-55e1
+
+                byte_array_data_page_v2_snappy:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY — per-value encryption"
+                  value:
+                    data_batch_encrypted:
+                      value: BAAAAPP9/f4AAgAAAA0AAACdmpCbvZuWhrKAMskQEwAAAJaSlp2Y1IKEuckd2BicrJccgL4=
+                      value_format:
+                        compression: SNAPPY
+                    encryption_metadata:
+                      dbps_agent_version: v0.01
+                      encrypt_mode_data_page: per_value
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-f5a81d23-8c99
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Unauthorized request due to failed access control
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - access
-                  - error_string
-                properties:
-                  access:
-                    $ref: '#/components/schemas/access_response'
-                  error_string:
-                    type: string
-                    description: Description of the access control or encryption failure
-                  error_code:
-                    type: string
-                    description: Code of the access control or encryption failure
-              examples:
-                unauthorized:
-                  summary: Access denied
-                  value:
-                    access:
-                      user_id: user123
-                      role: EmailReader
-                      access_control: denied
-                    error_string: User does not have permission to encrypt this column
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─────────────────────────────── Decryption ────────────────────────────────
 
   /decrypt:
     post:
-      summary: Decrypts a previously encrypted value using the provided metadata
+      summary: Decrypt a Parquet column page
       operationId: decryptBatch
+      description: >
+        Decrypts a single Parquet column page. The request carries the
+        ciphertext, the original column metadata, encoding attributes, and
+        the encryption_metadata that was returned by the corresponding
+        /encrypt call. The response returns the recovered plaintext along
+        with echoed format information.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - column_reference
-                - data_batch_encrypted
-                - data_batch
-                - encryption
-                - access
-              properties:
-                column_reference:
-                  $ref: '#/components/schemas/column_reference'
-                data_batch_encrypted:
-                  $ref: '#/components/schemas/data_batch_encrypted_with_value'
-                data_batch:
-                  $ref: '#/components/schemas/data_batch_no_value'
-                encryption:
-                  $ref: '#/components/schemas/encryption'
-                access:
-                  $ref: '#/components/schemas/access_request'
-                application_context:
-                  $ref: '#/components/schemas/application_context'
-                debug:
-                  $ref: '#/components/schemas/debug_info'
+              $ref: '#/components/schemas/DecryptRequest'
             examples:
-              standard:
-                summary: Decrypt the encrypted Base64 blob back to a base64-encoded byte array of emails
+
+              int32_data_page_v1_uncompressed:
+                summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
+                description: >
+                  Decrypt the ciphertext produced by encrypting five INT32
+                  values in an uncompressed DATA_PAGE_V1. The
+                  encryption_metadata is passed back verbatim from the
+                  encrypt response.
                 value:
                   column_reference:
-                    name: email
-                  data_batch_encrypted:
-                    value_format:
-                      compression: ZSTD
-                    value: td06zE24lJum4m9TGtCflp/vvuRKLI87kpe+0w2WkMW0wDK0
-                  data_batch:
-                    datatype_info:
-                      datatype: BYTE_ARRAY
-                    value_format:
-                      compression: UNCOMPRESSED
-                      format: PLAIN
-                  encryption:
-                    key_id: EMAIL_KEY_001
-                  access:
-                    user_id: user123
-                  application_context:
-                    column_schema:
-                      database: customerdb
-                      schema: public
-                      schema_version: v1
-                      table: users
-                    location:
-                      country: US
-                      region: CA
-                      lat: 37.7749
-                      lon: -122.4194
-                  debug:
-                    reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
-              ints_csv_utf8:
-                summary: Decrypt UNDEFINED of INT32 IDs (BASE64 encoded)
-                description: |
-                  Takes an encrypted Base64 blob and decrypts it back into the BASE64 encoded UNDEFINED.
-                  Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
-                value:
-                  column_reference:
-                    name: CustomerID
-                  data_batch_encrypted:
-                    value_format:
-                      compression: ZSTD
-                    value: QmFzZTY0RW5jcnlwdGVkQm9keUhlcmU=
+                    name: invoice_amount
                   data_batch:
                     datatype_info:
                       datatype: INT32
                     value_format:
                       compression: UNCOMPRESSED
-                      format: UNDEFINED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V1
+                        data_page_num_values: "5"
+                        data_page_max_definition_level: "2"
+                        data_page_max_repetition_level: "1"
+                        page_v1_definition_level_encoding: RLE
+                        page_v1_repetition_level_encoding: RLE
+                  data_batch_encrypted:
+                    value: EgAAABf////9//v+/f/9/vz8+PHpxAEFAAAABAAAAAj4/P8hKP///mKI/yXu//8Q/fD/
+                    value_format:
+                      compression: UNCOMPRESSED
                   encryption:
-                    key_id: NumericID001
+                    key_id: FIN_KEY_2024_Q3
+                  encryption_metadata:
+                    dbps_agent_version: v0.01
+                    encrypt_mode_data_page: per_value
                   access:
-                    user_id: GRM_009
-                  application_context:
-                    column_schema:
-                      database: public
-                      schema: Federation
-                      table: Customers
+                    user_id: svc_etl_finance
+                  application_context: '{"user_id":"svc_etl_finance","database":"ledger_prod","schema":"accounting","table":"invoices"}'
                   debug:
-                    reference_id: 123e4567-e89b-12d3-a456-426614174000
+                    reference_id: txn-88a1c4e7-3f02
+
+              int32_data_page_v2_snappy:
+                summary: "INT32 · DATA_PAGE_V2 · SNAPPY · PLAIN"
+                description: >
+                  Decrypt ciphertext from a SNAPPY-compressed DATA_PAGE_V2
+                  containing INT32 invoice amounts.
+                value:
+                  column_reference:
+                    name: invoice_amount
+                  data_batch:
+                    datatype_info:
+                      datatype: INT32
+                    value_format:
+                      compression: SNAPPY
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V2
+                        data_page_num_values: "5"
+                        data_page_max_definition_level: "2"
+                        data_page_max_repetition_level: "1"
+                        page_v2_definition_levels_byte_length: "8"
+                        page_v2_repetition_levels_byte_length: "8"
+                        page_v2_num_nulls: "2"
+                        page_v2_is_compressed: "false"
+                  data_batch_encrypted:
+                    value: EAAAAB3//f77//3++/39//z++vEBAwAAAAQAAAAI+Pz/ISj///5iiP8=
+                    value_format:
+                      compression: SNAPPY
+                  encryption:
+                    key_id: FIN_KEY_2024_Q3
+                  encryption_metadata:
+                    dbps_agent_version: v0.01
+                    encrypt_mode_data_page: per_value
+                  access:
+                    user_id: svc_etl_finance
+                  application_context: '{"user_id":"svc_etl_finance","database":"ledger_prod","schema":"accounting","table":"invoices"}'
+                  debug:
+                    reference_id: txn-91b2d5f8-4a13
+
+              byte_array_data_page_v1_uncompressed:
+                summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED · PLAIN"
+                description: >
+                  Decrypt ciphertext from two BYTE_ARRAY email addresses
+                  in an uncompressed DATA_PAGE_V1.
+                value:
+                  column_reference:
+                    name: contact_email
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value_format:
+                      compression: UNCOMPRESSED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V1
+                        data_page_num_values: "2"
+                        data_page_max_definition_level: "3"
+                        data_page_max_repetition_level: "0"
+                        page_v1_definition_level_encoding: RLE
+                        page_v1_repetition_level_encoding: RLE
+                  data_batch_encrypted:
+                    value: BgAAAPX+//75+QACAAAADQAAAJ2akJu9m5aGsoAyyRATAAAAlpKWnZjUgoS5yR3YGJyslxyAvg==
+                    value_format:
+                      compression: UNCOMPRESSED
+                  encryption:
+                    key_id: PII_EMAIL_KEY_NA
+                  encryption_metadata:
+                    dbps_agent_version: v0.01
+                    encrypt_mode_data_page: per_value
+                  access:
+                    user_id: dp_analyst_047
+                  application_context: '{"user_id":"dp_analyst_047","database":"crm_west","schema":"contacts","table":"email_addresses"}'
+                  debug:
+                    reference_id: crm-e4f70c12-7b88
+
+              byte_array_dictionary_page_uncompressed:
+                summary: "BYTE_ARRAY · DICTIONARY_PAGE · UNCOMPRESSED · PLAIN"
+                description: >
+                  Decrypt a dictionary page containing 3 distinct document
+                  type labels.
+                value:
+                  column_reference:
+                    name: document_type
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value_format:
+                      compression: UNCOMPRESSED
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DICTIONARY_PAGE
+                        dict_page_num_values: "3"
+                  data_batch_encrypted:
+                    value: AAAAAAADAAAAEAAAAD6Lno2Lmo2Th9yrlpeg7UoHAAAAJpCJkJacmg4AAAA/i42cl56Mmt6zi5eCvQ==
+                    value_format:
+                      compression: UNCOMPRESSED
+                  encryption:
+                    key_id: DOC_CLASS_KEY_V2
+                  encryption_metadata:
+                    dbps_agent_version: v0.01
+                    encrypt_mode_dict_page: per_value
+                  access:
+                    user_id: svc_doc_indexer
+                  application_context: '{"user_id":"svc_doc_indexer","database":"docstore","schema":"metadata","table":"classifications"}'
+                  debug:
+                    reference_id: doc-3c9a17d4-55e1
+
+              byte_array_data_page_v2_snappy:
+                summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY · PLAIN"
+                description: >
+                  Decrypt ciphertext from a SNAPPY-compressed DATA_PAGE_V2
+                  with two email addresses and one null.
+                value:
+                  column_reference:
+                    name: contact_email
+                  data_batch:
+                    datatype_info:
+                      datatype: BYTE_ARRAY
+                    value_format:
+                      compression: SNAPPY
+                      encoding: PLAIN
+                      encoding_attributes:
+                        page_encoding: PLAIN
+                        page_type: DATA_PAGE_V2
+                        data_page_num_values: "3"
+                        data_page_max_definition_level: "3"
+                        data_page_max_repetition_level: "0"
+                        page_v2_definition_levels_byte_length: "4"
+                        page_v2_repetition_levels_byte_length: "0"
+                        page_v2_num_nulls: "1"
+                        page_v2_is_compressed: "false"
+                  data_batch_encrypted:
+                    value: BAAAAPP9/f4AAgAAAA0AAACdmpCbvZuWhrKAMskQEwAAAJaSlp2Y1IKEuckd2BicrJccgL4=
+                    value_format:
+                      compression: SNAPPY
+                  encryption:
+                    key_id: PII_EMAIL_KEY_NA
+                  encryption_metadata:
+                    dbps_agent_version: v0.01
+                    encrypt_mode_data_page: per_value
+                  access:
+                    user_id: dp_analyst_047
+                  application_context: '{"user_id":"dp_analyst_047","database":"crm_west","schema":"contacts","table":"email_addresses"}'
+                  debug:
+                    reference_id: crm-f5a81d23-8c99
+
       responses:
         '200':
           description: Successful decryption
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - data_batch
-                  - access
-                properties:
-                  data_batch:
-                    $ref: '#/components/schemas/data_batch_with_value'
-                  access:
-                    $ref: '#/components/schemas/access_response'
-                  debug:
-                    $ref: '#/components/schemas/debug_info'
+                $ref: '#/components/schemas/DecryptResponse'
               examples:
-                success:
-                  summary: Decrypted back to base64 raw bytes (two lines of emails)
-                  value:
-                    data_batch:
-                      datatype_info:
-                        datatype: BYTE_ARRAY
-                      value_format:
-                        compression: UNCOMPRESSED
-                        format: PLAIN
-                      value: dXNlcjFAZXhhbXBsZS5jb20KdXNlcjJAZXhhbXBsZS5jb20K
-                    access:
-                      user_id: user123
-                      role: EmailReader
-                      access_control: granted
-                    debug:
-                      pretty_printed_value: "user1@example.com\nuser2@example.com"
-                      reference_id: de305d54-75b4-431b-adb2-eb6b9e546014
-                ints_csv_utf8_success:
-                  summary: Decrypted INT32 UNDEFINED IDs
-                  description: |
-                    Decrypted back into the BASE64 encoded UNDEFINED string.
-                    Original value: "3344,5566,7788" -> BASE64: "MzM0NCw1NTY2LDc3ODg="
+
+                int32_data_page_v1_uncompressed:
+                  summary: "INT32 · DATA_PAGE_V1 · UNCOMPRESSED — recovered plaintext"
                   value:
                     data_batch:
                       datatype_info:
                         datatype: INT32
+                      value: CAAAAAIABAECAAIBAgAAAAoCFwcDAD7XAADhnXcAOhEAAA8CDwA=
                       value_format:
                         compression: UNCOMPRESSED
-                        format: UNDEFINED
-                      value: "MzM0NCw1NTY2LDc3ODg="
+                        encoding: PLAIN
                     access:
-                      user_id: GRM_009
-                      role: IDReader
+                      user_id: svc_etl_finance
+                      role: FinanceWriter
                       access_control: granted
                     debug:
-                      reference_id: 123e4567-e89b-12d3-a456-426614174000
-        '401':
-          description: Unauthorized request due to failed access control
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - access
-                  - error_string
-                properties:
-                  access:
-                    $ref: '#/components/schemas/access_response'
-                  error_string:
-                    type: string
-                    description: Description of the access control or decryption failure
-                  error_code:
-                    type: string
-                    description: Code of the access control or decryption failure
-              examples:
-                unauthorized:
-                  summary: Access denied
+                      reference_id: txn-88a1c4e7-3f02
+
+                int32_data_page_v2_snappy:
+                  summary: "INT32 · DATA_PAGE_V2 · SNAPPY — recovered plaintext"
                   value:
+                    data_batch:
+                      datatype_info:
+                        datatype: INT32
+                      value: AgACAQQAAgEEAgIAAgICABcHAwA+1wAA4Z13AA==
+                      value_format:
+                        compression: SNAPPY
+                        encoding: PLAIN
                     access:
-                      user_id: user123
-                      role: EmailReader
-                      access_control: denied
-                    error_string: User does not have permission to decrypt this column
+                      user_id: svc_etl_finance
+                      role: FinanceWriter
+                      access_control: granted
+                    debug:
+                      reference_id: txn-91b2d5f8-4a13
+
+                byte_array_data_page_v1_uncompressed:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V1 · UNCOMPRESSED — recovered plaintext"
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: BYTE_ARRAY
+                      value: AgAAAAQDDQAAAGpkb2VAYWNtZS5vcmcTAAAAYWxpY2Uud29uZ0Bjb3JwLm5ldA==
+                      value_format:
+                        compression: UNCOMPRESSED
+                        encoding: PLAIN
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-e4f70c12-7b88
+
+                byte_array_dictionary_page_uncompressed:
+                  summary: "BYTE_ARRAY · DICTIONARY_PAGE · UNCOMPRESSED — recovered plaintext"
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: BYTE_ARRAY
+                      value: EAAAAFF1YXJ0ZXJseSBSZXBvcnQHAAAASW52b2ljZQ4AAABQdXJjaGFzZSBPcmRlcg==
+                      value_format:
+                        compression: UNCOMPRESSED
+                        encoding: PLAIN
+                    access:
+                      user_id: svc_doc_indexer
+                      role: DocClassifier
+                      access_control: granted
+                    debug:
+                      reference_id: doc-3c9a17d4-55e1
+
+                byte_array_data_page_v2_snappy:
+                  summary: "BYTE_ARRAY · DATA_PAGE_V2 · SNAPPY — recovered plaintext"
+                  value:
+                    data_batch:
+                      datatype_info:
+                        datatype: BYTE_ARRAY
+                      value: BAMCAA0AAABqZG9lQGFjbWUub3JnEwAAAGFsaWNlLndvbmdAY29ycC5uZXQ=
+                      value_format:
+                        compression: SNAPPY
+                        encoding: PLAIN
+                    access:
+                      user_id: dp_analyst_047
+                      role: PIIReader
+                      access_control: granted
+                    debug:
+                      reference_id: crm-f5a81d23-8c99
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ═══════════════════════════════ Components ═══════════════════════════════════
 
 components:
+
+  # ─────────────────────────── Security Schemes ──────────────────────────────
+
   securitySchemes:
     bearer_auth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: >
+        JWT token obtained from POST /token.
+        Passed as: Authorization: Bearer <token>
+
+  # ─────────────────────── Reusable Response Objects ─────────────────────────
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - error
+            properties:
+              error:
+                type: string
+                description: Human-readable error detail
+          examples:
+            missing_fields:
+              summary: Missing required fields
+              value:
+                error: "Missing required fields: column_reference.name, encryption.key_id"
+            encryption_failure:
+              summary: Processing failure
+              value:
+                error: "Encryption failed: validation - key_id cannot be null or empty"
+
+    Unauthorized:
+      description: Authentication failure
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - error
+            properties:
+              error:
+                type: string
+          examples:
+            missing_token:
+              summary: Missing JWT
+              value:
+                error: "Missing Authorization header"
+            expired_token:
+              summary: Expired JWT
+              value:
+                error: "Token has expired"
+
+  # ──────────────────────────────── Schemas ──────────────────────────────────
 
   schemas:
-    application_context:
-      type: object
-      description: Metadata about the application context of the request
-      properties:
-        column_schema:
-          type: object
-          description: Reference to a database column schema
-          properties:
-            database:
-              type: string
-              description: Database name containing the DB schemas and tables.
-            schema:
-              type: string
-              description: >
-                Namespace inside the database which contains the tables.
-                In databases without explicit schema definition, this is usually "public".
-            schema_version:
-              type: string
-              description: Optional version identifier for the schema.
-            table:
-              type: string
-              description: Table name of the source column
-        location:
-          type: object
-          description: Optional geographic information associated with the request
-          properties:
-            country:
-              type: string
-              example: US
-            region:
-              type: string
-              example: CA
-            lat:
-              type: number
-              format: float
-              example: 37.7749
-            lon:
-              type: number
-              format: float
-              example: -122.4194
 
-    column_reference:
-      type: object
-      description: Column name reference only
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          description: Column name in the source table
+    # ·················· Enum types ··················
 
-    encryption:
-      type: object
-      description: Encryption parameters
-      required:
-        - key_id
-      properties:
-        key_id:
-          type: string
-          description: >
-            Identifier of the key to use. Required for all encryption algorithms.
-
-    compression:
+    Datatype:
       type: string
+      description: >
+        Physical data type of the column values.
+        Intentionally mirrors parquet::Type from the Apache Arrow / Parquet specification.
+      enum:
+        - BOOLEAN
+        - INT32
+        - INT64
+        - INT96
+        - FLOAT
+        - DOUBLE
+        - BYTE_ARRAY
+        - FIXED_LEN_BYTE_ARRAY
+
+    CompressionCodec:
+      type: string
+      description: >
+        Compression codec applied to the data.
+        Intentionally mirrors arrow::Compression::type.
       enum:
         - UNCOMPRESSED
         - SNAPPY
@@ -443,10 +803,12 @@ components:
         - LZO
         - BZ2
         - LZ4_HADOOP
-      description: Compression format
 
-    serialization_format:
+    Encoding:
       type: string
+      description: >
+        Encoding scheme applied to the column page values.
+        Intentionally mirrors parquet::Encoding from the Apache Parquet specification.
       enum:
         - PLAIN
         - PLAIN_DICTIONARY
@@ -459,155 +821,339 @@ components:
         - BYTE_STREAM_SPLIT
         - UNDEFINED
         - UNKNOWN
-      description: Format used for serializing the data
 
-    value_format:
+    # ·················· Shared building blocks ··················
+
+    ColumnReference:
       type: object
-      description: Details on how the data was serialized for plaintext values.
       required:
-        - compression
-        - format
+        - name
       properties:
-        compression:
-          $ref: '#/components/schemas/compression'
-        format:
-          $ref: '#/components/schemas/serialization_format'
+        name:
+          type: string
+          description: Column name as it appears in the Parquet schema
 
-    value_format_encrypted:
+    DatatypeInfo:
+      type: object
+      required:
+        - datatype
+      properties:
+        datatype:
+          $ref: '#/components/schemas/Datatype'
+        length:
+          type: integer
+          minimum: 1
+          description: >
+            Byte width. Required when datatype is FIXED_LEN_BYTE_ARRAY,
+            omitted otherwise.
+
+    EncodingAttributes:
       type: object
       description: >
-        Details on how the data was serialized for encrypted values. Format is assumed to be binary and encoded as base64.
+        Parquet page metadata needed to interpret the encoded payload.
+        All values are strings.  Integer and boolean values must be
+        parseable from their string representation (e.g. "42", "true").
+        Required keys depend on page_type — see the table below.
+
+        Always required:
+          page_encoding  — Encoding enum value for the page values.
+          page_type      — DATA_PAGE_V1 | DATA_PAGE_V2 | DICTIONARY_PAGE.
+
+        DATA_PAGE_V1 and DATA_PAGE_V2 additionally require:
+          data_page_num_values, data_page_max_definition_level,
+          data_page_max_repetition_level.
+
+        DATA_PAGE_V1 additionally requires:
+          page_v1_definition_level_encoding,
+          page_v1_repetition_level_encoding.
+
+        DATA_PAGE_V2 additionally requires:
+          page_v2_definition_levels_byte_length,
+          page_v2_repetition_levels_byte_length,
+          page_v2_num_nulls, page_v2_is_compressed.
+
+        DICTIONARY_PAGE additionally requires:
+          dict_page_num_values.
+      additionalProperties:
+        type: string
+
+    ValueFormat:
+      type: object
+      description: Compression, encoding, and encoding attributes for the plaintext page.
+      required:
+        - compression
+        - encoding
+      properties:
+        compression:
+          $ref: '#/components/schemas/CompressionCodec'
+        encoding:
+          $ref: '#/components/schemas/Encoding'
+        encoding_attributes:
+          $ref: '#/components/schemas/EncodingAttributes'
+
+    ValueFormatEncrypted:
+      type: object
+      description: Compression applied to the encrypted payload.
       required:
         - compression
       properties:
         compression:
-          $ref: '#/components/schemas/compression'
+          $ref: '#/components/schemas/CompressionCodec'
 
-    access_request:
+    EncryptionRef:
       type: object
-      description: Access control metadata related to the encryption or decryption request
+      description: Key reference for encryption / decryption.
+      required:
+        - key_id
+      properties:
+        key_id:
+          type: string
+          description: >
+            Logical identifier for the encryption key.
+            The server resolves this to actual key material.
+
+    EncryptionMetadata:
+      type: object
+      description: >
+        Metadata produced by the server during encryption.
+        Must be persisted and sent back verbatim on the corresponding
+        /decrypt call.
+
+        Known keys:
+          dbps_agent_version         — version of the DBPS encryption logic (e.g. "v0.01").
+          encrypt_mode_data_page     — "per_value" or "per_block" (present when a data page was encrypted).
+          encrypt_mode_dict_page     — "per_value" or "per_block" (present when a dictionary page was encrypted).
+      additionalProperties:
+        type: string
+
+    AccessRequest:
+      type: object
       required:
         - user_id
       properties:
         user_id:
           type: string
           description: >
-            User identifier associated with the request. The request is sent "on behalf of" the user.
-            The user id refers to an internal ID on the encryption service for which ACLs are checked.
+            User identifier on whose behalf the request is made.
+            Forwarded to the server for access control and audit.
 
-    access_response:
+    AccessResponse:
       type: object
-      description: Access control metadata related to the encryption or decryption response.
       required:
         - user_id
+        - role
+        - access_control
       properties:
         user_id:
           type: string
-          description: >
-            User identifier associated with the response. The user id refers to an internal ID on the
-            encryption service for which ACLs are checked.
+          description: Echoed from the request.
         role:
           type: string
-          example: EmailReader
-          description: Role that was applied during access evaluation
+          description: Role applied during access evaluation.
         access_control:
           type: string
           enum:
             - granted
             - denied
-          example: granted
-          description: Result of the access control check
+          description: Result of the access control check.
 
-    debug_info:
+    DebugInfo:
       type: object
-      description: Optional debug settings for development or troubleshooting
+      required:
+        - reference_id
       properties:
-        pretty_printed_value:
-          type: string
-          description: Optional human-readable version of the value
         reference_id:
           type: string
           description: >
-            Optional identifier to correlate API call with requests and responses.
-            An app calling the API may already have a reference_id from the calling stack
-            and it can be used here, for example the session_id from a caller JWT.
+            Caller-provided identifier for request/response correlation
+            and log tracing. Echoed back by the server.
 
-    datatype_info:
+    # ·················· Token ··················
+
+    TokenResponse:
       type: object
-      description: Data type information for the values being encrypted or decrypted
       required:
-        - datatype
+        - token
+        - token_type
+        - expires_at
       properties:
-        datatype:
+        token:
           type: string
-          description: Generic data type for the values being encrypted or decrypted
-          enum:
-            - BOOLEAN
-            - INT32
-            - INT64
-            - INT96
-            - FLOAT
-            - DOUBLE
-            - BYTE_ARRAY
-            - FIXED_LEN_BYTE_ARRAY
-            - UNDEFINED
-        length:
+          description: Signed JWT token.
+        token_type:
+          type: string
+          description: Token type, always "Bearer".
+          example: Bearer
+        expires_at:
           type: integer
-          description: Optional length specification for fixed-length data types (e.g., FIXED_LEN_BYTE_ARRAY)
-          minimum: 0
+          format: int64
+          description: Unix epoch seconds when the token expires.
 
-    data_batch_base:
+    # ·················· Encrypt ··················
+
+    EncryptRequest:
       type: object
-      description: Base shape for plain (unencrypted) data batch metadata.
       required:
-        - datatype_info
-        - value_format
+        - column_reference
+        - data_batch
+        - data_batch_encrypted
+        - encryption
+        - access
+        - application_context
+        - debug
       properties:
-        datatype_info:
-          $ref: '#/components/schemas/datatype_info'
-        value_format:
-          $ref: '#/components/schemas/value_format'
+        column_reference:
+          $ref: '#/components/schemas/ColumnReference'
+        data_batch:
+          type: object
+          description: >
+            Plaintext payload and its format metadata.
+          required:
+            - datatype_info
+            - value
+            - value_format
+          properties:
+            datatype_info:
+              $ref: '#/components/schemas/DatatypeInfo'
+            value:
+              type: string
+              description: Base64-encoded plaintext page data.
+            value_format:
+              $ref: '#/components/schemas/ValueFormat'
+        data_batch_encrypted:
+          type: object
+          description: Desired format for the encrypted output.
+          required:
+            - value_format
+          properties:
+            value_format:
+              $ref: '#/components/schemas/ValueFormatEncrypted'
+        encryption:
+          $ref: '#/components/schemas/EncryptionRef'
+        access:
+          $ref: '#/components/schemas/AccessRequest'
+        application_context:
+          type: string
+          description: >
+            Opaque JSON string provided by the calling application.
+            Passed through to the server for policy evaluation, logging,
+            and user_id extraction.
+        debug:
+          $ref: '#/components/schemas/DebugInfo'
 
-    data_batch_no_value:
-      description: '`value` is not present since it is used for requests.'
-      allOf:
-        - $ref: '#/components/schemas/data_batch_base'
-
-    data_batch_with_value:
-      description: >
-        '`value` is present; used in /encrypt requests (plaintext input) and in
-        /decrypt responses (decrypted output).'
-      allOf:
-        - $ref: '#/components/schemas/data_batch_base'
-        - type: object
+    EncryptResponse:
+      type: object
+      required:
+        - data_batch_encrypted
+        - encryption_metadata
+        - access
+        - debug
+      properties:
+        data_batch_encrypted:
+          type: object
           required:
             - value
+            - value_format
           properties:
             value:
               type: string
-              description: The data to encrypt or the result of decryption
+              description: Base64-encoded ciphertext.
+            value_format:
+              $ref: '#/components/schemas/ValueFormatEncrypted'
+        encryption_metadata:
+          $ref: '#/components/schemas/EncryptionMetadata'
+        access:
+          $ref: '#/components/schemas/AccessResponse'
+        debug:
+          $ref: '#/components/schemas/DebugInfo'
 
-    data_batch_encrypted_base:
+    # ·················· Decrypt ··················
+
+    DecryptRequest:
       type: object
       required:
-        - value_format
+        - column_reference
+        - data_batch
+        - data_batch_encrypted
+        - encryption
+        - encryption_metadata
+        - access
+        - application_context
+        - debug
       properties:
-        value_format:
-          $ref: '#/components/schemas/value_format_encrypted'
-
-    data_batch_encrypted_no_value:
-      description: '`value` is not present since it is used for requests.'
-      allOf:
-        - $ref: '#/components/schemas/data_batch_encrypted_base'
-
-    data_batch_encrypted_with_value:
-      description: '`value` is present since it is used for responses.'
-      allOf:
-        - $ref: '#/components/schemas/data_batch_encrypted_base'
-        - type: object
+        column_reference:
+          $ref: '#/components/schemas/ColumnReference'
+        data_batch:
+          type: object
+          description: >
+            Original plaintext format metadata (no value field — the
+            payload is the ciphertext in data_batch_encrypted).
+          required:
+            - datatype_info
+            - value_format
+          properties:
+            datatype_info:
+              $ref: '#/components/schemas/DatatypeInfo'
+            value_format:
+              $ref: '#/components/schemas/ValueFormat'
+        data_batch_encrypted:
+          type: object
+          description: Ciphertext payload and its format.
           required:
             - value
+            - value_format
           properties:
             value:
               type: string
-              description: The encrypted value
+              description: Base64-encoded ciphertext.
+            value_format:
+              $ref: '#/components/schemas/ValueFormatEncrypted'
+        encryption:
+          $ref: '#/components/schemas/EncryptionRef'
+        encryption_metadata:
+          $ref: '#/components/schemas/EncryptionMetadata'
+        access:
+          $ref: '#/components/schemas/AccessRequest'
+        application_context:
+          type: string
+          description: >
+            Opaque JSON string provided by the calling application.
+            Passed through to the server for policy evaluation, logging,
+            and user_id extraction.
+        debug:
+          $ref: '#/components/schemas/DebugInfo'
+
+    DecryptResponse:
+      type: object
+      required:
+        - data_batch
+        - access
+        - debug
+      properties:
+        data_batch:
+          type: object
+          description: Recovered plaintext and echoed format metadata.
+          required:
+            - datatype_info
+            - value
+            - value_format
+          properties:
+            datatype_info:
+              $ref: '#/components/schemas/DatatypeInfo'
+            value:
+              type: string
+              description: Base64-encoded recovered plaintext.
+            value_format:
+              type: object
+              required:
+                - compression
+                - encoding
+              properties:
+                compression:
+                  $ref: '#/components/schemas/CompressionCodec'
+                encoding:
+                  $ref: '#/components/schemas/Encoding'
+        access:
+          $ref: '#/components/schemas/AccessResponse'
+        debug:
+          $ref: '#/components/schemas/DebugInfo'
